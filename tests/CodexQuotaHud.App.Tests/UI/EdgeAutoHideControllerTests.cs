@@ -26,25 +26,86 @@ public sealed class EdgeAutoHideControllerTests
     }
 
     [Theory]
-    [InlineData(EdgeDockSide.Left, -2040, -1920)]
-    [InlineData(EdgeDockSide.Right, -12, -132)]
+    [InlineData(EdgeDockSide.Left, -2040, -1920, 300, 300)]
+    [InlineData(EdgeDockSide.Right, -12, -132, 300, 300)]
+    [InlineData(EdgeDockSide.Top, -900, -900, -80, 40)]
+    [InlineData(EdgeDockSide.Bottom, -900, -900, 1068, 948)]
     public void Positions_LeaveTwelvePixelHandleAndExpandInsideWorkArea(
         EdgeDockSide side,
-        double collapsed,
-        double expanded)
+        double collapsedLeft,
+        double expandedLeft,
+        double collapsedTop,
+        double expandedTop)
     {
+        var collapsed = EdgeAutoHideGeometry.CollapsedPosition(
+            side, -900, 300, 132, 132, SecondaryMonitor);
+        var expanded = EdgeAutoHideGeometry.ExpandedPosition(
+            side, -900, 300, 132, 132, SecondaryMonitor);
+
+        Assert.Equal(collapsedLeft, collapsed.Left);
+        Assert.Equal(collapsedTop, collapsed.Top);
+        Assert.Equal(expandedLeft, expanded.Left);
+        Assert.Equal(expandedTop, expanded.Top);
+    }
+
+    [Theory]
+    [InlineData(100, 400, EdgeDockSide.Top)]
+    [InlineData(1700, 400, EdgeDockSide.Right)]
+    [InlineData(985, 0, EdgeDockSide.Top)]
+    [InlineData(985, 900, EdgeDockSide.Bottom)]
+    [InlineData(-1900, 400, EdgeDockSide.Left)]
+    [InlineData(-1000, 900, EdgeDockSide.Bottom)]
+    public void NearestDockSide_UsesAllFourOuterEdgesAcrossBothMonitors(
+        double left,
+        double top,
+        EdgeDockSide expected)
+    {
+        var primary = new WorkArea(0, 0, 1920, 1040);
+        var screens = new[] { SecondaryMonitor, primary };
+        var current = left < 0 ? SecondaryMonitor : primary;
+
         Assert.Equal(
-            collapsed,
-            EdgeAutoHideGeometry.CollapsedLeft(
-                side,
+            expected,
+            EdgeAutoHideGeometry.NearestDockSide(
+                left,
+                top,
                 width: 132,
-                SecondaryMonitor));
+                height: 132,
+                current,
+                screens));
+    }
+
+    [Fact]
+    public void NearestDockSide_ExcludesInternalMonitorSeam()
+    {
+        var primary = new WorkArea(0, 40, 1920, 1040);
+        var screens = new[] { SecondaryMonitor, primary };
+
         Assert.Equal(
-            expanded,
-            EdgeAutoHideGeometry.ExpandedLeft(
-                side,
+            EdgeDockSide.Top,
+            EdgeAutoHideGeometry.NearestDockSide(
+                left: -140,
+                top: 300,
                 width: 132,
-                SecondaryMonitor));
+                height: 132,
+                SecondaryMonitor,
+                screens));
+    }
+
+    [Fact]
+    public void NearestWorkArea_UsesWindowCenterWithNegativeCoordinates()
+    {
+        var primary = new WorkArea(0, 0, 1920, 1040);
+        var screens = new[] { SecondaryMonitor, primary };
+
+        Assert.Equal(
+            SecondaryMonitor,
+            EdgeAutoHideGeometry.NearestWorkArea(
+                -1200, 300, 132, 132, screens));
+        Assert.Equal(
+            primary,
+            EdgeAutoHideGeometry.NearestWorkArea(
+                600, 300, 132, 132, screens));
     }
 
     [Fact]

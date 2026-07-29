@@ -146,6 +146,16 @@ public sealed class PackagingScriptTests
         var actionItems = actions.RootElement.EnumerateArray().ToArray();
         var stopped = SingleAction(actionItems, "StopProcess");
         Assert.Equal(101, stopped.GetProperty("ProcessId").GetInt32());
+        var waited = SingleAction(actionItems, "WaitForProcessExit");
+        Assert.Equal(101, waited.GetProperty("ProcessId").GetInt32());
+        Assert.Equal(
+            Path.Combine(target, "CodexQuotaHud.App.exe"),
+            waited.GetProperty("ExecutablePath").GetString());
+        Assert.True(
+            Array.FindIndex(actionItems, item =>
+                item.GetProperty("Action").GetString() == "StopProcess") <
+            Array.FindIndex(actionItems, item =>
+                item.GetProperty("Action").GetString() == "WaitForProcessExit"));
 
         var runValue = SingleAction(actionItems, "SetRunValue");
         Assert.Equal("CodexQuotaHud", runValue.GetProperty("Name").GetString());

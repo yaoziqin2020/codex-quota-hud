@@ -179,11 +179,40 @@ function Stop-InstalledInstance {
                 ProcessId = $processId
                 ExecutablePath = [string]$process.ExecutablePath
             }
+            Add-TestAction -Action 'WaitForProcessExit' -Properties @{
+                ProcessId = $processId
+                ExecutablePath = [string]$process.ExecutablePath
+                TimeoutSeconds = 10
+            }
             continue
         }
 
         Stop-Process -Id $processId -Force -ErrorAction Stop
-        Wait-Process -Id $processId -Timeout 10 -ErrorAction SilentlyContinue
+
+        $deadline = [DateTime]::UtcNow.AddSeconds(10)
+        do {
+            $stillRunning = @(
+                Get-CodexQuotaHudProcesses |
+                    Where-Object {
+                        [int]$_.ProcessId -eq $processId -and
+                        -not [string]::IsNullOrWhiteSpace(
+                            [string]$_.ExecutablePath) -and
+                        (Test-PathEquals `
+                            ([string]$_.ExecutablePath) `
+                            $ExecutablePath)
+                    }
+            ).Count -gt 0
+
+            if (-not $stillRunning) {
+                break
+            }
+
+            Start-Sleep -Milliseconds 100
+        } while ([DateTime]::UtcNow -lt $deadline)
+
+        if ($stillRunning) {
+            throw "Timed out waiting for installed process $processId to exit."
+        }
     }
 }
 

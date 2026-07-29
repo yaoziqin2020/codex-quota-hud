@@ -17,7 +17,6 @@ namespace CodexQuotaHud.App.UI;
 
 public partial class QuotaOrbWindow : Window
 {
-    private const uint MonitorDefaultToNearest = 2;
     private const double PopupShadowMargin = 14;
     private readonly QuotaOrbViewModel _viewModel;
     private readonly HoverCloseController _hoverCloseController;
@@ -233,7 +232,7 @@ public partial class QuotaOrbWindow : Window
         _edgeAutoHideController.Expand();
         _edgeAutoHideController.CancelPendingCollapse();
         DetailsPopup.IsOpen = false;
-        CommitAnimatedLeft();
+        CommitAnimatedPosition();
         _isDragging = true;
         try
         {
@@ -267,12 +266,20 @@ public partial class QuotaOrbWindow : Window
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)
     {
-        var workArea = GetNearestWorkArea();
-        var side = EdgeAutoHideGeometry.DetectDockSide(
-            Left,
-            ActualWidth > 0 ? ActualWidth : Width,
-            workArea);
+        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var workAreas = GetWorkAreas();
+        var workArea = EdgeAutoHideGeometry.NearestWorkArea(
+            Left, Top, width, height, workAreas);
+        var side = EdgeAutoHideGeometry.NearestDockSide(
+            Left, Top, width, height, workArea, workAreas);
+        var expanded = EdgeAutoHideGeometry.ExpandedPosition(
+            side, Left, Top, width, height, workArea);
+        Left = expanded.Left;
+        Top = expanded.Top;
         _edgeAutoHideController.SetDock(side);
+        ApplyEdgeVisualState(side, collapsed: false, animate: false);
+        _viewModel.SavePosition(Left, Top);
         await ScheduleEdgeCollapseAsync();
     }
 
@@ -298,17 +305,19 @@ public partial class QuotaOrbWindow : Window
 
     private void UpdateDockAfterDrag()
     {
-        var workArea = GetNearestWorkArea();
         var width = ActualWidth > 0 ? ActualWidth : Width;
-        var side = EdgeAutoHideGeometry.DetectDockSide(
-            Left,
-            width,
-            workArea);
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var workAreas = GetWorkAreas();
+        var workArea = EdgeAutoHideGeometry.NearestWorkArea(
+            Left, Top, width, height, workAreas);
+        var side = EdgeAutoHideGeometry.NearestDockSide(
+            Left, Top, width, height, workArea, workAreas);
+        var expanded = EdgeAutoHideGeometry.ExpandedPosition(
+            side, Left, Top, width, height, workArea);
         _edgeAutoHideController.SetDock(side);
-        if (side != EdgeDockSide.None)
-        {
-            Left = EdgeAutoHideGeometry.ExpandedLeft(side, width, workArea);
-        }
+        Left = expanded.Left;
+        Top = expanded.Top;
+        ApplyEdgeVisualState(side, collapsed: false, animate: false);
 
         _viewModel.SavePosition(Left, Top);
         _ = ScheduleEdgeCollapseAsync();
@@ -333,12 +342,18 @@ public partial class QuotaOrbWindow : Window
 
         var workArea = GetNearestWorkArea();
         var width = ActualWidth > 0 ? ActualWidth : Width;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
         var target = collapsed
-            ? EdgeAutoHideGeometry.CollapsedLeft(side, width, workArea)
-            : EdgeAutoHideGeometry.ExpandedLeft(side, width, workArea);
+            ? EdgeAutoHideGeometry.CollapsedPosition(
+                side, Left, Top, width, height, workArea)
+            : EdgeAutoHideGeometry.ExpandedPosition(
+                side, Left, Top, width, height, workArea);
+        ApplyEdgeVisualState(side, collapsed, animate: true);
         var animation = new DoubleAnimation
         {
-            To = target,
+            To = side is EdgeDockSide.Left or EdgeDockSide.Right
+                ? target.Left
+                : target.Top,
             Duration = TimeSpan.FromMilliseconds(collapsed ? 260 : 190),
             EasingFunction = new CubicEase
             {
@@ -347,23 +362,97 @@ public partial class QuotaOrbWindow : Window
             FillBehavior = FillBehavior.HoldEnd
         };
         Timeline.SetDesiredFrameRate(animation, 30);
+        var property = side is EdgeDockSide.Left or EdgeDockSide.Right
+            ? LeftProperty
+            : TopProperty;
+        if (property == LeftProperty)
+        {
+            Top = target.Top;
+        }
+        else
+        {
+            Left = target.Left;
+        }
+
         animation.Completed += (_, _) =>
         {
-            BeginAnimation(LeftProperty, animation: null);
-            Left = target;
+            BeginAnimation(property, animation: null);
+            Left = target.Left;
+            Top = target.Top;
             RefreshPopupPlacement();
         };
         BeginAnimation(
-            LeftProperty,
+            property,
             animation,
             HandoffBehavior.SnapshotAndReplace);
     }
 
-    private void CommitAnimatedLeft()
+    private void CommitAnimatedPosition()
     {
-        var current = Left;
+        var currentLeft = Left;
+        var currentTop = Top;
         BeginAnimation(LeftProperty, animation: null);
-        Left = current;
+        BeginAnimation(TopProperty, animation: null);
+        Left = currentLeft;
+        Top = currentTop;
+    }
+
+    internal void ApplyEdgeVisualState(
+        EdgeDockSide side,
+        bool collapsed,
+        bool animate)
+    {
+        var verticalPill = side is EdgeDockSide.Left or EdgeDockSide.Right;
+        EdgeHandle.Width = verticalPill ? 6 : 44;
+        EdgeHandle.Height = verticalPill ? 44 : 6;
+        EdgeHandle.HorizontalAlignment = side switch
+        {
+            EdgeDockSide.Left => System.Windows.HorizontalAlignment.Right,
+            EdgeDockSide.Right => System.Windows.HorizontalAlignment.Left,
+            _ => System.Windows.HorizontalAlignment.Center
+        };
+        EdgeHandle.VerticalAlignment = side switch
+        {
+            EdgeDockSide.Top => System.Windows.VerticalAlignment.Bottom,
+            EdgeDockSide.Bottom => System.Windows.VerticalAlignment.Top,
+            _ => System.Windows.VerticalAlignment.Center
+        };
+
+        SetOpacity(
+            SkinHost,
+            collapsed ? 0 : 1,
+            animate);
+        SetOpacity(
+            EdgeHandle,
+            collapsed ? 1 : 0,
+            animate);
+    }
+
+    private static void SetOpacity(
+        UIElement element,
+        double target,
+        bool animate)
+    {
+        element.BeginAnimation(UIElement.OpacityProperty, animation: null);
+        if (!animate)
+        {
+            element.Opacity = target;
+            return;
+        }
+
+        var animation = new DoubleAnimation
+        {
+            From = element.Opacity,
+            To = target,
+            Duration = TimeSpan.FromMilliseconds(180),
+            FillBehavior = FillBehavior.Stop
+        };
+        Timeline.SetDesiredFrameRate(animation, 30);
+        element.Opacity = target;
+        element.BeginAnimation(
+            UIElement.OpacityProperty,
+            animation,
+            HandoffBehavior.SnapshotAndReplace);
     }
 
     private CustomPopupPlacement[] PlaceDetailsPopup(
@@ -374,12 +463,14 @@ public partial class QuotaOrbWindow : Window
         var workArea = GetNearestWorkArea();
         var dock = _edgeAutoHideController.DockSide;
         var width = ActualWidth > 0 ? ActualWidth : Width;
-        var effectiveLeft = dock == EdgeDockSide.None
-            ? Left
-            : EdgeAutoHideGeometry.ExpandedLeft(dock, width, workArea);
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var expanded = dock == EdgeDockSide.None
+            ? new WindowPosition(Left, Top)
+            : EdgeAutoHideGeometry.ExpandedPosition(
+                dock, Left, Top, width, height, workArea);
         var placement = PopupPlacementCalculator.Calculate(
-            effectiveLeft,
-            Top,
+            expanded.Left,
+            expanded.Top,
             targetSize.Width,
             targetSize.Height,
             popupSize.Width,
@@ -394,7 +485,9 @@ public partial class QuotaOrbWindow : Window
         [
             new CustomPopupPlacement(
                 new Point(placement.OffsetX, placement.OffsetY),
-                PopupPrimaryAxis.Vertical)
+                dock is EdgeDockSide.Top or EdgeDockSide.Bottom
+                    ? PopupPrimaryAxis.Horizontal
+                    : PopupPrimaryAxis.Vertical)
         ];
     }
 
@@ -420,6 +513,8 @@ public partial class QuotaOrbWindow : Window
         PopupCard.Resources["PopupSecondaryTextBrush"] =
             theme.SecondaryText;
         PopupShadow.Color = theme.ShadowColor;
+        EdgeHandle.Background = theme.Accent;
+        EdgeHandleGlow.Color = theme.ShadowColor;
         HudDialPopupDecoration.Visibility =
             theme.Decoration == PopupDecorationKind.HudDial
                 ? Visibility.Visible : Visibility.Collapsed;
@@ -453,52 +548,49 @@ public partial class QuotaOrbWindow : Window
 
     private WorkArea GetNearestWorkArea()
     {
-        var handle = new WindowInteropHelper(this).EnsureHandle();
-        var monitor = MonitorFromWindow(handle, MonitorDefaultToNearest);
-        var information = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-        if (monitor == nint.Zero || !GetMonitorInfo(monitor, ref information))
-        {
-            var fallback = SystemParameters.WorkArea;
-            return new WorkArea(
-                fallback.Left, fallback.Top, fallback.Width, fallback.Height);
-        }
+        var workAreas = GetWorkAreas();
+        return EdgeAutoHideGeometry.NearestWorkArea(
+            Left,
+            Top,
+            ActualWidth > 0 ? ActualWidth : Width,
+            ActualHeight > 0 ? ActualHeight : Height,
+            workAreas);
+    }
 
+    private IReadOnlyList<WorkArea> GetWorkAreas()
+    {
+        _ = new WindowInteropHelper(this).EnsureHandle();
         var fromDevice =
             PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice ??
             Matrix.Identity;
-        var topLeft = fromDevice.Transform(
-            new Point(information.Work.Left, information.Work.Top));
-        var bottomRight = fromDevice.Transform(
-            new Point(information.Work.Right, information.Work.Bottom));
-        return new WorkArea(
-            topLeft.X,
-            topLeft.Y,
-            bottomRight.X - topLeft.X,
-            bottomRight.Y - topLeft.Y);
-    }
+        var areas = System.Windows.Forms.Screen.AllScreens
+            .Select(screen =>
+            {
+                var work = screen.WorkingArea;
+                var topLeft = fromDevice.Transform(
+                    new Point(work.Left, work.Top));
+                var bottomRight = fromDevice.Transform(
+                    new Point(work.Right, work.Bottom));
+                return new WorkArea(
+                    topLeft.X,
+                    topLeft.Y,
+                    bottomRight.X - topLeft.X,
+                    bottomRight.Y - topLeft.Y);
+            })
+            .ToArray();
+        if (areas.Length > 0)
+        {
+            return areas;
+        }
 
-    [DllImport("user32.dll")]
-    private static extern nint MonitorFromWindow(nint window, uint flags);
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo information);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MonitorInfo
-    {
-        public int Size;
-        public NativeRect Monitor;
-        public NativeRect Work;
-        public uint Flags;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct NativeRect
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
+        var fallback = SystemParameters.WorkArea;
+        return
+        [
+            new WorkArea(
+                fallback.Left,
+                fallback.Top,
+                fallback.Width,
+                fallback.Height)
+        ];
     }
 }

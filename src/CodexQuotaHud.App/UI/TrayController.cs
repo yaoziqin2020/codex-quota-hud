@@ -1,7 +1,5 @@
 using System.ComponentModel;
 using CodexQuotaHud.Core.Models;
-using DrawingIcon = System.Drawing.Icon;
-using DrawingSystemIcons = System.Drawing.SystemIcons;
 using Forms = System.Windows.Forms;
 
 namespace CodexQuotaHud.App.UI;
@@ -13,11 +11,10 @@ public sealed class TrayController : IDisposable
     private readonly Forms.ToolStripMenuItem _statusItem;
     private readonly Forms.ToolStripMenuItem _animationsItem;
     private readonly Dictionary<SkinId, Forms.ToolStripMenuItem> _skinItems = [];
+    private readonly TrayIconLifetime _iconLifetime;
     private bool _disposed;
 
-    public TrayController(
-        QuotaOrbViewModel viewModel,
-        DrawingIcon? icon = null)
+    public TrayController(QuotaOrbViewModel viewModel)
     {
         _viewModel =
             viewModel ?? throw new ArgumentNullException(nameof(viewModel));
@@ -57,15 +54,17 @@ public sealed class TrayController : IDisposable
 
         _notifyIcon = new Forms.NotifyIcon
         {
-            Icon = icon ?? DrawingSystemIcons.Application,
             ContextMenuStrip = menu,
-            Visible = true
+            Visible = false
         };
+        _iconLifetime = new TrayIconLifetime(
+            icon => _notifyIcon.Icon = icon);
         _notifyIcon.DoubleClick += (_, _) =>
             _viewModel.RefreshCommand.Execute(parameter: null);
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         Synchronize();
+        _notifyIcon.Visible = true;
     }
 
     public void Dispose()
@@ -78,6 +77,7 @@ public sealed class TrayController : IDisposable
         _disposed = true;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _notifyIcon.Visible = false;
+        _iconLifetime.Dispose();
         _notifyIcon.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -105,6 +105,9 @@ public sealed class TrayController : IDisposable
         if (e.PropertyName is
             nameof(QuotaOrbViewModel.SelectedSkin) or
             nameof(QuotaOrbViewModel.AnimationsEnabled) or
+            nameof(QuotaOrbViewModel.DisplayMode) or
+            nameof(QuotaOrbViewModel.PrimaryPercent) or
+            nameof(QuotaOrbViewModel.PrimaryLabel) or
             nameof(QuotaOrbViewModel.StatusText) or
             nameof(QuotaOrbViewModel.LastUpdated) or
             nameof(QuotaOrbViewModel.LastError))
@@ -122,9 +125,21 @@ public sealed class TrayController : IDisposable
 
         _animationsItem.Checked = _viewModel.AnimationsEnabled;
         _statusItem.Text = _viewModel.StatusText;
-        _notifyIcon.Text = TruncateTooltip(
-            $"Codex 剩余额度 - {_viewModel.StatusText}");
+        _iconLifetime.Replace(
+            TrayIconRenderer.Render(
+                TrayIconRenderer.CreateState(
+                    _viewModel.DisplayMode,
+                    _viewModel.PrimaryPercent,
+                    _viewModel.SelectedSkin)));
+        _notifyIcon.Text = TruncateTooltip(CreateTooltip());
     }
+
+    private string CreateTooltip() =>
+        _viewModel.DisplayMode == QuotaDisplayMode.Hidden
+            ? "Codex · 暂无额度数据"
+            : $"Codex · {_viewModel.PrimaryLabel} " +
+              $"{_viewModel.PrimaryPercent:0}% · " +
+              $"{_viewModel.LastUpdatedText}";
 
     private static string TruncateTooltip(string value) =>
         value.Length <= 63 ? value : value[..63];

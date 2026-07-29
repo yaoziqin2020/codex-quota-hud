@@ -56,6 +56,23 @@
         <Border Background="Transparent" Cursor="SizeAll"
                 MouseLeftButtonDown="OnDragSurfaceMouseLeftButtonDown" />
 
+        <Border x:Name="EdgeHandle"
+                Width="6" Height="44"
+                CornerRadius="3"
+                Opacity="0"
+                IsHitTestVisible="False"
+                Background="#53DCF8"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center">
+            <Border.Effect>
+                <DropShadowEffect x:Name="EdgeHandleGlow"
+                                  BlurRadius="12"
+                                  ShadowDepth="0"
+                                  Opacity="0.9"
+                                  Color="#24CFF2" />
+            </Border.Effect>
+        </Border>
+
         <Popup x:Name="DetailsPopup"
                PlacementTarget="{Binding ElementName=OrbRoot}"
                Placement="Custom"

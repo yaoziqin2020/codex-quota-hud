@@ -11,14 +11,16 @@
 
 | 项目 | 状态 | 证据 |
 |---|---|---|
-| Release 全量测试 | PASS | Core 55/55、App 132/132 |
+| Release 全量测试 | PASS | Core 55/55、App 153/153 |
 | Release 构建 | PASS | 0 warnings、0 errors |
-| win-x64 自包含单文件发布 | PASS | 非 PDB 载荷仅 `CodexQuotaHud.App.exe`，170,153,886 bytes |
-| 可复现发布 | PASS | 连续两次 SHA-256 均为 `FAEC8C22F65D1E0151CAF1D7685979EFCC7943B5C415802DE5D5B13AAE775DA7` |
+| win-x64 自包含单文件发布 | PASS | 非 PDB 载荷仅 `CodexQuotaHud.App.exe`，170,170,270 bytes |
+| 可复现发布 | PASS | 连续两次 SHA-256 均为 `C61786D477863BA4D0EF9597E2C48DEA7452953E4F3D3E4C0518B3AF5924818A` |
 | PE GUI subsystem | PASS | PE32+ magic `0x020B`，Subsystem `2` |
+| 正式应用图标 | PASS | `ApplicationIcon` 指向品牌 ICO；发布 EXE 可提取 2 个 icon 资源 |
 | 安装/卸载安全契约 | PASS | `PackagingScriptTests` 8/8 |
-| 边缘自动隐藏 | PASS | 几何/controller/Window 聚焦测试通过：左右边缘、多屏负坐标、12px handle、延迟取消与关闭清理 |
-| Popup 位置与五皮肤主题 | PASS | 左右反向、垂直居中、上下限位、负坐标及 5 个主题映射测试通过 |
+| 四边自动隐藏 | PASS | 多屏负坐标、内部 seam 排除、四边双轴动画、12px 命中条与短发光 pill 测试通过 |
+| Popup 位置与五皮肤主题 | PASS | 左右/上下四向避让、实际阴影 inset 后 10px 间距、工作区限位及 5 个主题映射测试通过 |
+| 托盘动态数值图标 | PASS | 84/100/无数据映射、16/20/32px 渲染、皮肤色及 HICON/替换清理测试通过 |
 
 ## 真实 Windows 桌面验证
 

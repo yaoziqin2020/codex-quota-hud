@@ -8,7 +8,18 @@ namespace CodexQuotaHud.App.UI;
 public readonly record struct PopupPlacement(
     double OffsetX,
     double OffsetY,
-    bool OpensToRight);
+    PopupOpenDirection Direction)
+{
+    public bool OpensToRight => Direction == PopupOpenDirection.Right;
+}
+
+public enum PopupOpenDirection
+{
+    Left,
+    Right,
+    Up,
+    Down
+}
 
 public static class PopupPlacementCalculator
 {
@@ -30,6 +41,33 @@ public static class PopupPlacementCalculator
         var workRight = workArea.Left + workArea.Width;
         var cardWidth = Math.Max(0, popupWidth - insetLeft - insetRight);
         var cardHeight = Math.Max(0, popupHeight - insetTop - insetBottom);
+        if (dockSide is EdgeDockSide.Top or EdgeDockSide.Bottom)
+        {
+            var centeredCardLeft =
+                orbLeft + ((orbWidth - cardWidth) / 2);
+            var cardLeft = Math.Clamp(
+                centeredCardLeft,
+                workArea.Left,
+                Math.Max(workArea.Left, workRight - cardWidth));
+            var verticalPopupLeft = cardLeft - insetLeft;
+            var verticalCardTop = dockSide == EdgeDockSide.Top
+                ? orbTop + orbHeight + gap
+                : orbTop - gap - cardHeight;
+            verticalCardTop = Math.Clamp(
+                verticalCardTop,
+                workArea.Top,
+                Math.Max(
+                    workArea.Top,
+                    workArea.Top + workArea.Height - cardHeight));
+            var verticalPopupTop = verticalCardTop - insetTop;
+            return new PopupPlacement(
+                verticalPopupLeft - orbLeft,
+                verticalPopupTop - orbTop,
+                dockSide == EdgeDockSide.Top
+                    ? PopupOpenDirection.Down
+                    : PopupOpenDirection.Up);
+        }
+
         var center = orbLeft + (orbWidth / 2);
         var preferRight = dockSide == EdgeDockSide.Left ||
             (dockSide != EdgeDockSide.Right &&
@@ -64,7 +102,9 @@ public static class PopupPlacementCalculator
         return new PopupPlacement(
             popupLeft - orbLeft,
             popupTop - orbTop,
-            opensRight);
+            opensRight
+                ? PopupOpenDirection.Right
+                : PopupOpenDirection.Left);
     }
 }
 

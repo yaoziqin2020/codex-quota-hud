@@ -97,6 +97,65 @@ public sealed class QuotaOrbWindowStartupTests
         });
     }
 
+    [Fact]
+    public void EdgeHandle_UsesShortGlowPillForEverySideAndRestoresSkin()
+    {
+        RunSta(() =>
+        {
+            using var viewModel = new QuotaOrbViewModel(
+                new InertRefreshController(),
+                new InMemorySettingsStore(),
+                new AppSettings(),
+                new InlineDispatcher(),
+                () => { });
+            var window = new QuotaOrbWindow(viewModel);
+            var skin = Assert.IsType<ContentControl>(
+                window.FindName("SkinHost"));
+            var handle = Assert.IsType<Border>(
+                window.FindName("EdgeHandle"));
+
+            foreach (var (side, horizontal, vertical, width, height) in
+                new[]
+                {
+                    (EdgeDockSide.Left, HorizontalAlignment.Right,
+                        VerticalAlignment.Center, 6d, 44d),
+                    (EdgeDockSide.Right, HorizontalAlignment.Left,
+                        VerticalAlignment.Center, 6d, 44d),
+                    (EdgeDockSide.Top, HorizontalAlignment.Center,
+                        VerticalAlignment.Bottom, 44d, 6d),
+                    (EdgeDockSide.Bottom, HorizontalAlignment.Center,
+                        VerticalAlignment.Top, 44d, 6d)
+                })
+            {
+                window.ApplyEdgeVisualState(side, collapsed: true, animate: false);
+                Assert.Equal(0, skin.Opacity);
+                Assert.Equal(1, handle.Opacity);
+                Assert.Equal(horizontal, handle.HorizontalAlignment);
+                Assert.Equal(vertical, handle.VerticalAlignment);
+                Assert.Equal(width, handle.Width);
+                Assert.Equal(height, handle.Height);
+            }
+
+            viewModel.SelectedSkin = SkinId.Aurora;
+            var theme = PopupThemeProvider.Get(SkinId.Aurora);
+            Assert.Equal(
+                theme.Accent.ToString(),
+                handle.Background.ToString());
+            Assert.Equal(
+                theme.ShadowColor,
+                Assert.IsType<DropShadowEffect>(handle.Effect).Color);
+
+            window.ApplyEdgeVisualState(
+                EdgeDockSide.Bottom,
+                collapsed: false,
+                animate: false);
+            Assert.Equal(1, skin.Opacity);
+            Assert.Equal(0, handle.Opacity);
+
+            window.CloseForExit();
+        });
+    }
+
     private static void RunSta(Action action)
     {
         Exception? failure = null;

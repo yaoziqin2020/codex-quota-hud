@@ -84,6 +84,44 @@ public sealed class PopupPresentationTests
         }
     }
 
+    [Theory]
+    [InlineData(EdgeDockSide.Top, PopupOpenDirection.Down, 128)]
+    [InlineData(EdgeDockSide.Bottom, PopupOpenDirection.Up, -204)]
+    public void Placement_TopAndBottomOpenInwardWithTenPixelInnerGap(
+        EdgeDockSide side,
+        PopupOpenDirection expectedDirection,
+        double expectedOffsetY)
+    {
+        var orbTop = side == EdgeDockSide.Top ? 0 : 900;
+        var result = PopupPlacementCalculator.Calculate(
+            orbLeft: 800,
+            orbTop,
+            orbWidth: 132,
+            orbHeight: 132,
+            popupWidth: 278,
+            popupHeight: 208,
+            new WorkArea(0, 0, 1920, 1032),
+            side,
+            insetLeft: 14,
+            insetTop: 14,
+            insetRight: 14,
+            insetBottom: 14);
+
+        Assert.Equal(expectedDirection, result.Direction);
+        Assert.Equal(-73, result.OffsetX);
+        Assert.Equal(expectedOffsetY, result.OffsetY);
+        var innerTop = orbTop + result.OffsetY + 14;
+        var innerBottom = orbTop + result.OffsetY + 208 - 14;
+        if (side == EdgeDockSide.Top)
+        {
+            Assert.Equal(orbTop + 132 + 10, innerTop);
+        }
+        else
+        {
+            Assert.Equal(orbTop - 10, innerBottom);
+        }
+    }
+
     [Fact]
     public void Themes_CoverEverySkinWithDistinctAccents()
     {
