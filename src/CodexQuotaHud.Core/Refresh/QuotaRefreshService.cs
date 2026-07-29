@@ -15,8 +15,7 @@ public sealed class QuotaRefreshService : IAsyncDisposable
     private readonly object _lifecycleSync = new();
     private readonly object _notificationSync = new();
     private readonly object _stateSync = new();
-    private readonly AsyncLocal<int> _notificationDepth = new();
-    private readonly AsyncLocal<NotificationOrigin?> _notificationOrigin = new();
+    private readonly AsyncLocal<NotificationScope?> _notificationScope = new();
     private readonly List<RefreshSession> _sessions = [];
     private Task _notificationTail = Task.CompletedTask;
     private RefreshSession? _activeSession;
@@ -26,6 +25,7 @@ public sealed class QuotaRefreshService : IAsyncDisposable
     private long _nextGeneration;
     private long _stateGeneration;
     private bool _disposeStarted;
+    private Task? _disposeCoreTask;
     private Task? _disposeTask;
 
     public QuotaRefreshService(IQuotaClient quotaClient, IClock clock)
@@ -61,12 +61,13 @@ public sealed class QuotaRefreshService : IAsyncDisposable
                 return Task.CompletedTask;
             }
 
-            var notificationOrigin = _notificationOrigin.Value;
+            var notificationScope = _notificationScope.Value;
             refresh =
-                IsNotifying &&
-                notificationOrigin is not null &&
-                ReferenceEquals(notificationOrigin.Session, _activeSession)
-                    ? notificationOrigin.Refresh
+                notificationScope is { IsActive: true, Origin: not null } &&
+                ReferenceEquals(
+                    notificationScope.Origin.Session,
+                    _activeSession)
+                    ? notificationScope.Origin.Refresh
                     : GetOrCreateRefresh(_activeSession, onlyIfStale);
         }
 
@@ -76,19 +77,24 @@ public sealed class QuotaRefreshService : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         Task disposal;
+        Task notification;
         TaskCompletionSource<IReadOnlyList<Task>> disposalKickoff;
         RefreshSession[] sessions;
+        var calledFromNotification = IsNotifying;
 
         lock (_lifecycleSync)
         {
             if (_disposeTask is not null)
             {
-                return new ValueTask(_disposeTask);
+                return new ValueTask(
+                    calledFromNotification
+                        ? _disposeCoreTask!
+                        : _disposeTask);
             }
 
             _disposeStarted = true;
             _activeSession = null;
-            _ = ReplaceState(
+            notification = ReplaceState(
                 ++_nextGeneration,
                 new QuotaRefreshState(
                     false,
@@ -98,8 +104,13 @@ public sealed class QuotaRefreshService : IAsyncDisposable
             sessions = _sessions.ToArray();
             disposalKickoff = new TaskCompletionSource<IReadOnlyList<Task>>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
+            var disposalCore = _disposeCoreTask =
+                FinishDisposeCoreAsync(disposalKickoff.Task);
             disposal = _disposeTask = FinishDisposeAsync(
-                disposalKickoff.Task);
+                disposalCore,
+                !calledFromNotification
+                    ? notification
+                    : Task.CompletedTask);
         }
 
         CancelQuietly(_lifetimeCancellation);
@@ -446,9 +457,9 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         await previous.ConfigureAwait(false);
         await Task.Yield();
 
-        var previousOrigin = _notificationOrigin.Value;
-        _notificationDepth.Value++;
-        _notificationOrigin.Value = notification.Origin;
+        var previousScope = _notificationScope.Value;
+        var scope = new NotificationScope(notification.Origin);
+        _notificationScope.Value = scope;
         try
         {
             var handlers = StateChanged?.GetInvocationList();
@@ -470,8 +481,8 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         }
         finally
         {
-            _notificationOrigin.Value = previousOrigin;
-            _notificationDepth.Value--;
+            scope.Deactivate();
+            _notificationScope.Value = previousScope;
         }
     }
 
@@ -483,9 +494,10 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         }
     }
 
-    private bool IsNotifying => _notificationDepth.Value > 0;
+    private bool IsNotifying =>
+        _notificationScope.Value is { IsActive: true };
 
-    private async Task FinishDisposeAsync(
+    private async Task FinishDisposeCoreAsync(
         Task<IReadOnlyList<Task>> retirementKickoff)
     {
         try
@@ -501,6 +513,14 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         }
     }
 
+    private static async Task FinishDisposeAsync(
+        Task disposalCore,
+        Task notification)
+    {
+        await Task.WhenAll(disposalCore, notification)
+            .ConfigureAwait(false);
+    }
+
     private Task BeginRetirement(RefreshSession session)
     {
         return session.GetOrStartRetirement(
@@ -511,13 +531,19 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         RefreshSession session,
         IReadOnlyList<Task> ownedTasks)
     {
-        await Task.WhenAll(ownedTasks).ConfigureAwait(false);
-        lock (_lifecycleSync)
+        try
         {
-            _sessions.Remove(session);
+            await Task.WhenAll(ownedTasks).ConfigureAwait(false);
         }
+        finally
+        {
+            lock (_lifecycleSync)
+            {
+                _sessions.Remove(session);
+            }
 
-        session.ReleaseResources();
+            session.ReleaseResources();
+        }
     }
 
     private void ThrowIfDisposing()
@@ -539,6 +565,16 @@ public sealed class QuotaRefreshService : IAsyncDisposable
     private sealed record NotificationOrigin(
         RefreshSession Session,
         Task Refresh);
+
+    private sealed class NotificationScope(NotificationOrigin? origin)
+    {
+        private int _active = 1;
+
+        public NotificationOrigin? Origin { get; } = origin;
+        public bool IsActive => Volatile.Read(ref _active) == 1;
+
+        public void Deactivate() => Interlocked.Exchange(ref _active, 0);
+    }
 
     private sealed record StateNotification(
         QuotaRefreshState State,

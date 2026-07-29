@@ -682,6 +682,183 @@ public sealed class QuotaRefreshServiceTests
         Assert.Equal(0, TrackedSessionCount(service));
     }
 
+    [Fact]
+    public async Task SubscriberSpawnedWork_AfterHandlerReturns_IsNotReentrant()
+    {
+        var client = new FakeQuotaClient(
+            _ => Task.FromResult(Snapshot(StartTime, remainingPercent: 73)));
+        var clock = new FakeClock(StartTime);
+        var service = new QuotaRefreshService(client, clock);
+        var releaseSpawnedStop = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var stoppedHandlerEntered = new ManualResetEventSlim();
+        using var releaseStoppedHandler = new ManualResetEventSlim();
+        using var stopReturned = new ManualResetEventSlim();
+        Task? spawnedStop = null;
+        var spawnOnce = 0;
+        var blockStopped = 0;
+        var stopCompletedOnReturn = false;
+
+        service.StateChanged += state =>
+        {
+            if (state.IsRefreshing &&
+                Interlocked.CompareExchange(ref spawnOnce, 1, 0) == 0)
+            {
+                spawnedStop = Task.Run(async () =>
+                {
+                    await releaseSpawnedStop.Task;
+                    await service.RefreshNowAsync(
+                        onlyIfStale: false,
+                        CancellationToken.None);
+                    var stop = service.SetCodexRunningAsync(
+                        false,
+                        CancellationToken.None);
+                    stopCompletedOnReturn = stop.IsCompleted;
+                    stopReturned.Set();
+                    await stop;
+                });
+            }
+        };
+        service.StateChanged += state =>
+        {
+            if (!state.IsCodexRunning &&
+                Volatile.Read(ref blockStopped) == 1)
+            {
+                stoppedHandlerEntered.Set();
+                releaseStoppedHandler.Wait();
+            }
+        };
+
+        try
+        {
+            await service.SetCodexRunningAsync(true, CancellationToken.None);
+            Assert.NotNull(spawnedStop);
+            Volatile.Write(ref blockStopped, 1);
+            releaseSpawnedStop.SetResult();
+            Assert.True(stoppedHandlerEntered.Wait(TimeSpan.FromSeconds(2)));
+            Assert.True(stopReturned.Wait(TimeSpan.FromSeconds(2)));
+
+            Assert.Equal(2, client.CallCount);
+            Assert.False(
+                stopCompletedOnReturn || spawnedStop.IsCompleted,
+                "Stop returned before its hidden notification was delivered.");
+        }
+        finally
+        {
+            releaseStoppedHandler.Set();
+            if (spawnedStop is not null)
+            {
+                await spawnedStop.WaitAsync(TimeSpan.FromSeconds(2));
+            }
+
+            await service.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ExternalDispose_WaitsForBlockedHiddenNotification()
+    {
+        var client = new FakeQuotaClient(
+            _ => Task.FromResult(Snapshot(StartTime, remainingPercent: 73)));
+        var clock = new FakeClock(StartTime);
+        var service = new QuotaRefreshService(client, clock);
+        await service.SetCodexRunningAsync(true, CancellationToken.None);
+        using var hiddenHandlerEntered = new ManualResetEventSlim();
+        using var releaseHiddenHandler = new ManualResetEventSlim();
+        var disposeReturned = 0;
+        var callbackAfterDispose = 0;
+
+        service.StateChanged += state =>
+        {
+            if (!state.IsCodexRunning)
+            {
+                hiddenHandlerEntered.Set();
+                releaseHiddenHandler.Wait();
+                if (Volatile.Read(ref disposeReturned) == 1)
+                {
+                    Volatile.Write(ref callbackAfterDispose, 1);
+                }
+            }
+        };
+
+        var disposal = service.DisposeAsync().AsTask();
+        _ = disposal.ContinueWith(
+            _ => Volatile.Write(ref disposeReturned, 1),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+        Assert.True(hiddenHandlerEntered.Wait(TimeSpan.FromSeconds(2)));
+        var completedWhileBlocked =
+            await Task.WhenAny(disposal, Task.Delay(250)) == disposal;
+
+        releaseHiddenHandler.Set();
+        await disposal.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.False(
+            completedWhileBlocked,
+            "Dispose returned while its hidden notification was blocked.");
+        Assert.Equal(0, Volatile.Read(ref callbackAfterDispose));
+    }
+
+    [Fact]
+    public async Task DisposeNotification_ReentrantDispose_DoesNotWaitForItself()
+    {
+        var client = new FakeQuotaClient(
+            _ => Task.FromResult(Snapshot(StartTime, remainingPercent: 73)));
+        var clock = new FakeClock(StartTime);
+        var service = new QuotaRefreshService(client, clock);
+        await service.SetCodexRunningAsync(true, CancellationToken.None);
+        var reentrantDisposeCompleted = false;
+
+        service.StateChanged += state =>
+        {
+            if (!state.IsCodexRunning)
+            {
+                reentrantDisposeCompleted = service.DisposeAsync()
+                    .AsTask()
+                    .Wait(TimeSpan.FromMilliseconds(250));
+            }
+        };
+
+        await service.DisposeAsync();
+
+        Assert.True(
+            reentrantDisposeCompleted,
+            "The hidden notification waited on its own disposal task.");
+    }
+
+    [Theory]
+    [InlineData(false, "delay failed")]
+    [InlineData(true, "utc now failed")]
+    public async Task DisposeAsync_WhenOwnedTaskFaults_CleansAndPropagates(
+        bool throwFromUtcNow,
+        string expectedError)
+    {
+        var client = new FakeQuotaClient(
+            _ => Task.FromResult(Snapshot(StartTime, remainingPercent: 73)));
+        var clock = new ThrowingClock(StartTime, throwFromUtcNow);
+        var service = new QuotaRefreshService(client, clock);
+        await service.SetCodexRunningAsync(true, CancellationToken.None);
+
+        if (throwFromUtcNow)
+        {
+            var refreshError =
+                await Assert.ThrowsAsync<InvalidOperationException>(
+                    () => service.RefreshNowAsync(true, CancellationToken.None));
+            Assert.Equal(expectedError, refreshError.Message);
+        }
+        else
+        {
+            await clock.DelayCalled.WaitAsync(TimeSpan.FromSeconds(2));
+        }
+
+        var disposeError = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.DisposeAsync().AsTask());
+
+        Assert.Equal(expectedError, disposeError.Message);
+        Assert.Equal(0, TrackedSessionCount(service));
+    }
+
     private static QuotaSnapshot Snapshot(
         DateTimeOffset fetchedAt,
         double remainingPercent) =>
@@ -821,6 +998,34 @@ public sealed class QuotaRefreshServiceTests
         private sealed record DelayRequest(
             DateTimeOffset Due,
             TaskCompletionSource Completion);
+    }
+
+    private sealed class ThrowingClock(
+        DateTimeOffset utcNow,
+        bool throwFromUtcNow) : IClock
+    {
+        private readonly TaskCompletionSource _delayCalled =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public DateTimeOffset UtcNow =>
+            throwFromUtcNow
+                ? throw new InvalidOperationException("utc now failed")
+                : utcNow;
+        public Task DelayCalled => _delayCalled.Task;
+
+        public Task DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken)
+        {
+            if (throwFromUtcNow)
+            {
+                return Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+
+            _delayCalled.TrySetResult();
+            return Task.FromException(
+                new InvalidOperationException("delay failed"));
+        }
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition)
