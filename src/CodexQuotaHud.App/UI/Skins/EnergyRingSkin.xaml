@@ -40,16 +40,15 @@
         <controls:ProgressArc x:Name="PrimaryArc" Margin="20"
                               Stroke="#FF37E5FF" TrackStroke="#3237D7ED"
                               StrokeThickness="6" />
-        <Path x:Name="EnergyCoreHexagon"
-              Data="M 66,37 L 91,51 L 91,81 L 66,95 L 41,81 L 41,51 Z"
-              Fill="#B80A1626" Stroke="#706E75FF" StrokeThickness="1.1">
-            <Path.Effect>
-                <DropShadowEffect Color="#523FE6FF" BlurRadius="7"
-                                  ShadowDepth="0" />
-            </Path.Effect>
-        </Path>
-        <Path Data="M 48,57 L 84,57 M 45,75 L 87,75"
-              Stroke="#2E53E8FF" StrokeThickness=".7" />
+        <Ellipse x:Name="EnergyCoreGlow" Width="66" Height="66">
+            <Ellipse.Fill>
+                <RadialGradientBrush>
+                    <GradientStop Color="#C20A1826" Offset="0" />
+                    <GradientStop Color="#8A091521" Offset=".68" />
+                    <GradientStop Color="#00091521" Offset="1" />
+                </RadialGradientBrush>
+            </Ellipse.Fill>
+        </Ellipse>
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
             <TextBlock x:Name="PercentText" Foreground="#F8FDFF"
                        FontFamily="Segoe UI Variable Display" FontSize="23"

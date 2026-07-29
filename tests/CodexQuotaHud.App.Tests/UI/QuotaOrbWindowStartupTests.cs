@@ -217,7 +217,7 @@ public sealed class QuotaOrbWindowStartupTests
     }
 
     [Fact]
-    public void EnergyRing_UsesAHexagonalCoreAndEllipticalOrbit()
+    public void EnergyRing_UsesAQuietTextGlowAndEllipticalOrbit()
     {
         RunSta(() =>
         {
@@ -231,12 +231,12 @@ public sealed class QuotaOrbWindowStartupTests
             var skin = Assert.IsType<EnergyRingSkin>(
                 Assert.IsType<ContentControl>(
                     window.FindName("SkinHost")).Content);
-            var core = Assert.IsType<ShapePath>(
-                skin.FindName("EnergyCoreHexagon"));
+            var core = Assert.IsType<ShapeEllipse>(
+                skin.FindName("EnergyCoreGlow"));
             var orbit = Assert.IsType<ShapeEllipse>(
                 skin.FindName("EnergyOrbit"));
 
-            Assert.NotNull(core.Data);
+            Assert.IsType<RadialGradientBrush>(core.Fill);
             Assert.True(orbit.Width > orbit.Height);
 
             window.CloseForExit();
