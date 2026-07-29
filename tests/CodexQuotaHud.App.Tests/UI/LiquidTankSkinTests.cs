@@ -1,5 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Shapes;
+using CodexQuotaHud.App.UI.Animation;
 using CodexQuotaHud.App.UI.Controls;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Models;
@@ -80,6 +83,62 @@ public sealed class LiquidTankSkinTests
             Assert.Equal(84, secondary.Progress);
             Assert.Equal(Visibility.Visible, secondary.Visibility);
             Assert.Equal(Visibility.Visible, ticks.Visibility);
+        });
+
+    [Fact]
+    public void Motion_UsesVisibleWaveAndStaggeredBubbleTracksWithUnifiedCaps() =>
+        RunSta(() =>
+        {
+            var skin = new LiquidTankSkin();
+            var target = Assert.IsAssignableFrom<IOrbAnimationTarget>(skin);
+
+            Assert.True(skin.ConfiguredLiquidTrackCount >= 4);
+
+            target.ApplyAnimationState(
+                OrbAnimationState.Idle,
+                animationsEnabled: true);
+            Assert.All(
+                skin.ConfiguredLiquidFrameRates,
+                frameRate => Assert.Equal(4, frameRate));
+            Assert.Equal(
+                skin.ConfiguredLiquidTrackCount,
+                skin.ActiveLiquidClockCount);
+
+            target.ApplyAnimationState(
+                OrbAnimationState.Refreshing,
+                animationsEnabled: true);
+            Assert.All(
+                skin.ConfiguredLiquidFrameRates,
+                frameRate => Assert.Equal(24, frameRate));
+
+            target.ApplyAnimationState(
+                OrbAnimationState.Hidden,
+                animationsEnabled: true);
+            Assert.Equal(0, skin.ActiveLiquidClockCount);
+            Assert.Equal(
+                0,
+                Assert.IsType<TranslateTransform>(
+                    skin.FindName("TankWaveTranslateTransform")).X);
+            Assert.Equal(
+                0,
+                Assert.IsType<TranslateTransform>(
+                    skin.FindName("TankWaveTranslateTransform")).Y);
+            Assert.Equal(
+                0,
+                Assert.IsType<RotateTransform>(
+                    skin.FindName("TankWaveRotateTransform")).Angle);
+            Assert.Equal(
+                0,
+                Assert.IsType<Ellipse>(
+                    skin.FindName("BubbleOne")).Opacity);
+            Assert.Equal(
+                0,
+                Assert.IsType<Ellipse>(
+                    skin.FindName("BubbleTwo")).Opacity);
+            Assert.Equal(
+                0,
+                Assert.IsType<Ellipse>(
+                    skin.FindName("BubbleThree")).Opacity);
         });
 
     private static void RunSta(Action action)

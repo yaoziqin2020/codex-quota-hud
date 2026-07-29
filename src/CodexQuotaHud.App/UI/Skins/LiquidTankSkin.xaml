@@ -18,6 +18,9 @@
             <Ellipse.Effect>
                 <BlurEffect Radius="11" />
             </Ellipse.Effect>
+            <Ellipse.RenderTransform>
+                <TranslateTransform x:Name="TankAmbientTransform" />
+            </Ellipse.RenderTransform>
         </Ellipse>
 
         <!-- Weekly quota stays peripheral and visually subordinate to the
@@ -104,25 +107,46 @@
                                               ShadowDepth="0" />
                         </Path.Effect>
                         <Path.RenderTransform>
-                            <TranslateTransform x:Name="TankWaveTransform" />
+                            <TransformGroup>
+                                <RotateTransform x:Name="TankWaveRotateTransform" />
+                                <TranslateTransform x:Name="TankWaveTranslateTransform" />
+                            </TransformGroup>
                         </Path.RenderTransform>
                     </Path>
-                    <Ellipse Width="5" Height="5"
+                    <Ellipse x:Name="BubbleOne"
+                             Width="5" Height="5"
                              Fill="#83F2FFFF"
-                             HorizontalAlignment="Right"
-                             VerticalAlignment="Top"
-                             Margin="0,17,13,0" />
-                    <Ellipse Width="3" Height="3"
-                             Fill="#A8FFFFFF"
-                             HorizontalAlignment="Left"
-                             VerticalAlignment="Center"
-                             Margin="17,0,0,4" />
-                    <Ellipse Width="7" Height="7"
-                             Stroke="#6FFFFFFF"
-                             StrokeThickness="1"
+                             Opacity="0"
                              HorizontalAlignment="Right"
                              VerticalAlignment="Bottom"
-                             Margin="0,0,20,13" />
+                             Margin="0,0,13,9">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="BubbleOneTransform" />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse x:Name="BubbleTwo"
+                             Width="3.5" Height="3.5"
+                             Fill="#A8FFFFFF"
+                             Opacity="0"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Bottom"
+                             Margin="17,0,0,5">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="BubbleTwoTransform" />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse x:Name="BubbleThree"
+                             Width="7" Height="7"
+                             Stroke="#6FFFFFFF"
+                             StrokeThickness="1"
+                             Opacity="0"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Bottom"
+                             Margin="0,0,27,7">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="BubbleThreeTransform" />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
                 </Grid>
 
                 <Path Data="M 18,13 C 9,27 9,61 18,77"
