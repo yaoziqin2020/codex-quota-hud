@@ -1,3 +1,6 @@
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Reflection;
 using CodexQuotaHud.Core.Models;
 using CodexQuotaHud.Core.RateLimits;
 using CodexQuotaHud.Core.Refresh;
@@ -521,6 +524,164 @@ public sealed class QuotaRefreshServiceTests
             () => service.RefreshNowAsync(false, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task CrossThreadLifecycleNotifications_ArriveInCommitOrder()
+    {
+        var snapshot = Snapshot(StartTime, remainingPercent: 88);
+        var client = new FakeQuotaClient(_ => Task.FromResult(snapshot));
+        var clock = new FakeClock(StartTime);
+        var service = new QuotaRefreshService(client, clock);
+        var observed = new ConcurrentQueue<QuotaRefreshState>();
+        using var oldHandlerEntered = new ManualResetEventSlim();
+        using var releaseOldHandler = new ManualResetEventSlim();
+        var blockOldRunning = 0;
+
+        service.StateChanged += state =>
+        {
+            if (state.IsCodexRunning &&
+                !state.IsRefreshing &&
+                state.Display.Mode == QuotaDisplayMode.Hidden &&
+                Interlocked.CompareExchange(ref blockOldRunning, 1, 0) == 0)
+            {
+                oldHandlerEntered.Set();
+                releaseOldHandler.Wait();
+            }
+
+            observed.Enqueue(state);
+        };
+
+        var firstStart = Task.Run(
+            () => service.SetCodexRunningAsync(true, CancellationToken.None));
+        Assert.True(oldHandlerEntered.Wait(TimeSpan.FromSeconds(2)));
+        var stopAndRestart = Task.Run(async () =>
+        {
+            await service.SetCodexRunningAsync(false, CancellationToken.None);
+            await service.SetCodexRunningAsync(true, CancellationToken.None);
+        });
+
+        try
+        {
+            await client.WaitForCallCountAsync(1);
+        }
+        finally
+        {
+            releaseOldHandler.Set();
+        }
+
+        await firstStart.WaitAsync(TimeSpan.FromSeconds(2));
+        await stopAndRestart.WaitAsync(TimeSpan.FromSeconds(2));
+        await WaitUntilAsync(() =>
+            observed.TryPeek(out _) &&
+            observed.Last().Display.Primary?.RemainingPercent == 88);
+
+        var final = observed.Last();
+        Assert.True(final.IsCodexRunning);
+        Assert.Equal(88, final.Display.Primary!.RemainingPercent);
+
+        await service.SetCodexRunningAsync(false, CancellationToken.None);
+        await service.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task SubscriberReentrantRefresh_DoesNotSelfWaitOrDuplicateRead()
+    {
+        var client = new FakeQuotaClient(
+            _ => Task.FromResult(Snapshot(StartTime, remainingPercent: 73)));
+        var clock = new FakeClock(StartTime);
+        await using var service = new QuotaRefreshService(client, clock);
+        await service.SetCodexRunningAsync(true, CancellationToken.None);
+        using var reentrantReturned = new ManualResetEventSlim();
+        var reenterOnce = 0;
+        var completedInsideHandler = false;
+
+        service.StateChanged += state =>
+        {
+            if (state.IsRefreshing &&
+                Interlocked.CompareExchange(ref reenterOnce, 1, 0) == 0)
+            {
+                completedInsideHandler = service
+                    .RefreshNowAsync(false, CancellationToken.None)
+                    .Wait(TimeSpan.FromMilliseconds(250));
+                reentrantReturned.Set();
+            }
+        };
+
+        await service.RefreshNowAsync(false, CancellationToken.None);
+        Assert.True(reentrantReturned.Wait(TimeSpan.FromSeconds(2)));
+        await service.SetCodexRunningAsync(false, CancellationToken.None);
+
+        Assert.True(
+            completedInsideHandler,
+            "The subscriber waited on refresh work that could not continue.");
+        Assert.Equal(2, client.CallCount);
+    }
+
+    [Fact]
+    public async Task SubscriberReentrantDispose_WaitsForTrackedRefresh()
+    {
+        var attempt = 0;
+        var initial = Snapshot(StartTime, remainingPercent: 73);
+        var completed = Snapshot(StartTime, remainingPercent: 62);
+        var blockedRead = new TaskCompletionSource<QuotaSnapshot>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new FakeQuotaClient(_ =>
+            Interlocked.Increment(ref attempt) == 1
+                ? Task.FromResult(initial)
+                : blockedRead.Task);
+        var clock = new FakeClock(StartTime);
+        var service = new QuotaRefreshService(client, clock);
+        await service.SetCodexRunningAsync(true, CancellationToken.None);
+        using var disposeReturned = new ManualResetEventSlim();
+        var disposeOnce = 0;
+
+        service.StateChanged += state =>
+        {
+            if (state.IsRefreshing &&
+                Interlocked.CompareExchange(ref disposeOnce, 1, 0) == 0)
+            {
+                try
+                {
+                    service.DisposeAsync()
+                        .AsTask()
+                        .GetAwaiter()
+                        .GetResult();
+                }
+                finally
+                {
+                    disposeReturned.Set();
+                }
+            }
+        };
+
+        var refresh = Task.Run(
+            () => service.RefreshNowAsync(false, CancellationToken.None));
+        await client.WaitForCallCountAsync(2);
+        var disposedBeforeReadCompleted = disposeReturned.IsSet;
+        blockedRead.SetResult(completed);
+        var refreshError = await Record.ExceptionAsync(
+            () => refresh.WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.True(disposeReturned.Wait(TimeSpan.FromSeconds(2)));
+
+        Assert.False(disposedBeforeReadCompleted);
+        Assert.Null(refreshError);
+    }
+
+    [Fact]
+    public async Task StoppedSession_IsRetiredBeforeServiceDispose()
+    {
+        var client = new FakeQuotaClient(
+            _ => Task.FromResult(Snapshot(StartTime, remainingPercent: 73)));
+        var clock = new FakeClock(StartTime);
+        await using var service = new QuotaRefreshService(client, clock);
+        await service.SetCodexRunningAsync(true, CancellationToken.None);
+        Assert.Equal(1, TrackedSessionCount(service));
+
+        await service.SetCodexRunningAsync(false, CancellationToken.None);
+        await WaitUntilAsync(() => TrackedSessionCount(service) == 0);
+
+        Assert.Equal(0, TrackedSessionCount(service));
+    }
+
     private static QuotaSnapshot Snapshot(
         DateTimeOffset fetchedAt,
         double remainingPercent) =>
@@ -675,5 +836,15 @@ public sealed class QuotaRefreshServiceTests
         }
 
         Assert.True(condition(), "The asynchronous condition was not reached.");
+    }
+
+    private static int TrackedSessionCount(QuotaRefreshService service)
+    {
+        var field = typeof(QuotaRefreshService).GetField(
+            "_sessions",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var sessions = Assert.IsAssignableFrom<ICollection>(field.GetValue(service));
+        return sessions.Count;
     }
 }

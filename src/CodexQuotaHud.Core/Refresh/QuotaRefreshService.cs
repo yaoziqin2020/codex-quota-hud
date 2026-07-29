@@ -13,15 +13,18 @@ public sealed class QuotaRefreshService : IAsyncDisposable
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly object _lifecycleSync = new();
+    private readonly object _notificationSync = new();
     private readonly object _stateSync = new();
+    private readonly AsyncLocal<int> _notificationDepth = new();
+    private readonly AsyncLocal<NotificationOrigin?> _notificationOrigin = new();
     private readonly List<RefreshSession> _sessions = [];
+    private Task _notificationTail = Task.CompletedTask;
     private RefreshSession? _activeSession;
     private QuotaSnapshot? _lastSuccess;
     private QuotaRefreshState _state =
         new(false, false, QuotaDisplayState.Hidden(), null);
     private long _nextGeneration;
     private long _stateGeneration;
-    private long _stateVersion;
     private bool _disposeStarted;
     private Task? _disposeTask;
 
@@ -58,17 +61,22 @@ public sealed class QuotaRefreshService : IAsyncDisposable
                 return Task.CompletedTask;
             }
 
-            refresh = GetOrCreateRefresh(_activeSession, onlyIfStale);
+            var notificationOrigin = _notificationOrigin.Value;
+            refresh =
+                IsNotifying &&
+                notificationOrigin is not null &&
+                ReferenceEquals(notificationOrigin.Session, _activeSession)
+                    ? notificationOrigin.Refresh
+                    : GetOrCreateRefresh(_activeSession, onlyIfStale);
         }
 
-        return refresh.WaitAsync(cancellationToken);
+        return WaitForCallerAsync(refresh, cancellationToken);
     }
 
     public ValueTask DisposeAsync()
     {
-        StateNotification? notification;
         Task disposal;
-        TaskCompletionSource disposalKickoff;
+        TaskCompletionSource<IReadOnlyList<Task>> disposalKickoff;
         RefreshSession[] sessions;
 
         lock (_lifecycleSync)
@@ -80,7 +88,7 @@ public sealed class QuotaRefreshService : IAsyncDisposable
 
             _disposeStarted = true;
             _activeSession = null;
-            notification = ReplaceState(
+            _ = ReplaceState(
                 ++_nextGeneration,
                 new QuotaRefreshState(
                     false,
@@ -88,20 +96,17 @@ public sealed class QuotaRefreshService : IAsyncDisposable
                     QuotaDisplayState.Hidden(),
                     null));
             sessions = _sessions.ToArray();
-            var ownedTasks = sessions
-                .SelectMany(static session => session.SnapshotOwnedTasks())
-                .ToArray();
-            disposalKickoff = new TaskCompletionSource(
+            disposalKickoff = new TaskCompletionSource<IReadOnlyList<Task>>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             disposal = _disposeTask = FinishDisposeAsync(
-                disposalKickoff.Task,
-                ownedTasks,
-                sessions);
+                disposalKickoff.Task);
         }
 
         CancelQuietly(_lifetimeCancellation);
-        Notify(notification);
-        disposalKickoff.TrySetResult();
+        var retirements = sessions
+            .Select(BeginRetirement)
+            .ToArray();
+        disposalKickoff.TrySetResult(retirements);
         return new ValueTask(disposal);
     }
 
@@ -109,7 +114,6 @@ public sealed class QuotaRefreshService : IAsyncDisposable
     {
         RefreshSession session;
         Task initialRefresh;
-        StateNotification notification;
 
         lock (_lifecycleSync)
         {
@@ -126,7 +130,7 @@ public sealed class QuotaRefreshService : IAsyncDisposable
                     _lifetimeCancellation.Token));
             _sessions.Add(session);
             _activeSession = session;
-            notification = ReplaceState(
+            _ = ReplaceState(
                 generation,
                 new QuotaRefreshState(
                     true,
@@ -137,7 +141,6 @@ public sealed class QuotaRefreshService : IAsyncDisposable
             session.SetPollTask(PollAsync(session));
         }
 
-        Notify(notification);
         session.Start();
         return WaitForInitialCallerAsync(
             initialRefresh,
@@ -148,7 +151,7 @@ public sealed class QuotaRefreshService : IAsyncDisposable
     private Task StopAsync()
     {
         RefreshSession? stoppedSession;
-        StateNotification notification;
+        Task notification;
 
         lock (_lifecycleSync)
         {
@@ -167,10 +170,10 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         if (stoppedSession is not null)
         {
             CancelQuietly(stoppedSession.Cancellation);
+            _ = BeginRetirement(stoppedSession);
         }
 
-        Notify(notification);
-        return Task.CompletedTask;
+        return IsNotifying ? Task.CompletedTask : notification;
     }
 
     private async Task WaitForInitialCallerAsync(
@@ -182,11 +185,27 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         {
             await initialRefresh.WaitAsync(callerCancellationToken)
                 .ConfigureAwait(false);
+            if (!IsNotifying)
+            {
+                await SnapshotNotificationTail().ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException)
             when (!callerCancellationToken.IsCancellationRequested &&
                   session.Cancellation.IsCancellationRequested)
         {
+        }
+    }
+
+    private async Task WaitForCallerAsync(
+        Task refresh,
+        CancellationToken callerCancellationToken)
+    {
+        await refresh.WaitAsync(callerCancellationToken)
+            .ConfigureAwait(false);
+        if (!IsNotifying)
+        {
+            await SnapshotNotificationTail().ConfigureAwait(false);
         }
     }
 
@@ -201,8 +220,15 @@ public sealed class QuotaRefreshService : IAsyncDisposable
                 return inFlight;
             }
 
-            return session.InFlightRefresh =
-                RefreshSerializedAsync(session, onlyIfStale);
+            var trackingReady = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var refresh = RefreshSerializedAsync(
+                session,
+                onlyIfStale,
+                trackingReady.Task);
+            session.InFlightRefresh = refresh;
+            trackingReady.TrySetResult();
+            return refresh;
         }
     }
 
@@ -224,13 +250,18 @@ public sealed class QuotaRefreshService : IAsyncDisposable
 
     private async Task RefreshSerializedAsync(
         RefreshSession session,
-        bool onlyIfStale)
+        bool onlyIfStale,
+        Task trackingReady)
     {
         var cancellationToken = session.Cancellation.Token;
         var lockTaken = false;
 
         try
         {
+            await trackingReady.ConfigureAwait(false);
+            var origin = new NotificationOrigin(
+                session,
+                session.GetTrackedRefresh());
             await session.WaitForStartAsync(cancellationToken)
                 .ConfigureAwait(false);
             await _refreshLock.WaitAsync(cancellationToken)
@@ -246,13 +277,12 @@ public sealed class QuotaRefreshService : IAsyncDisposable
 
             var refreshing = TryUpdateForSession(
                 session,
-                state => state with { IsRefreshing = true });
+                state => state with { IsRefreshing = true },
+                origin);
             if (refreshing is null)
             {
                 return;
             }
-
-            Notify(refreshing);
 
             QuotaSnapshot snapshot;
             try
@@ -264,19 +294,21 @@ public sealed class QuotaRefreshService : IAsyncDisposable
             {
                 if (!cancellationToken.IsCancellationRequested)
                 {
-                    PublishFailure(session, "Quota refresh canceled.");
+                    PublishFailure(
+                        session,
+                        "Quota refresh canceled.",
+                        origin);
                 }
 
                 return;
             }
             catch (Exception exception)
             {
-                PublishFailure(session, exception.Message);
+                PublishFailure(session, exception.Message, origin);
                 return;
             }
 
-            var succeeded = TryCommitSuccess(session, snapshot);
-            Notify(succeeded);
+            _ = TryCommitSuccess(session, snapshot, origin);
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
@@ -291,21 +323,24 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         }
     }
 
-    private void PublishFailure(RefreshSession session, string error)
+    private void PublishFailure(
+        RefreshSession session,
+        string error,
+        NotificationOrigin origin)
     {
         var display =
             _lastSuccess is not null &&
             _clock.UtcNow - _lastSuccess.FetchedAt <= StaleLifetime
                 ? QuotaDisplayState.FromSnapshot(_lastSuccess, isStale: true)
                 : QuotaDisplayState.Hidden();
-        var failed = TryUpdateForSession(
+        _ = TryUpdateForSession(
             session,
             _ => new QuotaRefreshState(
                 true,
                 false,
                 display,
-                error));
-        Notify(failed);
+                error),
+            origin);
     }
 
     private async Task PollAsync(RefreshSession session)
@@ -337,9 +372,10 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         }
     }
 
-    private StateNotification? TryCommitSuccess(
+    private Task? TryCommitSuccess(
         RefreshSession session,
-        QuotaSnapshot snapshot)
+        QuotaSnapshot snapshot,
+        NotificationOrigin origin)
     {
         lock (_stateSync)
         {
@@ -355,13 +391,14 @@ public sealed class QuotaRefreshService : IAsyncDisposable
                 false,
                 QuotaDisplayState.FromSnapshot(snapshot),
                 null);
-            return new StateNotification(++_stateVersion, _state);
+            return Notify(new StateNotification(_state, origin));
         }
     }
 
-    private StateNotification? TryUpdateForSession(
+    private Task? TryUpdateForSession(
         RefreshSession session,
-        Func<QuotaRefreshState, QuotaRefreshState> update)
+        Func<QuotaRefreshState, QuotaRefreshState> update,
+        NotificationOrigin origin)
     {
         lock (_stateSync)
         {
@@ -372,11 +409,11 @@ public sealed class QuotaRefreshService : IAsyncDisposable
             }
 
             _state = update(_state);
-            return new StateNotification(++_stateVersion, _state);
+            return Notify(new StateNotification(_state, origin));
         }
     }
 
-    private StateNotification ReplaceState(
+    private Task ReplaceState(
         long generation,
         QuotaRefreshState state)
     {
@@ -384,69 +421,103 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         {
             _stateGeneration = generation;
             _state = state;
-            return new StateNotification(++_stateVersion, state);
+            return Notify(new StateNotification(state, Origin: null));
         }
     }
 
-    private void Notify(StateNotification? notification)
+    private Task Notify(StateNotification? notification)
     {
         if (notification is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        var handlers = StateChanged?.GetInvocationList();
-        if (handlers is null)
+        lock (_notificationSync)
         {
-            return;
+            return _notificationTail =
+                DeliverAfterAsync(_notificationTail, notification);
         }
+    }
 
-        foreach (var handler in handlers)
+    private async Task DeliverAfterAsync(
+        Task previous,
+        StateNotification notification)
+    {
+        await previous.ConfigureAwait(false);
+        await Task.Yield();
+
+        var previousOrigin = _notificationOrigin.Value;
+        _notificationDepth.Value++;
+        _notificationOrigin.Value = notification.Origin;
+        try
         {
-            if (!IsCurrent(notification))
+            var handlers = StateChanged?.GetInvocationList();
+            if (handlers is null)
             {
                 return;
             }
 
-            try
+            foreach (var handler in handlers)
             {
-                ((Action<QuotaRefreshState>)handler)(notification.State);
+                try
+                {
+                    ((Action<QuotaRefreshState>)handler)(notification.State);
+                }
+                catch
+                {
+                }
             }
-            catch
-            {
-            }
-        }
-    }
-
-    private bool IsCurrent(StateNotification notification)
-    {
-        lock (_stateSync)
-        {
-            return notification.Version == _stateVersion;
-        }
-    }
-
-    private async Task FinishDisposeAsync(
-        Task kickoff,
-        IReadOnlyList<Task> ownedTasks,
-        IReadOnlyList<RefreshSession> sessions)
-    {
-        try
-        {
-            await kickoff.ConfigureAwait(false);
-            await Task.WhenAll(ownedTasks).ConfigureAwait(false);
         }
         finally
         {
-            foreach (var session in sessions)
-            {
-                session.Cancellation.Dispose();
-            }
+            _notificationOrigin.Value = previousOrigin;
+            _notificationDepth.Value--;
+        }
+    }
 
+    private Task SnapshotNotificationTail()
+    {
+        lock (_notificationSync)
+        {
+            return _notificationTail;
+        }
+    }
+
+    private bool IsNotifying => _notificationDepth.Value > 0;
+
+    private async Task FinishDisposeAsync(
+        Task<IReadOnlyList<Task>> retirementKickoff)
+    {
+        try
+        {
+            var retirements = await retirementKickoff.ConfigureAwait(false);
+            await Task.WhenAll(retirements).ConfigureAwait(false);
+        }
+        finally
+        {
             _lifetimeCancellation.Dispose();
             _refreshLock.Dispose();
             GC.SuppressFinalize(this);
         }
+    }
+
+    private Task BeginRetirement(RefreshSession session)
+    {
+        return session.GetOrStartRetirement(
+            ownedTasks => RetireSessionAsync(session, ownedTasks));
+    }
+
+    private async Task RetireSessionAsync(
+        RefreshSession session,
+        IReadOnlyList<Task> ownedTasks)
+    {
+        await Task.WhenAll(ownedTasks).ConfigureAwait(false);
+        lock (_lifecycleSync)
+        {
+            _sessions.Remove(session);
+        }
+
+        session.ReleaseResources();
     }
 
     private void ThrowIfDisposing()
@@ -465,9 +536,13 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         }
     }
 
+    private sealed record NotificationOrigin(
+        RefreshSession Session,
+        Task Refresh);
+
     private sealed record StateNotification(
-        long Version,
-        QuotaRefreshState State);
+        QuotaRefreshState State,
+        NotificationOrigin? Origin);
 
     private sealed class RefreshSession(
         long generation,
@@ -476,6 +551,7 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         private readonly TaskCompletionSource _start =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Task _pollTask = Task.CompletedTask;
+        private Task? _retirementTask;
 
         public long Generation { get; } = generation;
         public CancellationTokenSource Cancellation { get; } = cancellation;
@@ -495,14 +571,42 @@ public sealed class QuotaRefreshService : IAsyncDisposable
             }
         }
 
-        public IReadOnlyList<Task> SnapshotOwnedTasks()
+        public Task GetTrackedRefresh()
         {
             lock (Sync)
             {
-                return InFlightRefresh is null
+                return InFlightRefresh ??
+                    throw new InvalidOperationException(
+                        "Refresh task is not tracked.");
+            }
+        }
+
+        public Task GetOrStartRetirement(
+            Func<IReadOnlyList<Task>, Task> retire)
+        {
+            lock (Sync)
+            {
+                if (_retirementTask is not null)
+                {
+                    return _retirementTask;
+                }
+
+                IReadOnlyList<Task> ownedTasks = InFlightRefresh is null
                     ? [_pollTask]
                     : [_pollTask, InFlightRefresh];
+                return _retirementTask = retire(ownedTasks);
             }
+        }
+
+        public void ReleaseResources()
+        {
+            lock (Sync)
+            {
+                _pollTask = Task.CompletedTask;
+                InFlightRefresh = null;
+            }
+
+            Cancellation.Dispose();
         }
     }
 }
