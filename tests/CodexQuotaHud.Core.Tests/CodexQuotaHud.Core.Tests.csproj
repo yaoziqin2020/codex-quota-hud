@@ -22,4 +22,8 @@
     <ProjectReference Include="..\..\src\CodexQuotaHud.Core\CodexQuotaHud.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures\rate-limits-*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
