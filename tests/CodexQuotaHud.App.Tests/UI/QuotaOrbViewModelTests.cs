@@ -1,4 +1,5 @@
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Models;
 using CodexQuotaHud.Core.Refresh;
 using CodexQuotaHud.Core.Settings;
@@ -66,6 +67,16 @@ public sealed class QuotaOrbViewModelTests : IDisposable
             viewModel.Details,
             row => Assert.Equal("5 小时", row.Label),
             row => Assert.Equal("每周", row.Label));
+        Assert.Equal(QuotaDisplayMode.Dual, viewModel.DisplayMode);
+        Assert.Equal(
+            new QuotaSkinState(
+                62,
+                84,
+                "5 小时",
+                QuotaDisplayMode.Dual,
+                IsRefreshing: false,
+                AnimationsEnabled: true),
+            viewModel.SkinState);
     }
 
     [Fact]

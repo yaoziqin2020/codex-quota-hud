@@ -4,6 +4,8 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using CodexQuotaHud.App.UI.Animation;
+using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Models;
 using MenuItem = System.Windows.Controls.MenuItem;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
@@ -16,6 +18,8 @@ public partial class QuotaOrbWindow : Window
     private const uint MonitorDefaultToNearest = 2;
     private readonly QuotaOrbViewModel _viewModel;
     private readonly HoverCloseController _hoverCloseController;
+    private readonly SkinController _skinController;
+    private readonly OrbAnimationController _animationController;
     private bool _allowClose;
 
     public QuotaOrbWindow(QuotaOrbViewModel viewModel)
@@ -24,6 +28,13 @@ public partial class QuotaOrbWindow : Window
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         DataContext = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _skinController = new SkinController();
+        var selected = _skinController.Select(viewModel.SelectedSkin);
+        _animationController = new OrbAnimationController(
+            selected as IOrbAnimationTarget);
+        SetSkinView(selected.View);
+        _skinController.Render(viewModel.SkinState);
+        ApplyAnimationState();
         _hoverCloseController = new HoverCloseController(
             () => Task.Delay(TimeSpan.FromMilliseconds(180)),
             () => DetailsPopup.IsOpen = false);
@@ -58,10 +69,13 @@ public partial class QuotaOrbWindow : Window
         {
             e.Cancel = true;
             Hide();
+            ApplyAnimationState();
             return;
         }
 
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _animationController.SetState(OrbAnimationState.Hidden);
+        _animationController.Attach(target: null);
         base.OnClosing(e);
     }
 
@@ -70,8 +84,51 @@ public partial class QuotaOrbWindow : Window
         if (e.PropertyName == nameof(QuotaOrbViewModel.IsVisible))
         {
             ApplyVisibility();
+            ApplyAnimationState();
+        }
+        else if (e.PropertyName == nameof(QuotaOrbViewModel.SelectedSkin))
+        {
+            ApplySelectedSkin();
+        }
+        else if (e.PropertyName == nameof(QuotaOrbViewModel.SkinState))
+        {
+            _skinController.Render(_viewModel.SkinState);
+            _animationController.SetAnimationsEnabled(
+                _viewModel.AnimationsEnabled);
+            ApplyAnimationState();
         }
     }
+
+    private void ApplySelectedSkin()
+    {
+        var skin = _skinController.Select(_viewModel.SelectedSkin);
+        SetSkinView(skin.View);
+        _animationController.Attach(skin as IOrbAnimationTarget);
+        _skinController.Render(_viewModel.SkinState);
+        ApplyAnimationState();
+    }
+
+    private void ApplyAnimationState()
+    {
+        _animationController.SetAnimationsEnabled(
+            _viewModel.AnimationsEnabled);
+        _animationController.SetState(
+            SelectAnimationState(
+                IsVisible,
+                _viewModel.IsVisible &&
+                _viewModel.DisplayMode != QuotaDisplayMode.Hidden,
+                _viewModel.IsRefreshing));
+    }
+
+    internal static OrbAnimationState SelectAnimationState(
+        bool windowVisible,
+        bool displayVisible,
+        bool refreshing) =>
+        !windowVisible || !displayVisible
+            ? OrbAnimationState.Hidden
+            : refreshing
+                ? OrbAnimationState.Refreshing
+                : OrbAnimationState.Idle;
 
     private void ApplyVisibility()
     {

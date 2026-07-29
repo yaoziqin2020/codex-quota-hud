@@ -9,6 +9,7 @@ using System.Windows.Threading;
 using CodexQuotaHud.Core.Models;
 using CodexQuotaHud.Core.Refresh;
 using CodexQuotaHud.Core.Settings;
+using CodexQuotaHud.App.UI.Skins;
 
 namespace CodexQuotaHud.App.UI;
 
@@ -75,6 +76,7 @@ public sealed class QuotaOrbViewModel :
     private string? _lastError;
     private DateTimeOffset? _lastUpdated;
     private string? _lastSettingsError;
+    private QuotaDisplayMode _displayMode = QuotaDisplayMode.Hidden;
     private bool _disposed;
 
     public QuotaOrbViewModel(
@@ -132,6 +134,12 @@ public sealed class QuotaOrbViewModel :
     }
 
     public bool HasSecondary => SecondaryPercent is not null;
+
+    public QuotaDisplayMode DisplayMode
+    {
+        get => _displayMode;
+        private set => SetField(ref _displayMode, value);
+    }
 
     public string PrimaryLabel
     {
@@ -238,8 +246,18 @@ public sealed class QuotaOrbViewModel :
 
             SaveSettings(_settings with { AnimationsEnabled = value });
             OnPropertyChanged();
+            OnPropertyChanged(nameof(SkinState));
         }
     }
+
+    public QuotaSkinState SkinState =>
+        new(
+            PrimaryPercent,
+            SecondaryPercent,
+            PrimaryLabel,
+            DisplayMode,
+            IsRefreshing,
+            AnimationsEnabled);
 
     public ICommand RefreshCommand { get; }
 
@@ -303,6 +321,7 @@ public sealed class QuotaOrbViewModel :
 
     private void ApplyState(QuotaRefreshState state)
     {
+        DisplayMode = state.Display.Mode;
         IsRefreshing = state.IsRefreshing;
         LastError = state.LastError;
         IsStale = state.Display.IsStale;
@@ -320,6 +339,7 @@ public sealed class QuotaOrbViewModel :
         AddDetail(primary);
         AddDetail(state.Display.Secondary);
         OnPropertyChanged(nameof(Details));
+        OnPropertyChanged(nameof(SkinState));
 
         if (!state.Display.IsStale &&
             state.Display.FetchedAt is { } fetchedAt &&

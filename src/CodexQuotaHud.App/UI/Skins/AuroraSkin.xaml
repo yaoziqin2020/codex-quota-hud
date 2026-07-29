@@ -1,0 +1,61 @@
+<skins:AnimatedQuotaSkin x:Class="CodexQuotaHud.App.UI.Skins.AuroraSkin"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:CodexQuotaHud.App.UI.Controls"
+        xmlns:skins="clr-namespace:CodexQuotaHud.App.UI.Skins"
+        Width="132" Height="132" Background="Transparent">
+    <Grid Margin="4">
+        <Ellipse Margin="6" Fill="#E50B1420" Stroke="#594BDBE8" StrokeThickness="1">
+            <Ellipse.Effect>
+                <DropShadowEffect Color="#44DAB0" BlurRadius="17" ShadowDepth="0" Opacity=".26" />
+            </Ellipse.Effect>
+        </Ellipse>
+        <Grid RenderTransformOrigin=".5,.5" Opacity=".82">
+            <Grid.RenderTransform>
+                <RotateTransform x:Name="AuroraBandTransform" />
+            </Grid.RenderTransform>
+            <Path Data="M 15,73 C 29,31 73,12 111,43"
+                  StrokeThickness="8" StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round">
+                <Path.Stroke>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#0051F3CE" Offset="0" />
+                        <GradientStop Color="#A752F2D4" Offset=".38" />
+                        <GradientStop Color="#817D6BFF" Offset=".72" />
+                        <GradientStop Color="#00A46BFF" Offset="1" />
+                    </LinearGradientBrush>
+                </Path.Stroke>
+                <Path.Effect>
+                    <BlurEffect Radius="5" />
+                </Path.Effect>
+            </Path>
+            <Path Data="M 25,96 C 50,112 91,103 108,71"
+                  StrokeThickness="4" StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round">
+                <Path.Stroke>
+                    <LinearGradientBrush StartPoint="0,1" EndPoint="1,0">
+                        <GradientStop Color="#00846DFF" Offset="0" />
+                        <GradientStop Color="#806A85FF" Offset=".45" />
+                        <GradientStop Color="#5B54E7D2" Offset=".75" />
+                        <GradientStop Color="#0054E7D2" Offset="1" />
+                    </LinearGradientBrush>
+                </Path.Stroke>
+            </Path>
+        </Grid>
+        <controls:ProgressArc x:Name="SecondaryArc" Margin="8"
+                              Stroke="#917C74FF" TrackStroke="#1A4D5D77"
+                              StrokeThickness="3" />
+        <controls:ProgressArc x:Name="PrimaryArc" Margin="19"
+                              Stroke="#C67CEAD8" TrackStroke="#234DD2C3"
+                              StrokeThickness="4.5" />
+        <Border Width="65" Height="65" CornerRadius="33"
+                Background="#B80C1723" BorderBrush="#2DFFFFFF" BorderThickness=".8" />
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock x:Name="PercentText" Foreground="#F5FFFD"
+                       FontSize="22" FontWeight="Light"
+                       HorizontalAlignment="Center" />
+            <TextBlock x:Name="LabelText" Foreground="#A7CFE4DD"
+                       FontSize="10.5" HorizontalAlignment="Center" />
+        </StackPanel>
+    </Grid>
+</skins:AnimatedQuotaSkin>
