@@ -1154,14 +1154,16 @@ public sealed class QuotaRefreshServiceTests
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
-        for (var attempt = 0; attempt < 1_000; attempt++)
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        while (System.Diagnostics.Stopwatch.GetElapsedTime(started) <
+               TimeSpan.FromSeconds(5))
         {
             if (condition())
             {
                 return;
             }
 
-            await Task.Yield();
+            await Task.Delay(1);
         }
 
         Assert.True(condition(), "The asynchronous condition was not reached.");
