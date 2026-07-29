@@ -150,8 +150,8 @@ public sealed class QuotaOrbWindowStartupTests
             var texture = Assert.IsType<Border>(
                 window.FindName("EdgeProgressTexture"));
             Assert.Null(window.FindName("EdgeProgressSheen"));
-            Assert.True(handle.SnapsToDevicePixels);
-            Assert.True(track.SnapsToDevicePixels);
+            Assert.False(handle.SnapsToDevicePixels);
+            Assert.False(track.SnapsToDevicePixels);
             Assert.Equal(new Thickness(1), track.BorderThickness);
 
             foreach (var (side, horizontal, vertical, width, height) in

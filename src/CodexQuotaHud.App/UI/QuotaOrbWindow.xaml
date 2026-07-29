@@ -59,7 +59,6 @@
         <Border x:Name="EdgeHandle"
                 Width="12" Height="72"
                 CornerRadius="6"
-                SnapsToDevicePixels="True"
                 Opacity="0"
                 IsHitTestVisible="False"
                 Background="Transparent"
@@ -75,7 +74,6 @@
             </Border.Effect>
             <Border x:Name="EdgeProgressTrack"
                     CornerRadius="6"
-                    SnapsToDevicePixels="True"
                     ClipToBounds="True"
                     Background="#F21A202B"
                     BorderBrush="#6638D9FF"
