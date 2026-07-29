@@ -43,7 +43,7 @@
 
 | 项目 | 状态 | 备注 |
 |---|---|---|
-| 安装目录精确 | PASS | `C:\Users\yaozi\AppData\Local\Programs\CodexQuotaHud` |
+| 安装目录精确 | PASS | `%LOCALAPPDATA%\Programs\CodexQuotaHud` |
 | 启动项精确 | PASS | 仅 `Run\CodexQuotaHud`，quoted exe + `--background` |
 | 单实例 | PASS | 最终运行 1 个 `CodexQuotaHud.App.exe` |
 | 无 Cookie / Token 文件 | PASS | 设置仅坐标、动画、皮肤、最近成功刷新时间 |
