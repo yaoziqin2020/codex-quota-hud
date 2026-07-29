@@ -13,7 +13,9 @@ public static class RateLimitMapper
         QuotaWindow? fiveHour = null;
         QuotaWindow? weekly = null;
 
-        if (result.TryGetProperty("rateLimits", out var limits))
+        if (result.ValueKind == JsonValueKind.Object &&
+            result.TryGetProperty("rateLimits", out var limits) &&
+            limits.ValueKind == JsonValueKind.Object)
         {
             foreach (var name in new[] { "primary", "secondary" })
             {

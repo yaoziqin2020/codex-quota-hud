@@ -80,6 +80,34 @@ public sealed class RateLimitMapperTests
         Assert.Equal(FetchedAt, snapshot.FetchedAt);
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("42")]
+    public void Map_NonObjectRoot_ReturnsEmptySnapshot(string json)
+    {
+        var snapshot = RateLimitMapper.Map(Parse(json), FetchedAt);
+
+        Assert.Null(snapshot.FiveHour);
+        Assert.Null(snapshot.Weekly);
+        Assert.Equal(FetchedAt, snapshot.FetchedAt);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("42")]
+    public void Map_NonObjectRateLimits_ReturnsEmptySnapshot(string rateLimits)
+    {
+        var snapshot = RateLimitMapper.Map(Parse($$"""
+            { "rateLimits": {{rateLimits}} }
+            """), FetchedAt);
+
+        Assert.Null(snapshot.FiveHour);
+        Assert.Null(snapshot.Weekly);
+        Assert.Equal(FetchedAt, snapshot.FetchedAt);
+    }
+
     private static JsonElement ReadFixture(string name) =>
         Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", name)));
 
