@@ -38,6 +38,19 @@ public sealed class StartupRegistrationTests
             registry.Values[(StartupRegistration.RunSubKeyPath, "AnotherApp")]);
     }
 
+    [Fact]
+    public void TryEnable_RegistryPermissionFailureIsNonFatal()
+    {
+        var registration = new StartupRegistration(
+            @"C:\CodexQuotaHud.App.exe",
+            new ThrowingRegistryStore());
+
+        var exception = Record.Exception(
+            () => Assert.False(registration.TryEnable(out var error)));
+
+        Assert.Null(exception);
+    }
+
     private sealed class MemoryRegistryStore : IRegistryStore
     {
         public Dictionary<(string SubKeyPath, string ValueName), string> Values { get; } = [];
@@ -50,6 +63,16 @@ public sealed class StartupRegistrationTests
         public void DeleteCurrentUserValue(string subKeyPath, string valueName)
         {
             Values.Remove((subKeyPath, valueName));
+        }
+    }
+
+    private sealed class ThrowingRegistryStore : IRegistryStore
+    {
+        public void SetCurrentUserString(string subKeyPath, string valueName, string value) =>
+            throw new UnauthorizedAccessException("policy denied");
+
+        public void DeleteCurrentUserValue(string subKeyPath, string valueName)
+        {
         }
     }
 }

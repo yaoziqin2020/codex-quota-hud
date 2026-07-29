@@ -1,3 +1,5 @@
+using System.IO;
+using System.Security;
 using Microsoft.Win32;
 
 namespace CodexQuotaHud.App.Infrastructure;
@@ -43,6 +45,22 @@ public sealed class StartupRegistration
             RunSubKeyPath,
             ValueName,
             $"\"{_executablePath}\" --background");
+    }
+
+    public bool TryEnable(out string? error)
+    {
+        try
+        {
+            Enable();
+            error = null;
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or SecurityException)
+        {
+            error = exception.Message;
+            return false;
+        }
     }
 
     public void Disable()

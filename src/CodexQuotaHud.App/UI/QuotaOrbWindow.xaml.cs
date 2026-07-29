@@ -15,7 +15,7 @@ public partial class QuotaOrbWindow : Window
 {
     private const uint MonitorDefaultToNearest = 2;
     private readonly QuotaOrbViewModel _viewModel;
-    private bool _isPointerOverPopup;
+    private readonly HoverCloseController _hoverCloseController;
     private bool _allowClose;
 
     public QuotaOrbWindow(QuotaOrbViewModel viewModel)
@@ -24,6 +24,9 @@ public partial class QuotaOrbWindow : Window
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         DataContext = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _hoverCloseController = new HoverCloseController(
+            () => Task.Delay(TimeSpan.FromMilliseconds(180)),
+            () => DetailsPopup.IsOpen = false);
 
         var saved = viewModel.GetSavedPosition();
         if (saved.Left is { } left)
@@ -88,6 +91,7 @@ public partial class QuotaOrbWindow : Window
 
     private async void OnOrbMouseEnter(object sender, MouseEventArgs e)
     {
+        _hoverCloseController.CancelPendingClose();
         DetailsPopup.IsOpen = true;
         try
         {
@@ -98,22 +102,14 @@ public partial class QuotaOrbWindow : Window
         }
     }
 
-    private void OnOrbMouseLeave(object sender, MouseEventArgs e)
-    {
-        if (!_isPointerOverPopup)
-        {
-            DetailsPopup.IsOpen = false;
-        }
-    }
+    private async void OnOrbMouseLeave(object sender, MouseEventArgs e) =>
+        await _hoverCloseController.ScheduleCloseAsync();
 
     private void OnPopupMouseEnter(object sender, MouseEventArgs e) =>
-        _isPointerOverPopup = true;
+        _hoverCloseController.CancelPendingClose();
 
-    private void OnPopupMouseLeave(object sender, MouseEventArgs e)
-    {
-        _isPointerOverPopup = false;
-        DetailsPopup.IsOpen = false;
-    }
+    private async void OnPopupMouseLeave(object sender, MouseEventArgs e) =>
+        await _hoverCloseController.ScheduleCloseAsync();
 
     private void OnDragSurfaceMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

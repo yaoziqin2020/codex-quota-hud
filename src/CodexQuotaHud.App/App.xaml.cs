@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Diagnostics;
 using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.App.UI;
 using CodexQuotaHud.Core.Refresh;
@@ -8,12 +9,11 @@ namespace CodexQuotaHud.App;
 
 public partial class App : System.Windows.Application
 {
-    private readonly SemaphoreSlim _runningTransition = new(1, 1);
-    private readonly CancellationTokenSource _lifetime = new();
     private SingleInstanceGuard? _singleInstance;
     private CodexProcessMonitor? _processMonitor;
     private RestartableQuotaClient? _quotaClient;
     private QuotaRefreshService? _refreshService;
+    private CodexRunningCoordinator? _runningCoordinator;
     private QuotaOrbViewModel? _viewModel;
     private QuotaOrbWindow? _window;
     private TrayController? _tray;
@@ -40,6 +40,9 @@ public partial class App : System.Windows.Application
             _refreshService = new QuotaRefreshService(
                 _quotaClient,
                 new SystemClock());
+            _runningCoordinator = new CodexRunningCoordinator(
+                _refreshService.SetCodexRunningAsync,
+                _quotaClient.ResetAsync);
             _viewModel = new QuotaOrbViewModel(
                 new QuotaRefreshController(_refreshService),
                 settingsStore,
@@ -54,7 +57,12 @@ public partial class App : System.Windows.Application
 
             if (IsInteractiveLaunch(e.Args))
             {
-                new StartupRegistration().Enable();
+                if (!new StartupRegistration().TryEnable(out var error))
+                {
+                    Trace.TraceWarning(
+                        "Could not register CodexQuotaHud startup: {0}",
+                        error);
+                }
             }
         }
         catch
@@ -68,18 +76,24 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _lifetime.Cancel();
         if (_processMonitor is not null)
         {
             _processMonitor.RunningChanged -= OnCodexRunningChanged;
         }
 
-        _tray?.Dispose();
-        _window?.CloseForExit();
-        _viewModel?.Dispose();
-        _singleInstance?.Dispose();
-        _lifetime.Dispose();
-        _runningTransition.Dispose();
+        EmergencyCleanup(
+            () => _runningCoordinator?.DisposeAsync().AsTask()
+                .GetAwaiter().GetResult(),
+            () => _refreshService?.DisposeAsync().AsTask()
+                .GetAwaiter().GetResult(),
+            () => _quotaClient?.DisposeAsync().AsTask()
+                .GetAwaiter().GetResult(),
+            () => _processMonitor?.DisposeAsync().AsTask()
+                .GetAwaiter().GetResult(),
+            () => _tray?.Dispose(),
+            () => _window?.CloseForExit(),
+            () => _viewModel?.Dispose(),
+            () => _singleInstance?.Dispose());
         base.OnExit(e);
     }
 
@@ -90,42 +104,14 @@ public partial class App : System.Windows.Application
                 "--background",
                 StringComparison.OrdinalIgnoreCase));
 
-    private async void OnCodexRunningChanged(bool isRunning)
+    private void OnCodexRunningChanged(bool isRunning)
     {
         try
         {
-            await ApplyCodexRunningAsync(isRunning);
+            _ = _runningCoordinator?.SetDesiredStateAsync(isRunning);
         }
-        catch (OperationCanceledException)
-            when (_lifetime.IsCancellationRequested)
+        catch (ObjectDisposedException)
         {
-        }
-        catch
-        {
-        }
-    }
-
-    private async Task ApplyCodexRunningAsync(bool isRunning)
-    {
-        await _runningTransition.WaitAsync(_lifetime.Token);
-        try
-        {
-            if (_refreshService is null || _quotaClient is null)
-            {
-                return;
-            }
-
-            await _refreshService.SetCodexRunningAsync(
-                isRunning,
-                _lifetime.Token);
-            if (!isRunning)
-            {
-                await _quotaClient.ResetAsync();
-            }
-        }
-        finally
-        {
-            _runningTransition.Release();
         }
     }
 
@@ -145,6 +131,12 @@ public partial class App : System.Windows.Application
         {
             await ShutdownResourcesAsync();
         }
+        catch (Exception exception)
+        {
+            Trace.TraceError(
+                "CodexQuotaHud shutdown cleanup failed: {0}",
+                exception);
+        }
         finally
         {
             Shutdown();
@@ -157,6 +149,12 @@ public partial class App : System.Windows.Application
         {
             await ShutdownResourcesAsync();
         }
+        catch (Exception exception)
+        {
+            Trace.TraceError(
+                "CodexQuotaHud startup-failure cleanup failed: {0}",
+                exception);
+        }
         finally
         {
             Shutdown();
@@ -165,45 +163,92 @@ public partial class App : System.Windows.Application
 
     private async Task ShutdownResourcesAsync()
     {
-        _lifetime.Cancel();
         if (_processMonitor is not null)
         {
             _processMonitor.RunningChanged -= OnCodexRunningChanged;
         }
 
-        await _runningTransition.WaitAsync();
-        try
-        {
-            if (_refreshService is not null)
+        await BestEffortCleanup.RunAsync(
+            async () =>
             {
-                await _refreshService.DisposeAsync();
+                var coordinator = _runningCoordinator;
+                _runningCoordinator = null;
+                if (coordinator is not null)
+                {
+                    await coordinator.DisposeAsync();
+                }
+            },
+            async () =>
+            {
+                var refreshService = _refreshService;
                 _refreshService = null;
-            }
-
-            if (_quotaClient is not null)
+                if (refreshService is not null)
+                {
+                    await refreshService.DisposeAsync();
+                }
+            },
+            async () =>
             {
-                await _quotaClient.DisposeAsync();
+                var quotaClient = _quotaClient;
                 _quotaClient = null;
+                if (quotaClient is not null)
+                {
+                    await quotaClient.DisposeAsync();
+                }
+            },
+            async () =>
+            {
+                var processMonitor = _processMonitor;
+                _processMonitor = null;
+                if (processMonitor is not null)
+                {
+                    await processMonitor.DisposeAsync();
+                }
+            },
+            () =>
+            {
+                var tray = _tray;
+                _tray = null;
+                tray?.Dispose();
+                return ValueTask.CompletedTask;
+            },
+            () =>
+            {
+                var window = _window;
+                _window = null;
+                window?.CloseForExit();
+                return ValueTask.CompletedTask;
+            },
+            () =>
+            {
+                var viewModel = _viewModel;
+                _viewModel = null;
+                viewModel?.Dispose();
+                return ValueTask.CompletedTask;
+            },
+            () =>
+            {
+                var singleInstance = _singleInstance;
+                _singleInstance = null;
+                singleInstance?.Dispose();
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static void EmergencyCleanup(params Action[] cleanupActions)
+    {
+        foreach (var cleanup in cleanupActions)
+        {
+            try
+            {
+                cleanup();
+            }
+            catch (Exception exception)
+            {
+                Trace.TraceError(
+                    "CodexQuotaHud emergency cleanup failed: {0}",
+                    exception);
             }
         }
-        finally
-        {
-            _runningTransition.Release();
-        }
-
-        if (_processMonitor is not null)
-        {
-            await _processMonitor.DisposeAsync();
-            _processMonitor = null;
-        }
-
-        _tray?.Dispose();
-        _tray = null;
-        _window?.CloseForExit();
-        _window = null;
-        _viewModel?.Dispose();
-        _viewModel = null;
-        _singleInstance?.Dispose();
-        _singleInstance = null;
     }
 }

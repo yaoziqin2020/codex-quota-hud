@@ -5,7 +5,14 @@ using CodexQuotaHud.Core.Models;
 
 namespace CodexQuotaHud.Core.Settings;
 
-public sealed class SettingsStore
+public interface ISettingsStore
+{
+    AppSettings Load();
+
+    void Save(AppSettings settings);
+}
+
+public sealed class SettingsStore : ISettingsStore
 {
     private static readonly ConcurrentDictionary<string, SaveLockEntry> SaveLocks =
         new(StringComparer.OrdinalIgnoreCase);

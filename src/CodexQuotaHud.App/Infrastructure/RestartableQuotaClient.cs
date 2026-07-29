@@ -47,10 +47,11 @@ public sealed class RestartableQuotaClient :
         await _sessionGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (_session is not null)
+            var session = _session;
+            _session = null;
+            if (session is not null)
             {
-                await DisposeSessionAsync(_session).ConfigureAwait(false);
-                _session = null;
+                await DisposeSessionAsync(session).ConfigureAwait(false);
             }
         }
         finally
@@ -70,10 +71,11 @@ public sealed class RestartableQuotaClient :
             }
 
             _disposed = true;
-            if (_session is not null)
+            var session = _session;
+            _session = null;
+            if (session is not null)
             {
-                await DisposeSessionAsync(_session).ConfigureAwait(false);
-                _session = null;
+                await DisposeSessionAsync(session).ConfigureAwait(false);
             }
         }
         finally

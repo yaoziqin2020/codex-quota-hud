@@ -58,7 +58,30 @@ public sealed class RestartableQuotaClientTests
             () => client.ReadAsync(CancellationToken.None));
     }
 
-    private sealed class FakeSession(int value) : IQuotaClient, IAsyncDisposable
+    [Fact]
+    public async Task ResetDisposeFailureStillDetachesOldSession()
+    {
+        var sessions = new List<FakeSession>();
+        var client = new RestartableQuotaClient(() =>
+        {
+            var session = new FakeSession(
+                sessions.Count + 1,
+                throwOnDispose: sessions.Count == 0);
+            sessions.Add(session);
+            return session;
+        });
+        await client.ReadAsync(CancellationToken.None);
+
+        await Assert.ThrowsAsync<IOException>(client.ResetAsync);
+        var result = await client.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(2, result.FiveHour!.RemainingPercent);
+        Assert.Equal(2, sessions.Count);
+    }
+
+    private sealed class FakeSession(
+        int value,
+        bool throwOnDispose = false) : IQuotaClient, IAsyncDisposable
     {
         public bool IsDisposed { get; private set; }
 
@@ -73,6 +96,11 @@ public sealed class RestartableQuotaClientTests
         public ValueTask DisposeAsync()
         {
             IsDisposed = true;
+            if (throwOnDispose)
+            {
+                throw new IOException("dispose failed");
+            }
+
             return ValueTask.CompletedTask;
         }
     }

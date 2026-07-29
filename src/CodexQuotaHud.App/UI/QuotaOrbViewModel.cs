@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Runtime.CompilerServices;
+using System.Security;
 using System.Windows.Input;
 using System.Windows.Threading;
 using CodexQuotaHud.Core.Models;
@@ -58,7 +60,7 @@ public sealed class QuotaOrbViewModel :
     IDisposable
 {
     private readonly IQuotaRefreshController _refreshController;
-    private readonly SettingsStore _settingsStore;
+    private readonly ISettingsStore _settingsStore;
     private readonly IUiDispatcher _dispatcher;
     private readonly Action _requestExit;
     private readonly object _settingsSync = new();
@@ -72,11 +74,12 @@ public sealed class QuotaOrbViewModel :
     private bool _isVisible;
     private string? _lastError;
     private DateTimeOffset? _lastUpdated;
+    private string? _lastSettingsError;
     private bool _disposed;
 
     public QuotaOrbViewModel(
         IQuotaRefreshController refreshController,
-        SettingsStore settingsStore,
+        ISettingsStore settingsStore,
         AppSettings settings,
         IUiDispatcher dispatcher,
         Action requestExit)
@@ -176,6 +179,12 @@ public sealed class QuotaOrbViewModel :
         }
     }
 
+    public string? LastSettingsError
+    {
+        get => _lastSettingsError;
+        private set => SetField(ref _lastSettingsError, value);
+    }
+
     public DateTimeOffset? LastUpdated
     {
         get => _lastUpdated;
@@ -272,13 +281,24 @@ public sealed class QuotaOrbViewModel :
 
     private void OnStateChanged(QuotaRefreshState state)
     {
+        if (Volatile.Read(ref _disposed))
+        {
+            return;
+        }
+
         if (_dispatcher.CheckAccess())
         {
             ApplyState(state);
             return;
         }
 
-        _dispatcher.Post(() => ApplyState(state));
+        _dispatcher.Post(() =>
+        {
+            if (!Volatile.Read(ref _disposed))
+            {
+                ApplyState(state);
+            }
+        });
     }
 
     private void ApplyState(QuotaRefreshState state)
@@ -303,7 +323,8 @@ public sealed class QuotaOrbViewModel :
 
         if (!state.Display.IsStale &&
             state.Display.FetchedAt is { } fetchedAt &&
-            _settings.LastSuccessfulRefresh != fetchedAt)
+            (_settings.LastSuccessfulRefresh != fetchedAt ||
+             LastSettingsError is not null))
         {
             SaveSettings(_settings with { LastSuccessfulRefresh = fetchedAt });
         }
@@ -327,8 +348,17 @@ public sealed class QuotaOrbViewModel :
     {
         lock (_settingsSync)
         {
-            _settingsStore.Save(settings);
             _settings = settings;
+            try
+            {
+                _settingsStore.Save(settings);
+                LastSettingsError = null;
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException or SecurityException)
+            {
+                LastSettingsError = "设置未保存";
+            }
         }
     }
 

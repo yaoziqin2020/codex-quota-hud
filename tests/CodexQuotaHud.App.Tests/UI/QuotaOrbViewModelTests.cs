@@ -147,6 +147,57 @@ public sealed class QuotaOrbViewModelTests : IDisposable
         Assert.DoesNotContain("FiveHour", json, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void SettingsSaveFailure_DoesNotEscapeSkinAnimationPositionOrRefreshUpdates()
+    {
+        var source = new FakeRefreshController();
+        var store = new ThrowingSettingsStore();
+        using var viewModel = new QuotaOrbViewModel(
+            source,
+            store,
+            new AppSettings(),
+            new QueuedDispatcher(checkAccess: true),
+            () => { });
+        var snapshot = new QuotaSnapshot(
+            new QuotaWindow(QuotaWindowKind.FiveHour, 45, null),
+            null,
+            DateTimeOffset.Parse("2026-07-29T01:00:00Z"));
+
+        var exception = Record.Exception(() =>
+        {
+            viewModel.SelectSkinCommand.Execute(SkinId.Aurora);
+            viewModel.ToggleAnimationsCommand.Execute(null);
+            viewModel.SavePosition(20, 30);
+            source.Publish(State(QuotaDisplayState.FromSnapshot(snapshot)));
+        });
+
+        Assert.Null(exception);
+        Assert.Equal(SkinId.Aurora, viewModel.SelectedSkin);
+        Assert.False(viewModel.AnimationsEnabled);
+        Assert.True(viewModel.IsVisible);
+        Assert.Equal(45, viewModel.PrimaryPercent);
+        Assert.Equal("设置未保存", viewModel.LastSettingsError);
+    }
+
+    [Fact]
+    public void DisposedViewModel_IgnoresAlreadyQueuedState()
+    {
+        var source = new FakeRefreshController();
+        var dispatcher = new QueuedDispatcher(checkAccess: false);
+        var viewModel = CreateViewModel(source, dispatcher: dispatcher);
+        var snapshot = new QuotaSnapshot(
+            new QuotaWindow(QuotaWindowKind.FiveHour, 74, null),
+            null,
+            DateTimeOffset.Parse("2026-07-29T01:00:00Z"));
+        source.Publish(State(QuotaDisplayState.FromSnapshot(snapshot)));
+
+        viewModel.Dispose();
+        dispatcher.Drain();
+
+        Assert.False(viewModel.IsVisible);
+        Assert.Equal(0, viewModel.PrimaryPercent);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))
@@ -209,5 +260,13 @@ public sealed class QuotaOrbViewModelTests : IDisposable
                 action();
             }
         }
+    }
+
+    private sealed class ThrowingSettingsStore : ISettingsStore
+    {
+        public AppSettings Load() => new();
+
+        public void Save(AppSettings settings) =>
+            throw new UnauthorizedAccessException("read only");
     }
 }
