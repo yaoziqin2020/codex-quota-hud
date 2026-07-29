@@ -752,7 +752,7 @@ public partial class QuotaOrbWindow : Window
             theme.SecondaryText;
         PopupShadow.Color = theme.ShadowColor;
         EdgeProgressTrack.Background = edgeTheme.Track;
-        EdgeProgressTrack.BorderBrush = edgeTheme.Border;
+        EdgeProgressOutline.BorderBrush = edgeTheme.Border;
         EdgeProgressFill.Background = edgeTheme.Fill;
         EdgeProgressTexture.Background = edgeTheme.Texture;
         EdgeProgressTexture.Opacity = edgeTheme.TextureOpacity;

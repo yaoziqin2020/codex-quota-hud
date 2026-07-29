@@ -144,6 +144,8 @@ public sealed class QuotaOrbWindowStartupTests
                 window.FindName("EdgeHandle"));
             var track = Assert.IsType<Border>(
                 window.FindName("EdgeProgressTrack"));
+            var outline = Assert.IsType<Border>(
+                window.FindName("EdgeProgressOutline"));
             var fill = Assert.IsType<Border>(
                 window.FindName("EdgeProgressFill"));
             Assert.Equal(new CornerRadius(6), fill.CornerRadius);
@@ -152,7 +154,8 @@ public sealed class QuotaOrbWindowStartupTests
             Assert.Null(window.FindName("EdgeProgressSheen"));
             Assert.False(handle.SnapsToDevicePixels);
             Assert.False(track.SnapsToDevicePixels);
-            Assert.Equal(new Thickness(1), track.BorderThickness);
+            Assert.Equal(default, track.BorderThickness);
+            Assert.Equal(new Thickness(1), outline.BorderThickness);
 
             foreach (var (side, horizontal, vertical, width, height) in
                 new[]
@@ -191,7 +194,9 @@ public sealed class QuotaOrbWindowStartupTests
             Assert.Equal(
                 theme.Track.ToString(),
                 track.Background.ToString());
-            Assert.Equal(theme.Border.ToString(), track.BorderBrush.ToString());
+            Assert.Equal(
+                theme.Border.ToString(),
+                outline.BorderBrush.ToString());
             Assert.Equal(
                 byte.MaxValue,
                 Assert.IsType<SolidColorBrush>(theme.Border).Color.A);

@@ -72,24 +72,29 @@
                                   Opacity="0.9"
                                   Color="#24CFF2" />
             </Border.Effect>
-            <Border x:Name="EdgeProgressTrack"
-                    CornerRadius="6"
-                    ClipToBounds="True"
-                    Background="#F21A202B"
-                    BorderBrush="#6638D9FF"
-                    BorderThickness="1">
-                <Grid>
-                    <Border x:Name="EdgeProgressFill"
-                            Background="#53DCF8"
-                            CornerRadius="6"
-                            HorizontalAlignment="Stretch"
-                            VerticalAlignment="Bottom">
-                        <Border x:Name="EdgeProgressTexture"
-                                IsHitTestVisible="False"
-                                Opacity="0.72" />
-                    </Border>
-                </Grid>
-            </Border>
+            <Grid>
+                <Border x:Name="EdgeProgressTrack"
+                        CornerRadius="6"
+                        ClipToBounds="True"
+                        Background="#F21A202B">
+                    <Grid>
+                        <Border x:Name="EdgeProgressFill"
+                                Background="#53DCF8"
+                                CornerRadius="6"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Bottom">
+                            <Border x:Name="EdgeProgressTexture"
+                                    IsHitTestVisible="False"
+                                    Opacity="0.72" />
+                        </Border>
+                    </Grid>
+                </Border>
+                <Border x:Name="EdgeProgressOutline"
+                        CornerRadius="6"
+                        BorderBrush="#6638D9FF"
+                        BorderThickness="1"
+                        IsHitTestVisible="False" />
+            </Grid>
         </Border>
 
         <Popup x:Name="DetailsPopup"
