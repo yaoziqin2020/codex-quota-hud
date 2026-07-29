@@ -1,21 +1,42 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
 namespace CodexQuotaHud.App.Infrastructure;
 
+internal interface IAppServerProcessPlatform
+{
+    void EnsureCurrentProcessInKillOnCloseJob();
+    IAppServerChildProcess Start(ProcessStartInfo startInfo);
+    bool IsInKillOnCloseJob(IAppServerChildProcess process);
+}
+
+internal interface IAppServerChildProcess : IDisposable
+{
+    TextWriter StandardInput { get; }
+    TextReader StandardOutput { get; }
+    TextReader StandardError { get; }
+    bool HasExited { get; }
+
+    void Kill();
+    bool WaitForExit(TimeSpan timeout);
+    Task WaitForExitAsync(CancellationToken cancellationToken);
+}
+
 public sealed class AppServerProcess : IAppServerProcess, IDisposable
 {
-    private readonly Process _process;
-    private readonly SafeJobHandle _job;
+    private static readonly TimeSpan StartupCleanupTimeout = TimeSpan.FromSeconds(5);
+
+    private readonly IAppServerChildProcess _process;
     private bool _disposed;
 
-    private AppServerProcess(Process process, SafeJobHandle job)
+    private AppServerProcess(IAppServerChildProcess process)
     {
         _process = process;
-        _job = job;
     }
 
     public TextWriter StandardInput => _process.StandardInput;
@@ -25,39 +46,43 @@ public sealed class AppServerProcess : IAppServerProcess, IDisposable
 
     public static AppServerProcess Start(string absoluteCodexPath)
     {
+        return Start(
+            absoluteCodexPath,
+            WindowsAppServerProcessPlatform.Instance,
+            File.Exists);
+    }
+
+    internal static AppServerProcess Start(
+        string absoluteCodexPath,
+        IAppServerProcessPlatform platform,
+        Func<string, bool> fileExists)
+    {
+        ArgumentNullException.ThrowIfNull(platform);
+        ArgumentNullException.ThrowIfNull(fileExists);
+
         var startInfo = CreateStartInfo(absoluteCodexPath);
-        if (!File.Exists(startInfo.FileName))
+        if (!fileExists(startInfo.FileName))
         {
             throw new FileNotFoundException("The Codex executable was not found.", startInfo.FileName);
         }
 
-        var job = CreateKillOnCloseJob();
-        Process? process = null;
+        platform.EnsureCurrentProcessInKillOnCloseJob();
+        var process = platform.Start(startInfo);
 
         try
         {
-            process = Process.Start(startInfo) ??
-                throw new InvalidOperationException("Failed to start the Codex app-server process.");
-
-            if (!NativeMethods.AssignProcessToJobObject(job, process.Handle))
+            if (!platform.IsInKillOnCloseJob(process))
             {
-                throw new Win32Exception(
-                    Marshal.GetLastWin32Error(),
-                    "Failed to assign the Codex app-server process to its owning job.");
+                throw new InvalidOperationException(
+                    "The Codex app-server process did not inherit the HUD ownership job.");
             }
 
-            return new AppServerProcess(process, job);
+            return new AppServerProcess(process);
         }
-        catch
+        catch (Exception startupFailure)
         {
-            if (process is not null)
-            {
-                TryKill(process);
-                process.Dispose();
-            }
-
-            job.Dispose();
-            throw;
+            ThrowAfterStartupCleanup(process, startupFailure);
+            throw new UnreachableException();
         }
     }
 
@@ -67,8 +92,8 @@ public sealed class AppServerProcess : IAppServerProcess, IDisposable
 
         if (!_process.HasExited)
         {
-            _process.Kill(entireProcessTree: true);
-            await _process.WaitForExitAsync();
+            _process.Kill();
+            await _process.WaitForExitAsync(CancellationToken.None);
         }
     }
 
@@ -80,8 +105,7 @@ public sealed class AppServerProcess : IAppServerProcess, IDisposable
         }
 
         _disposed = true;
-        _job.Dispose();
-        _process.Dispose();
+        StopAndDispose(_process);
         GC.SuppressFinalize(this);
     }
 
@@ -111,55 +135,237 @@ public sealed class AppServerProcess : IAppServerProcess, IDisposable
         return startInfo;
     }
 
-    private static SafeJobHandle CreateKillOnCloseJob()
+    [DoesNotReturn]
+    private static void ThrowAfterStartupCleanup(
+        IAppServerChildProcess process,
+        Exception startupFailure)
     {
-        var job = NativeMethods.CreateJobObject(nint.Zero, null);
-        if (job.IsInvalid)
-        {
-            throw new Win32Exception(
-                Marshal.GetLastWin32Error(),
-                "Failed to create the Codex app-server ownership job.");
-        }
+        var failures = new List<Exception> { startupFailure };
+        var shouldKill = true;
 
-        var limits = new JobObjectExtendedLimitInformation
-        {
-            BasicLimitInformation = new JobObjectBasicLimitInformation
-            {
-                LimitFlags = JobObjectLimitFlags.KillOnJobClose
-            }
-        };
-
-        if (!NativeMethods.SetInformationJobObject(
-                job,
-                JobObjectInformationClass.ExtendedLimitInformation,
-                ref limits,
-                (uint)Marshal.SizeOf<JobObjectExtendedLimitInformation>()))
-        {
-            var error = new Win32Exception(
-                Marshal.GetLastWin32Error(),
-                "Failed to configure the Codex app-server ownership job.");
-            job.Dispose();
-            throw error;
-        }
-
-        return job;
-    }
-
-    private static void TryKill(Process process)
-    {
         try
         {
-            if (!process.HasExited)
+            shouldKill = !process.HasExited;
+        }
+        catch (Exception inspectionFailure)
+        {
+            failures.Add(inspectionFailure);
+        }
+
+        if (shouldKill)
+        {
+            try
             {
-                process.Kill(entireProcessTree: true);
+                process.Kill();
+            }
+            catch (Exception killFailure)
+            {
+                failures.Add(killFailure);
             }
         }
-        catch (InvalidOperationException)
+
+        try
+        {
+            if (!process.WaitForExit(StartupCleanupTimeout))
+            {
+                failures.Add(new TimeoutException(
+                    $"The Codex app-server process did not exit within {StartupCleanupTimeout}."));
+            }
+        }
+        catch (Exception waitFailure)
+        {
+            failures.Add(waitFailure);
+        }
+
+        try
+        {
+            process.Dispose();
+        }
+        catch (Exception disposeFailure)
+        {
+            failures.Add(disposeFailure);
+        }
+
+        if (failures.Count == 1)
+        {
+            ExceptionDispatchInfo.Capture(startupFailure).Throw();
+        }
+
+        throw new AggregateException(
+            "Codex app-server startup failed and cleanup was not fully successful.",
+            failures);
+    }
+
+    private static void StopAndDispose(IAppServerChildProcess process)
+    {
+        List<Exception>? failures = null;
+        var shouldStop = true;
+
+        try
+        {
+            shouldStop = !process.HasExited;
+        }
+        catch (Exception inspectionFailure)
+        {
+            (failures ??= []).Add(inspectionFailure);
+        }
+
+        if (shouldStop)
+        {
+            try
+            {
+                process.Kill();
+            }
+            catch (Exception killFailure)
+            {
+                (failures ??= []).Add(killFailure);
+            }
+
+            try
+            {
+                if (!process.WaitForExit(StartupCleanupTimeout))
+                {
+                    (failures ??= []).Add(new TimeoutException(
+                        $"The Codex app-server process did not exit within {StartupCleanupTimeout}."));
+                }
+            }
+            catch (Exception waitFailure)
+            {
+                (failures ??= []).Add(waitFailure);
+            }
+        }
+
+        try
+        {
+            process.Dispose();
+        }
+        catch (Exception disposeFailure)
+        {
+            (failures ??= []).Add(disposeFailure);
+        }
+
+        if (failures is not null)
+        {
+            throw new AggregateException(
+                "Failed to stop the Codex app-server process.",
+                failures);
+        }
+    }
+
+    private sealed class WindowsAppServerProcessPlatform : IAppServerProcessPlatform
+    {
+        private static readonly Lazy<SafeJobHandle> LifetimeJob = new(
+            CreateAndOwnCurrentProcess,
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
+        public static WindowsAppServerProcessPlatform Instance { get; } = new();
+
+        private WindowsAppServerProcessPlatform()
         {
         }
-        catch (Win32Exception)
+
+        public void EnsureCurrentProcessInKillOnCloseJob()
         {
+            _ = LifetimeJob.Value;
         }
+
+        public IAppServerChildProcess Start(ProcessStartInfo startInfo)
+        {
+            var process = Process.Start(startInfo) ??
+                throw new InvalidOperationException("Failed to start the Codex app-server process.");
+            return new SystemChildProcess(process);
+        }
+
+        public bool IsInKillOnCloseJob(IAppServerChildProcess process)
+        {
+            var systemProcess = (SystemChildProcess)process;
+            if (!NativeMethods.IsProcessInJob(
+                    systemProcess.Handle,
+                    LifetimeJob.Value,
+                    out var isInJob))
+            {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Failed to verify the Codex app-server ownership job.");
+            }
+
+            return isInJob;
+        }
+
+        private static SafeJobHandle CreateAndOwnCurrentProcess()
+        {
+            var job = CreateKillOnCloseJob();
+
+            using var currentProcess = Process.GetCurrentProcess();
+            // Windows 8+ supports nested jobs. If host policy rejects nesting,
+            // fail before spawning a child rather than weakening ownership.
+            if (!NativeMethods.AssignProcessToJobObject(job, currentProcess.Handle))
+            {
+                var error = new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Failed to assign the HUD to its app-server ownership job.");
+                job.Dispose();
+                throw error;
+            }
+
+            return job;
+        }
+
+        private static SafeJobHandle CreateKillOnCloseJob()
+        {
+            var job = NativeMethods.CreateJobObject(nint.Zero, null);
+            if (job.IsInvalid)
+            {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Failed to create the Codex app-server ownership job.");
+            }
+
+            var limits = new JobObjectExtendedLimitInformation
+            {
+                BasicLimitInformation = new JobObjectBasicLimitInformation
+                {
+                    LimitFlags = JobObjectLimitFlags.KillOnJobClose
+                }
+            };
+
+            if (!NativeMethods.SetInformationJobObject(
+                    job,
+                    JobObjectInformationClass.ExtendedLimitInformation,
+                    ref limits,
+                    (uint)Marshal.SizeOf<JobObjectExtendedLimitInformation>()))
+            {
+                var error = new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Failed to configure the Codex app-server ownership job.");
+                job.Dispose();
+                throw error;
+            }
+
+            return job;
+        }
+    }
+
+    private sealed class SystemChildProcess(Process process) : IAppServerChildProcess
+    {
+        public TextWriter StandardInput => process.StandardInput;
+        public TextReader StandardOutput => process.StandardOutput;
+        public TextReader StandardError => process.StandardError;
+        public bool HasExited => process.HasExited;
+        public nint Handle => process.Handle;
+
+        public void Kill() => process.Kill(entireProcessTree: true);
+
+        public bool WaitForExit(TimeSpan timeout)
+        {
+            var milliseconds = checked((int)timeout.TotalMilliseconds);
+            return process.WaitForExit(milliseconds);
+        }
+
+        public Task WaitForExitAsync(CancellationToken cancellationToken) =>
+            process.WaitForExitAsync(cancellationToken);
+
+        public void Dispose() => process.Dispose();
     }
 
     [Flags]
@@ -239,6 +445,13 @@ public sealed class AppServerProcess : IAppServerProcess, IDisposable
         internal static extern bool AssignProcessToJobObject(
             SafeJobHandle job,
             nint process);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool IsProcessInJob(
+            nint process,
+            SafeJobHandle job,
+            [MarshalAs(UnmanagedType.Bool)] out bool result);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

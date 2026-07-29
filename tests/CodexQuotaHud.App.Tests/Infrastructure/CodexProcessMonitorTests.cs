@@ -84,6 +84,102 @@ public sealed class CodexProcessMonitorTests
         Assert.False(monitor.IsRunning);
     }
 
+    [Fact]
+    public async Task DisposeAsyncWaitsForInFlightPollAndStopsFutureEvents()
+    {
+        var tick = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var pollEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releasePoll = new ManualResetEventSlim();
+        var snapshotCall = 0;
+        var eventCount = 0;
+
+        IReadOnlyList<IProcessSnapshot> GetSnapshots()
+        {
+            if (Interlocked.Increment(ref snapshotCall) == 1)
+            {
+                return [];
+            }
+
+            pollEntered.TrySetResult();
+            releasePoll.Wait();
+            return [new FakeProcessSnapshot(200, "Codex", new nint(1), null)];
+        }
+
+        var waiterCall = 0;
+        async ValueTask<bool> WaitForNextTick(CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref waiterCall) == 1)
+            {
+                return await tick.Task.WaitAsync(cancellationToken);
+            }
+
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return false;
+        }
+
+        var monitor = new CodexProcessMonitor(
+            GetSnapshots,
+            currentProcessId: 100,
+            startPolling: true,
+            WaitForNextTick);
+        monitor.RunningChanged += _ => Interlocked.Increment(ref eventCount);
+
+        tick.SetResult(true);
+        await pollEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var disposal = monitor.DisposeAsync().AsTask();
+        Assert.False(disposal.IsCompleted);
+
+        releasePoll.Set();
+        await disposal.WaitAsync(TimeSpan.FromSeconds(2));
+        var eventsAtDispose = Volatile.Read(ref eventCount);
+        await Task.Delay(50);
+
+        Assert.Equal(1, eventsAtDispose);
+        Assert.Equal(eventsAtDispose, Volatile.Read(ref eventCount));
+        Assert.Throws<ObjectDisposedException>(monitor.Poll);
+    }
+
+    [Fact]
+    public async Task DisposeAsyncSurfacesPollFault()
+    {
+        var tick = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var pollAttempted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var snapshotCall = 0;
+
+        IReadOnlyList<IProcessSnapshot> GetSnapshots()
+        {
+            if (Interlocked.Increment(ref snapshotCall) == 1)
+            {
+                return [];
+            }
+
+            pollAttempted.TrySetResult();
+            throw new InvalidOperationException("snapshot failed");
+        }
+
+        async ValueTask<bool> WaitForNextTick(CancellationToken cancellationToken)
+        {
+            return await tick.Task.WaitAsync(cancellationToken);
+        }
+
+        var monitor = new CodexProcessMonitor(
+            GetSnapshots,
+            currentProcessId: 100,
+            startPolling: true,
+            WaitForNextTick);
+        tick.SetResult(true);
+        await pollAttempted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => monitor.DisposeAsync().AsTask());
+
+        Assert.Equal("snapshot failed", error.Message);
+    }
+
     private static CodexProcessMonitor CreateMonitor(
         int currentProcessId,
         params IProcessSnapshot[] snapshots)

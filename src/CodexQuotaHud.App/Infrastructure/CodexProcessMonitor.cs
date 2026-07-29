@@ -11,7 +11,7 @@ internal interface IProcessSnapshot : IDisposable
     string? ExecutablePath { get; }
 }
 
-public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable
+public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable, IAsyncDisposable
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
@@ -19,8 +19,10 @@ public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable
     private readonly int _currentProcessId;
     private readonly CancellationTokenSource _stopping = new();
     private readonly Task _pollTask;
+    private readonly object _disposeLock = new();
     private int _isRunning;
-    private bool _disposed;
+    private int _lifecycleState;
+    private Task? _disposeTask;
 
     public CodexProcessMonitor()
         : this(ProcessSnapshotFactory.Capture, Environment.ProcessId, startPolling: true)
@@ -30,14 +32,17 @@ public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable
     internal CodexProcessMonitor(
         Func<IReadOnlyList<IProcessSnapshot>> getProcessSnapshots,
         int currentProcessId,
-        bool startPolling)
+        bool startPolling,
+        Func<CancellationToken, ValueTask<bool>>? waitForNextTick = null)
     {
         ArgumentNullException.ThrowIfNull(getProcessSnapshots);
 
         _getProcessSnapshots = getProcessSnapshots;
         _currentProcessId = currentProcessId;
         _isRunning = DetectRunningCodex() ? 1 : 0;
-        _pollTask = startPolling ? PollPeriodicallyAsync(_stopping.Token) : Task.CompletedTask;
+        _pollTask = startPolling
+            ? StartPolling(waitForNextTick, _stopping.Token)
+            : Task.CompletedTask;
     }
 
     public bool IsRunning => Volatile.Read(ref _isRunning) != 0;
@@ -46,8 +51,15 @@ public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable
 
     internal void Poll()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(
+            Volatile.Read(ref _lifecycleState) != 0,
+            this);
 
+        PollCore();
+    }
+
+    private void PollCore()
+    {
         var isRunning = DetectRunningCodex();
         var previous = Interlocked.Exchange(ref _isRunning, isRunning ? 1 : 0) != 0;
         if (previous != isRunning)
@@ -97,15 +109,32 @@ public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
 
-        _disposed = true;
+    public ValueTask DisposeAsync()
+    {
+        lock (_disposeLock)
+        {
+            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        Interlocked.CompareExchange(ref _lifecycleState, 1, 0);
         _stopping.Cancel();
-        _stopping.Dispose();
-        GC.SuppressFinalize(this);
+
+        try
+        {
+            await _pollTask.ConfigureAwait(false);
+        }
+        finally
+        {
+            _stopping.Dispose();
+            Volatile.Write(ref _lifecycleState, 2);
+            GC.SuppressFinalize(this);
+        }
     }
 
     private bool DetectRunningCodex()
@@ -136,15 +165,35 @@ public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable
         }
     }
 
-    private async Task PollPeriodicallyAsync(CancellationToken cancellationToken)
+    private Task StartPolling(
+        Func<CancellationToken, ValueTask<bool>>? waitForNextTick,
+        CancellationToken cancellationToken)
+    {
+        return waitForNextTick is null
+            ? PollUsingPeriodicTimerAsync(cancellationToken)
+            : PollPeriodicallyAsync(waitForNextTick, cancellationToken);
+    }
+
+    private async Task PollUsingPeriodicTimerAsync(CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(PollInterval);
+        await PollPeriodicallyAsync(timer.WaitForNextTickAsync, cancellationToken);
+    }
 
+    private async Task PollPeriodicallyAsync(
+        Func<CancellationToken, ValueTask<bool>> waitForNextTick,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            while (await waitForNextTick(cancellationToken))
             {
-                Poll();
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                PollCore();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
