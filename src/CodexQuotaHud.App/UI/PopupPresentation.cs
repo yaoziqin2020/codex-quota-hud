@@ -138,23 +138,23 @@ public static class EdgeProgressThemeProvider
         skin switch
         {
             SkinId.EnergyRing => Create(
-                "#F2111024", "#A18D62FF",
+                "#F2111024", "#FF8D62FF",
                 ["#FF9A68FF", "#FFB85FE8", "#FF765DDE"],
                 "#A6E9D8FF", 45, 7, 1.2, 0.58, 0.76),
             SkinId.LiquidGlass => Create(
-                "#D8142834", "#A2A9EAFF",
+                "#D8142834", "#FFD0EEFF",
                 ["#FFBDF4FF", "#FF6FD9F5", "#FF9DE8FF"],
                 "#B8FFFFFF", -35, 11, 0.8, 0.48, 0.7),
             SkinId.Aurora => Create(
-                "#F20B211B", "#8A4BC88D",
+                "#F20B211B", "#FF49D294",
                 ["#FF35C982", "#FF55D99A", "#FF28A987"],
                 "#806DDDA8", 28, 13, 1.1, 0.24, 0.44),
             SkinId.LiquidTank => Create(
-                "#F20C2430", "#A259CDEA",
+                "#F20C2430", "#FF59CDEA",
                 ["#FF84EBF6", "#FF39C7E5", "#FF506EEB"],
                 "#A8D9F8FF", 90, 9, 1, 0.52, 0.72),
             _ => Create(
-                "#F20A1622", "#A238D9FF",
+                "#F20A1622", "#FF38D9FF",
                 ["#FF58E6FA", "#FF24B8F2", "#FF4B7DFF"],
                 "#A6C4F7FF", 0, 6, 0.8, 0.5, 0.78)
         };
