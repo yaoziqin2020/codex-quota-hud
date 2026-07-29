@@ -4,65 +4,179 @@
         xmlns:controls="clr-namespace:CodexQuotaHud.App.UI.Controls"
         xmlns:skins="clr-namespace:CodexQuotaHud.App.UI.Skins"
         Width="132" Height="132" Background="Transparent">
-    <Grid Margin="4">
-        <Ellipse Margin="4" Fill="#E308111A" Stroke="#6A31D6E8" StrokeThickness="1.2">
+    <Grid>
+        <!-- A restrained ambient halo keeps the glass readable without making
+             the skin look like another circular HUD dial. -->
+        <Ellipse Width="116" Height="116" Opacity=".34">
+            <Ellipse.Fill>
+                <RadialGradientBrush>
+                    <GradientStop Color="#3539DDEE" Offset="0" />
+                    <GradientStop Color="#101C92C1" Offset=".66" />
+                    <GradientStop Color="#001C92C1" Offset="1" />
+                </RadialGradientBrush>
+            </Ellipse.Fill>
             <Ellipse.Effect>
-                <DropShadowEffect Color="#21CFE8" BlurRadius="13" ShadowDepth="0" Opacity=".32" />
+                <BlurEffect Radius="11" />
             </Ellipse.Effect>
         </Ellipse>
-        <controls:ProgressArc x:Name="SecondaryArc" Margin="7"
-                              Stroke="#AE836AFF" TrackStroke="#243F3468"
-                              StrokeThickness="4" />
-        <Grid Width="76" Height="90" VerticalAlignment="Center">
-            <Border CornerRadius="31" BorderBrush="#B65EE8F2" BorderThickness="2"
-                    Background="#71101F2A" />
-            <Grid Margin="5" ClipToBounds="True">
+
+        <!-- Weekly quota stays peripheral and visually subordinate to the
+             primary liquid level. -->
+        <controls:ProgressArc x:Name="SecondaryArc"
+                              Margin="4"
+                              Stroke="#928A79FF"
+                              TrackStroke="#18385A70"
+                              StrokeThickness="2.5" />
+        <StackPanel x:Name="WeeklyTicks"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Margin="0,0,7,0"
+                    Opacity=".56">
+            <Border Width="7" Height="1" Margin="0,3" Background="#8FA997FF" />
+            <Border Width="4" Height="1" Margin="0,3" Background="#6684DCE9" />
+            <Border Width="6" Height="1" Margin="0,3" Background="#7BA997FF" />
+            <Border Width="4" Height="1" Margin="0,3" Background="#6684DCE9" />
+            <Border Width="7" Height="1" Margin="0,3" Background="#8FA997FF" />
+        </StackPanel>
+
+        <!-- The primary quota is a literal glass vessel whose fill height is
+             driven directly from the remaining percentage. -->
+        <Grid Width="82" Height="108"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center">
+            <Border CornerRadius="38"
+                    Background="#76132131"
+                    BorderThickness="1.4">
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#D0EAFBFF" Offset="0" />
+                        <GradientStop Color="#674FCFE3" Offset=".42" />
+                        <GradientStop Color="#A58F77FF" Offset=".78" />
+                        <GradientStop Color="#8AEAFBFF" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <Border.Effect>
+                    <DropShadowEffect Color="#2CCFE9" BlurRadius="12"
+                                      ShadowDepth="0" Opacity=".38" />
+                </Border.Effect>
+            </Border>
+
+            <Grid Width="72" Height="96"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  ClipToBounds="True">
                 <Grid.Clip>
-                    <RectangleGeometry Rect="0,0,66,80" RadiusX="27" RadiusY="27" />
+                    <RectangleGeometry Rect="0,0,72,96"
+                                       RadiusX="33" RadiusY="33" />
                 </Grid.Clip>
-                <Rectangle x:Name="LiquidFill" Height="40"
-                           VerticalAlignment="Bottom" RenderTransformOrigin=".5,.5">
-                    <Rectangle.Fill>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                            <GradientStop Color="#CC48E8F5" Offset="0" />
-                            <GradientStop Color="#B93C8BFF" Offset=".58" />
-                            <GradientStop Color="#AA6552E9" Offset="1" />
-                        </LinearGradientBrush>
-                    </Rectangle.Fill>
-                    <Rectangle.RenderTransform>
-                        <TranslateTransform x:Name="TankSloshTransform" />
-                    </Rectangle.RenderTransform>
-                </Rectangle>
-                <Path x:Name="WaveCrest" Data="M -4,43 C 10,36 21,49 34,42 C 48,35 60,48 72,40"
-                      Stroke="#C4E8FCFF" StrokeThickness="1.5"
-                      RenderTransformOrigin=".5,.5">
-                    <Path.RenderTransform>
-                        <TranslateTransform x:Name="TankWaveTransform" />
-                    </Path.RenderTransform>
-                </Path>
-                <Ellipse Width="6" Height="6" Fill="#80FFFFFF"
-                         HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                         Margin="0,0,12,19" />
+
+                <Rectangle Fill="#25152535" />
+                <Grid x:Name="LiquidLayer"
+                      Height="48"
+                      VerticalAlignment="Bottom"
+                      ClipToBounds="True">
+                    <Rectangle>
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#E556E6F3" Offset="0" />
+                                <GradientStop Color="#D536B7EA" Offset=".38" />
+                                <GradientStop Color="#CD596DFF" Offset=".78" />
+                                <GradientStop Color="#D52E4EC3" Offset="1" />
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle VerticalAlignment="Top" Height="15" Opacity=".52">
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#B5E9FDFF" Offset="0" />
+                                <GradientStop Color="#007CE5F5" Offset="1" />
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Path Data="M -8,7 C 4,1 15,12 27,6 C 40,0 52,11 64,5 C 72,2 78,6 82,8"
+                          Stroke="#E0F2FFFF"
+                          StrokeThickness="1.4"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          VerticalAlignment="Top">
+                        <Path.Effect>
+                            <DropShadowEffect Color="#B2F7FF" BlurRadius="4"
+                                              ShadowDepth="0" />
+                        </Path.Effect>
+                        <Path.RenderTransform>
+                            <TranslateTransform x:Name="TankWaveTransform" />
+                        </Path.RenderTransform>
+                    </Path>
+                    <Ellipse Width="5" Height="5"
+                             Fill="#83F2FFFF"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Top"
+                             Margin="0,17,13,0" />
+                    <Ellipse Width="3" Height="3"
+                             Fill="#A8FFFFFF"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Center"
+                             Margin="17,0,0,4" />
+                    <Ellipse Width="7" Height="7"
+                             Stroke="#6FFFFFFF"
+                             StrokeThickness="1"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Bottom"
+                             Margin="0,0,20,13" />
+                </Grid>
+
+                <Path Data="M 18,13 C 9,27 9,61 18,77"
+                      Stroke="#72FFFFFF"
+                      StrokeThickness="2.2"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round" />
+                <Ellipse Width="13" Height="6"
+                         Fill="#45FFFFFF"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Top"
+                         Margin="0,12,13,0"
+                         RenderTransformOrigin=".5,.5">
+                    <Ellipse.RenderTransform>
+                        <RotateTransform Angle="-24" />
+                    </Ellipse.RenderTransform>
+                </Ellipse>
             </Grid>
-            <Border CornerRadius="31" BorderBrush="#35FFFFFF" BorderThickness="1"
-                    Margin="4" />
+
+            <Border Margin="4"
+                    CornerRadius="34"
+                    BorderBrush="#33FFFFFF"
+                    BorderThickness="1"
+                    Background="Transparent" />
         </Grid>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock x:Name="PercentText" Foreground="#FFFFFF"
-                       FontSize="22" FontWeight="SemiBold"
+
+        <StackPanel HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsHitTestVisible="False">
+            <TextBlock x:Name="PercentText"
+                       Foreground="#FFFFFFFF"
+                       FontFamily="Segoe UI Variable Display"
+                       FontSize="23"
+                       FontWeight="SemiBold"
                        HorizontalAlignment="Center">
                 <TextBlock.Effect>
-                    <DropShadowEffect Color="#09213A" BlurRadius="4" ShadowDepth="1" />
+                    <DropShadowEffect Color="#07141F"
+                                      BlurRadius="6"
+                                      ShadowDepth="1"
+                                      Opacity=".92" />
                 </TextBlock.Effect>
             </TextBlock>
-            <Border Background="#8A102437" CornerRadius="7" Padding="5,1">
-                <TextBlock x:Name="LabelText" Foreground="#E2F8FD"
-                           FontSize="10" HorizontalAlignment="Center" />
+            <Border Background="#A20A1B2A"
+                    BorderBrush="#2FFFFFFF"
+                    BorderThickness=".6"
+                    CornerRadius="8"
+                    Padding="6,1"
+                    Margin="0,1,0,0">
+                <TextBlock x:Name="LabelText"
+                           Foreground="#EAFBFFFF"
+                           FontSize="10.5"
+                           FontWeight="Medium"
+                           HorizontalAlignment="Center" />
             </Border>
         </StackPanel>
-        <Border Width="28" Height="5" CornerRadius="2.5"
-                Background="#7D64E8F3" VerticalAlignment="Top" Margin="0,8,0,0" />
-        <Border Width="20" Height="4" CornerRadius="2"
-                Background="#603E8EA2" VerticalAlignment="Bottom" Margin="0,0,0,7" />
     </Grid>
 </skins:AnimatedQuotaSkin>

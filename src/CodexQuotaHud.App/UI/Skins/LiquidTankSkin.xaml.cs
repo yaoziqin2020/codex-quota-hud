@@ -5,18 +5,14 @@ namespace CodexQuotaHud.App.UI.Skins;
 
 public partial class LiquidTankSkin : AnimatedQuotaSkin
 {
-    private const double TankHeight = 80;
+    private const double LiquidCapacity = 96;
 
     public LiquidTankSkin()
     {
         InitializeComponent();
         ConfigureSlosh(
-            nameof(TankSloshTransform),
-            idleSeconds: 18,
-            refreshingSeconds: 2.8);
-        ConfigureSlosh(
             nameof(TankWaveTransform),
-            idleSeconds: 23,
+            idleSeconds: 24,
             refreshingSeconds: 3.2);
     }
 
@@ -24,18 +20,22 @@ public partial class LiquidTankSkin : AnimatedQuotaSkin
 
     protected override void RenderCore(QuotaSkinState state)
     {
-        var height = TankHeight * state.PrimaryPercent / 100;
-        LiquidFill.Height = height;
-        WaveCrest.Margin = new Thickness(
-            0,
-            Math.Clamp(TankHeight - height - 5, -4, TankHeight - 5),
-            0,
-            0);
+        LiquidLayer.Height = CalculateLiquidHeight(state.PrimaryPercent);
         SecondaryArc.Progress = state.SecondaryPercent ?? 0;
-        SecondaryArc.Visibility = state.Mode == QuotaDisplayMode.Dual
+        var secondaryVisibility = state.Mode == QuotaDisplayMode.Dual
             ? Visibility.Visible
             : Visibility.Collapsed;
+        SecondaryArc.Visibility = secondaryVisibility;
+        WeeklyTicks.Visibility = secondaryVisibility;
         PercentText.Text = $"{state.PrimaryPercent:0}%";
         LabelText.Text = state.PrimaryLabel;
+    }
+
+    internal static double CalculateLiquidHeight(double remainingPercent)
+    {
+        var normalized = double.IsFinite(remainingPercent)
+            ? Math.Clamp(remainingPercent, 0, 100)
+            : 0;
+        return LiquidCapacity * normalized / 100;
     }
 }
