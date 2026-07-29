@@ -5,9 +5,9 @@
         xmlns:skins="clr-namespace:CodexQuotaHud.App.UI.Skins"
         Width="132" Height="132" Background="Transparent">
     <Grid Margin="4">
-        <Ellipse Margin="4" Fill="#DE07131D" Stroke="#7039DFF8" StrokeThickness="1">
+        <Ellipse Margin="4" Fill="#E00D1020" Stroke="#807A5CFF" StrokeThickness="1">
             <Ellipse.Effect>
-                <DropShadowEffect Color="#2BE2FF" BlurRadius="16" ShadowDepth="0" Opacity=".42" />
+                <DropShadowEffect Color="#8B5CFF" BlurRadius="16" ShadowDepth="0" Opacity=".38" />
             </Ellipse.Effect>
         </Ellipse>
 
@@ -16,29 +16,29 @@
                 <RotateTransform x:Name="EnergyOrbitTransform" />
             </Grid.RenderTransform>
             <Ellipse x:Name="EnergyOrbit" Width="116" Height="76"
-                     Stroke="#A353E8FF" StrokeThickness="1.8"
+                     Stroke="#B27868FF" StrokeThickness="1.8"
                      StrokeDashArray="4,3"
                      RenderTransformOrigin=".5,.5">
                 <Ellipse.RenderTransform>
                     <RotateTransform Angle="-24" />
                 </Ellipse.RenderTransform>
             </Ellipse>
-            <Ellipse Width="10" Height="10" Fill="#D8FBFF"
+            <Ellipse Width="10" Height="10" Fill="#F3D8FF"
                      HorizontalAlignment="Center" VerticalAlignment="Top"
                      Margin="0,23,0,0">
                 <Ellipse.Effect>
-                    <DropShadowEffect Color="#41E7FF" BlurRadius="10" ShadowDepth="0" />
+                    <DropShadowEffect Color="#B96BFF" BlurRadius="10" ShadowDepth="0" />
                 </Ellipse.Effect>
             </Ellipse>
             <Path Data="M 104,43 L 111,48 L 104,53 L 97,48 Z"
-                  Fill="#E18B68FF" Stroke="#C9F2E8FF" StrokeThickness=".8" />
+                  Fill="#E95FBFE8" Stroke="#D7F1D8FF" StrokeThickness=".8" />
         </Grid>
 
         <controls:ProgressArc x:Name="SecondaryArc" Margin="9"
-                              Stroke="#B98A63FF" TrackStroke="#263C3A76"
+                              Stroke="#D9ED68C7" TrackStroke="#303E2D73"
                               StrokeThickness="4" />
         <controls:ProgressArc x:Name="PrimaryArc" Margin="20"
-                              Stroke="#FF37E5FF" TrackStroke="#3237D7ED"
+                              Stroke="#FF9A68FF" TrackStroke="#385B37A8"
                               StrokeThickness="6" />
         <Ellipse x:Name="EnergyCoreGlow" Width="66" Height="66">
             <Ellipse.Fill>

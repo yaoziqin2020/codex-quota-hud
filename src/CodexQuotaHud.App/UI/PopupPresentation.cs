@@ -97,7 +97,7 @@ public static class PopupThemeProvider
     public static PopupTheme Get(SkinId skin) =>
         skin switch
         {
-            SkinId.EnergyRing => Create("#F20A1722", "#8A35E8FF", "#53ECFF", "#1DDCFF", PopupDecorationKind.EnergyRing),
+            SkinId.EnergyRing => Create("#F2111024", "#8A8D62FF", "#AE7BFF", "#965FFF", PopupDecorationKind.EnergyRing),
             SkinId.LiquidGlass => Create("#E8162635", "#8AADEBFF", "#B9F1FF", "#8ADFFF", PopupDecorationKind.LiquidGlass),
             SkinId.Aurora => Create("#F212241F", "#8A57E6A3", "#62F2A0", "#44E89A", PopupDecorationKind.Aurora),
             SkinId.LiquidTank => Create("#ED102632", "#8A59CDEA", "#8DE9F5", "#3DCBE8", PopupDecorationKind.LiquidTank),
@@ -138,9 +138,9 @@ public static class EdgeProgressThemeProvider
         skin switch
         {
             SkinId.EnergyRing => Create(
-                "#F20A101C", "#A15371FF",
-                ["#FF8B4DFF", "#FF43E6FF", "#FF63F5FF"],
-                "#A6FFFFFF", 45, 7, 1.2, 0.62, 0.82),
+                "#F2111024", "#A18D62FF",
+                ["#FF9A68FF", "#FFB85FE8", "#FF765DDE"],
+                "#A6E9D8FF", 45, 7, 1.2, 0.58, 0.76),
             SkinId.LiquidGlass => Create(
                 "#D8142834", "#A2A9EAFF",
                 ["#FFBDF4FF", "#FF6FD9F5", "#FF9DE8FF"],
