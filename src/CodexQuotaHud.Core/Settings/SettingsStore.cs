@@ -7,7 +7,7 @@ namespace CodexQuotaHud.Core.Settings;
 
 public sealed class SettingsStore
 {
-    private static readonly ConcurrentDictionary<string, object> SaveLocks =
+    private static readonly ConcurrentDictionary<string, SaveLockEntry> SaveLocks =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -15,7 +15,9 @@ public sealed class SettingsStore
         Converters = { new JsonStringEnumConverter() }
     };
 
-    private readonly object _saveSync;
+    private readonly string _saveLockKey;
+
+    internal static int ActiveSaveLockCount => SaveLocks.Count;
 
     public SettingsStore()
         : this(Path.Combine(
@@ -29,7 +31,7 @@ public sealed class SettingsStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsPath);
         SettingsPath = settingsPath;
-        _saveSync = SaveLocks.GetOrAdd(Path.GetFullPath(settingsPath), _ => new object());
+        _saveLockKey = Path.GetFullPath(settingsPath);
     }
 
     public string SettingsPath { get; }
@@ -84,7 +86,7 @@ public sealed class SettingsStore
             Directory.CreateDirectory(directory);
         }
 
-        lock (_saveSync)
+        using (AcquireSaveLock(_saveLockKey))
         {
             var temporaryPath =
                 $"{SettingsPath}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
@@ -189,6 +191,91 @@ public sealed class SettingsStore
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException)
         {
+        }
+    }
+
+    private static SaveLockLease AcquireSaveLock(string path)
+    {
+        while (true)
+        {
+            var entry = SaveLocks.GetOrAdd(path, static _ => new SaveLockEntry());
+            lock (entry.LifecycleSync)
+            {
+                if (entry.IsRetired)
+                {
+                    continue;
+                }
+
+                entry.ReferenceCount++;
+            }
+
+            try
+            {
+                Monitor.Enter(entry.SaveSync);
+                return new SaveLockLease(path, entry);
+            }
+            catch
+            {
+                ReleaseSaveLockReference(path, entry);
+                throw;
+            }
+        }
+    }
+
+    private static void ReleaseSaveLockReference(string path, SaveLockEntry entry)
+    {
+        lock (entry.LifecycleSync)
+        {
+            entry.ReferenceCount--;
+            if (entry.ReferenceCount != 0)
+            {
+                return;
+            }
+
+            entry.IsRetired = true;
+            ((ICollection<KeyValuePair<string, SaveLockEntry>>)SaveLocks).Remove(
+                new KeyValuePair<string, SaveLockEntry>(path, entry));
+        }
+    }
+
+    private sealed class SaveLockEntry
+    {
+        public object LifecycleSync { get; } = new();
+
+        public object SaveSync { get; } = new();
+
+        public int ReferenceCount { get; set; }
+
+        public bool IsRetired { get; set; }
+    }
+
+    private sealed class SaveLockLease : IDisposable
+    {
+        private readonly string _path;
+        private SaveLockEntry? _entry;
+
+        public SaveLockLease(string path, SaveLockEntry entry)
+        {
+            _path = path;
+            _entry = entry;
+        }
+
+        public void Dispose()
+        {
+            var entry = Interlocked.Exchange(ref _entry, null);
+            if (entry is null)
+            {
+                return;
+            }
+
+            try
+            {
+                Monitor.Exit(entry.SaveSync);
+            }
+            finally
+            {
+                ReleaseSaveLockReference(_path, entry);
+            }
         }
     }
 }

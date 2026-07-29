@@ -57,10 +57,11 @@ public sealed class SingleInstanceGuardTests
         var name = UniqueMutexName();
         using var observer = new Mutex(initiallyOwned: false, name);
         using var ownerReady = new ManualResetEventSlim();
+        Mutex? abandonedOwner = null;
         var owner = new Thread(() =>
         {
-            using var mutex = new Mutex(initiallyOwned: false, name);
-            mutex.WaitOne();
+            abandonedOwner = new Mutex(initiallyOwned: false, name);
+            abandonedOwner.WaitOne();
             ownerReady.Set();
         });
 
@@ -68,9 +69,21 @@ public sealed class SingleInstanceGuardTests
         Assert.True(ownerReady.Wait(TimeSpan.FromSeconds(2)));
         Assert.True(owner.Join(TimeSpan.FromSeconds(2)));
 
-        using var guard = SingleInstanceGuard.TryAcquire(name);
-
-        Assert.NotNull(guard);
+        try
+        {
+            SingleInstanceGuard? guard = null;
+            Assert.True(SpinWait.SpinUntil(
+                () => (guard = SingleInstanceGuard.TryAcquire(name)) is not null,
+                TimeSpan.FromSeconds(2)));
+            using (guard)
+            {
+                Assert.NotNull(guard);
+            }
+        }
+        finally
+        {
+            abandonedOwner?.Dispose();
+        }
     }
 
     [Fact]

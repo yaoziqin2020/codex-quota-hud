@@ -113,6 +113,7 @@ public sealed class SettingsStoreTests : IDisposable
     [Fact]
     public void Save_WhenAtomicMoveFails_DoesNotDamageExistingSettings()
     {
+        var baselineLocks = SettingsStore.ActiveSaveLockCount;
         var store = CreateStore();
         var original = new AppSettings(SelectedSkin: SkinId.Aurora);
         store.Save(original);
@@ -132,12 +133,14 @@ public sealed class SettingsStoreTests : IDisposable
         lockedTarget.Dispose();
         Assert.Equal(original, store.Load());
         Assert.Empty(TemporaryFiles());
+        Assert.Equal(baselineLocks, SettingsStore.ActiveSaveLockCount);
     }
 
     [Fact]
     public async Task Save_ConcurrentCallsEachCompleteAndLeaveOneWholeSettingsDocument()
     {
         const int writerCount = 16;
+        var baselineLocks = SettingsStore.ActiveSaveLockCount;
         var store = CreateStore();
         using var start = new Barrier(writerCount);
         var candidates = Enumerable.Range(1, writerCount)
@@ -166,6 +169,22 @@ public sealed class SettingsStoreTests : IDisposable
 
         Assert.Contains(store.Load(), candidates);
         Assert.Empty(TemporaryFiles());
+        Assert.Equal(baselineLocks, SettingsStore.ActiveSaveLockCount);
+    }
+
+    [Fact]
+    public void Save_ManyShortLivedPaths_DoNotRemainInTheActiveLockPool()
+    {
+        const int pathCount = 64;
+        var baseline = SettingsStore.ActiveSaveLockCount;
+
+        for (var index = 0; index < pathCount; index++)
+        {
+            var path = Path.Combine(_directory, $"short-lived-{index}", "settings.json");
+            new SettingsStore(path).Save(new AppSettings(Left: index));
+        }
+
+        Assert.Equal(baseline, SettingsStore.ActiveSaveLockCount);
     }
 
     public void Dispose()
