@@ -83,12 +83,6 @@
                             Background="#53DCF8"
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Bottom" />
-                    <Border x:Name="EdgeProgressSheen"
-                            Width="2"
-                            Margin="2"
-                            CornerRadius="1"
-                            HorizontalAlignment="Left"
-                            Background="#88FFFFFF" />
                 </Grid>
             </Border>
         </Border>

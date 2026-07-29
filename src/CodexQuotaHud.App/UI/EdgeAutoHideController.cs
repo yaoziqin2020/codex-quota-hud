@@ -353,6 +353,18 @@ internal sealed class EdgeAutoHideController(
         }
     }
 
+    public bool TryExpandCollapsed()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!IsCollapsed)
+        {
+            return false;
+        }
+
+        Expand();
+        return true;
+    }
+
     public void CancelPendingCollapse() =>
         Interlocked.Increment(ref _generation);
 

@@ -187,9 +187,16 @@ public partial class QuotaOrbWindow : Window
         _ = ScheduleEdgeCollapseAsync();
     }
 
-    private void OnOrbMouseEnter(object sender, MouseEventArgs e)
+    private async void OnOrbMouseEnter(object sender, MouseEventArgs e)
     {
         _edgeAutoHideController.CancelPendingCollapse();
+        try
+        {
+            await RevealOrbAsync();
+        }
+        catch
+        {
+        }
     }
 
     private async void OnOrbMouseLeave(object sender, MouseEventArgs e)
@@ -542,19 +549,15 @@ public partial class QuotaOrbWindow : Window
         EdgeProgressFill.Height = vertical
             ? fillLength
             : double.NaN;
-        EdgeProgressSheen.Width = vertical ? 2 : double.NaN;
-        EdgeProgressSheen.Height = vertical ? double.NaN : 2;
-        EdgeProgressSheen.HorizontalAlignment = vertical
-            ? System.Windows.HorizontalAlignment.Left
-            : System.Windows.HorizontalAlignment.Stretch;
-        EdgeProgressSheen.VerticalAlignment = vertical
-            ? System.Windows.VerticalAlignment.Stretch
-            : System.Windows.VerticalAlignment.Top;
     }
 
     private async Task RevealOrbAsync()
     {
-        _edgeAutoHideController.Expand();
+        if (!_edgeAutoHideController.TryExpandCollapsed())
+        {
+            return;
+        }
+
         var completion = _expandAnimationCompletion;
         if (completion is not null)
         {
@@ -676,7 +679,6 @@ public partial class QuotaOrbWindow : Window
         EdgeProgressTrack.Background = theme.Background;
         EdgeProgressTrack.BorderBrush = theme.Border;
         EdgeProgressFill.Background = theme.Accent;
-        EdgeProgressSheen.Background = theme.SecondaryText;
         EdgeHandleGlow.Color = theme.ShadowColor;
         HudDialPopupDecoration.Visibility =
             theme.Decoration == PopupDecorationKind.HudDial

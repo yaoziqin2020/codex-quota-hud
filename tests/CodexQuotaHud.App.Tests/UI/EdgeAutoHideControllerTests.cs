@@ -147,6 +147,23 @@ public sealed class EdgeAutoHideControllerTests
         Assert.True(controller.IsCollapsed);
     }
 
+    [Fact]
+    public async Task HoveringCollapsedProgress_RevealsOrbOnlyOnce()
+    {
+        var expanded = new List<EdgeDockSide>();
+        using var controller = new EdgeAutoHideController(
+            () => Task.CompletedTask,
+            _ => { },
+            expanded.Add);
+        controller.SetDock(EdgeDockSide.Top);
+        Assert.True(await controller.ScheduleCollapseAsync(() => true));
+
+        Assert.True(controller.TryExpandCollapsed());
+        Assert.False(controller.IsCollapsed);
+        Assert.False(controller.TryExpandCollapsed());
+        Assert.Equal([EdgeDockSide.Top], expanded);
+    }
+
     [Theory]
     [InlineData(-10, 0)]
     [InlineData(0, 0)]

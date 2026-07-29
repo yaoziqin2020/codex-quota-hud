@@ -140,6 +140,7 @@ public sealed class QuotaOrbWindowStartupTests
                 window.FindName("EdgeProgressTrack"));
             var fill = Assert.IsType<Border>(
                 window.FindName("EdgeProgressFill"));
+            Assert.Null(window.FindName("EdgeProgressSheen"));
 
             foreach (var (side, horizontal, vertical, width, height) in
                 new[]
