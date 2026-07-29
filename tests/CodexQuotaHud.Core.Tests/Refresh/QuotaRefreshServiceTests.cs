@@ -827,6 +827,107 @@ public sealed class QuotaRefreshServiceTests
             "The hidden notification waited on its own disposal task.");
     }
 
+    [Fact]
+    public async Task HandlerFirstDispose_ExternalDisposeWaitsForHiddenNotification()
+    {
+        var client = new FakeQuotaClient(
+            _ => Task.FromResult(Snapshot(StartTime, remainingPercent: 73)));
+        var clock = new FakeClock(StartTime);
+        var service = new QuotaRefreshService(client, clock);
+        await service.SetCodexRunningAsync(true, CancellationToken.None);
+        using var handlerDisposeReturned = new ManualResetEventSlim();
+        using var hiddenHandlerEntered = new ManualResetEventSlim();
+        using var releaseHiddenHandler = new ManualResetEventSlim();
+        var disposeFromHandlerOnce = 0;
+        var externalDisposeReturned = 0;
+        var callbackAfterExternalDispose = 0;
+
+        service.StateChanged += state =>
+        {
+            if (state.IsRefreshing &&
+                Interlocked.CompareExchange(
+                    ref disposeFromHandlerOnce,
+                    1,
+                    0) == 0)
+            {
+                service.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                handlerDisposeReturned.Set();
+            }
+        };
+        service.StateChanged += state =>
+        {
+            if (!state.IsCodexRunning)
+            {
+                hiddenHandlerEntered.Set();
+                releaseHiddenHandler.Wait();
+                if (Volatile.Read(ref externalDisposeReturned) == 1)
+                {
+                    Volatile.Write(ref callbackAfterExternalDispose, 1);
+                }
+            }
+        };
+
+        var refresh = service.RefreshNowAsync(false, CancellationToken.None);
+        Task? externalDisposal = null;
+        var completedWhileHiddenWasBlocked = false;
+        try
+        {
+            Assert.True(
+                handlerDisposeReturned.Wait(TimeSpan.FromSeconds(2)));
+            Assert.True(hiddenHandlerEntered.Wait(TimeSpan.FromSeconds(2)));
+            externalDisposal = service.DisposeAsync().AsTask();
+            _ = externalDisposal.ContinueWith(
+                _ => Volatile.Write(ref externalDisposeReturned, 1),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            completedWhileHiddenWasBlocked =
+                await Task.WhenAny(externalDisposal, Task.Delay(250)) ==
+                externalDisposal;
+        }
+        finally
+        {
+            releaseHiddenHandler.Set();
+            if (externalDisposal is not null)
+            {
+                await externalDisposal.WaitAsync(TimeSpan.FromSeconds(2));
+            }
+
+            await refresh.WaitAsync(TimeSpan.FromSeconds(2));
+        }
+
+        Assert.False(
+            completedWhileHiddenWasBlocked,
+            "External Dispose returned before the hidden notification.");
+        Assert.Equal(
+            0,
+            Volatile.Read(ref callbackAfterExternalDispose));
+    }
+
+    [Fact]
+    public async Task Stop_ObservesFaultedBackgroundRetirement()
+    {
+        var client = new FakeQuotaClient(
+            _ => Task.FromResult(Snapshot(StartTime, remainingPercent: 73)));
+        var clock = new GatedFaultClock(StartTime);
+        var service = new QuotaRefreshService(client, clock);
+        await service.SetCodexRunningAsync(true, CancellationToken.None);
+        await clock.DelayCalled.WaitAsync(TimeSpan.FromSeconds(2));
+
+        await service.SetCodexRunningAsync(false, CancellationToken.None);
+        var trackedWhilePending =
+            TrackedBackgroundRetirementCount(service);
+        clock.FailDelay();
+        await WaitUntilAsync(() => TrackedSessionCount(service) == 0);
+        await WaitUntilAsync(
+            () => TrackedBackgroundRetirementCount(service) == 0);
+        var disposeError = await Record.ExceptionAsync(
+            () => service.DisposeAsync().AsTask());
+
+        Assert.Equal(1, trackedWhilePending);
+        Assert.Null(disposeError);
+    }
+
     [Theory]
     [InlineData(false, "delay failed")]
     [InlineData(true, "utc now failed")]
@@ -1028,6 +1129,29 @@ public sealed class QuotaRefreshServiceTests
         }
     }
 
+    private sealed class GatedFaultClock(DateTimeOffset utcNow) : IClock
+    {
+        private readonly TaskCompletionSource _delayCalled =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _delay =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public DateTimeOffset UtcNow { get; } = utcNow;
+        public Task DelayCalled => _delayCalled.Task;
+
+        public Task DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken)
+        {
+            _delayCalled.TrySetResult();
+            return _delay.Task;
+        }
+
+        public void FailDelay() =>
+            _delay.TrySetException(
+                new InvalidOperationException("delay failed"));
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
         for (var attempt = 0; attempt < 1_000; attempt++)
@@ -1051,5 +1175,16 @@ public sealed class QuotaRefreshServiceTests
         Assert.NotNull(field);
         var sessions = Assert.IsAssignableFrom<ICollection>(field.GetValue(service));
         return sessions.Count;
+    }
+
+    private static int TrackedBackgroundRetirementCount(
+        QuotaRefreshService service)
+    {
+        var field = typeof(QuotaRefreshService).GetField(
+            "_backgroundRetirements",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        return field?.GetValue(service) is ICollection retirements
+            ? retirements.Count
+            : -1;
     }
 }

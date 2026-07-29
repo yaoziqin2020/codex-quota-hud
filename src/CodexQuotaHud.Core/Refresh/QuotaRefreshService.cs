@@ -16,6 +16,7 @@ public sealed class QuotaRefreshService : IAsyncDisposable
     private readonly object _notificationSync = new();
     private readonly object _stateSync = new();
     private readonly AsyncLocal<NotificationScope?> _notificationScope = new();
+    private readonly List<Task> _backgroundRetirements = [];
     private readonly List<RefreshSession> _sessions = [];
     private Task _notificationTail = Task.CompletedTask;
     private RefreshSession? _activeSession;
@@ -108,9 +109,7 @@ public sealed class QuotaRefreshService : IAsyncDisposable
                 FinishDisposeCoreAsync(disposalKickoff.Task);
             disposal = _disposeTask = FinishDisposeAsync(
                 disposalCore,
-                !calledFromNotification
-                    ? notification
-                    : Task.CompletedTask);
+                notification);
         }
 
         CancelQuietly(_lifetimeCancellation);
@@ -118,7 +117,10 @@ public sealed class QuotaRefreshService : IAsyncDisposable
             .Select(BeginRetirement)
             .ToArray();
         disposalKickoff.TrySetResult(retirements);
-        return new ValueTask(disposal);
+        return new ValueTask(
+            calledFromNotification
+                ? _disposeCoreTask!
+                : disposal);
     }
 
     private Task StartAsync(CancellationToken callerCancellationToken)
@@ -181,7 +183,7 @@ public sealed class QuotaRefreshService : IAsyncDisposable
         if (stoppedSession is not null)
         {
             CancelQuietly(stoppedSession.Cancellation);
-            _ = BeginRetirement(stoppedSession);
+            TrackBackgroundRetirement(BeginRetirement(stoppedSession));
         }
 
         return IsNotifying ? Task.CompletedTask : notification;
@@ -525,6 +527,34 @@ public sealed class QuotaRefreshService : IAsyncDisposable
     {
         return session.GetOrStartRetirement(
             ownedTasks => RetireSessionAsync(session, ownedTasks));
+    }
+
+    private void TrackBackgroundRetirement(Task retirement)
+    {
+        lock (_lifecycleSync)
+        {
+            _backgroundRetirements.Add(retirement);
+        }
+
+        _ = ObserveBackgroundRetirementAsync(retirement);
+    }
+
+    private async Task ObserveBackgroundRetirementAsync(Task retirement)
+    {
+        try
+        {
+            await retirement.ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+        finally
+        {
+            lock (_lifecycleSync)
+            {
+                _backgroundRetirements.Remove(retirement);
+            }
+        }
     }
 
     private async Task RetireSessionAsync(
