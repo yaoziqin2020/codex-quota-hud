@@ -177,7 +177,10 @@ public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable, IAs
     private async Task PollUsingPeriodicTimerAsync(CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(PollInterval);
-        await PollPeriodicallyAsync(timer.WaitForNextTickAsync, cancellationToken);
+        await PollPeriodicallyAsync(
+                timer.WaitForNextTickAsync,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task PollPeriodicallyAsync(
@@ -186,7 +189,7 @@ public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable, IAs
     {
         try
         {
-            while (await waitForNextTick(cancellationToken))
+            while (await waitForNextTick(cancellationToken).ConfigureAwait(false))
             {
                 if (cancellationToken.IsCancellationRequested)
                 {

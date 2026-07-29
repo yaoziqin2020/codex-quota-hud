@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using CodexQuotaHud.App.Infrastructure;
 
 namespace CodexQuotaHud.App.Tests.Infrastructure;
@@ -180,6 +182,71 @@ public sealed class CodexProcessMonitorTests
         Assert.Equal("snapshot failed", error.Message);
     }
 
+    [Fact]
+    public void DisposeCompletesWhenPollingCapturedSingleThreadContext()
+    {
+        var context = new QueuedSynchronizationContext();
+        using var monitorStarted = new ManualResetEventSlim();
+        using var waiterCanceled = new ManualResetEventSlim();
+        using var disposalCompleted = new ManualResetEventSlim();
+        Exception? threadError = null;
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                SynchronizationContext.SetSynchronizationContext(context);
+
+                ValueTask<bool> WaitForNextTick(CancellationToken cancellationToken)
+                {
+                    var completion = new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    cancellationToken.Register(() =>
+                    {
+                        waiterCanceled.Set();
+                        completion.TrySetCanceled(cancellationToken);
+                    });
+                    return new ValueTask<bool>(completion.Task);
+                }
+
+                var monitor = new CodexProcessMonitor(
+                    () => [],
+                    currentProcessId: 100,
+                    startPolling: true,
+                    WaitForNextTick);
+                monitorStarted.Set();
+                monitor.Dispose();
+            }
+            catch (Exception exception)
+            {
+                threadError = exception;
+            }
+            finally
+            {
+                disposalCompleted.Set();
+            }
+        })
+        {
+            IsBackground = true
+        };
+
+        thread.Start();
+        Assert.True(monitorStarted.Wait(TimeSpan.FromSeconds(2)));
+        var completedWithoutPumping = disposalCompleted.Wait(TimeSpan.FromMilliseconds(250));
+
+        if (!completedWithoutPumping)
+        {
+            context.DrainUntil(disposalCompleted, TimeSpan.FromSeconds(2));
+        }
+
+        Assert.True(thread.Join(TimeSpan.FromSeconds(2)));
+        Assert.Null(threadError);
+        Assert.True(waiterCanceled.IsSet);
+        Assert.True(
+            completedWithoutPumping,
+            "Synchronous disposal depended on pumping the captured context.");
+    }
+
     private static CodexProcessMonitor CreateMonitor(
         int currentProcessId,
         params IProcessSnapshot[] snapshots)
@@ -228,6 +295,31 @@ public sealed class CodexProcessMonitorTests
 
         public void Dispose()
         {
+        }
+    }
+
+    private sealed class QueuedSynchronizationContext : SynchronizationContext
+    {
+        private readonly ConcurrentQueue<(SendOrPostCallback Callback, object? State)> _callbacks = new();
+
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+            _callbacks.Enqueue((callback, state));
+        }
+
+        public void DrainUntil(ManualResetEventSlim completion, TimeSpan timeout)
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            while (!completion.IsSet && stopwatch.Elapsed < timeout)
+            {
+                while (_callbacks.TryDequeue(out var callback))
+                {
+                    callback.Callback(callback.State);
+                }
+
+                completion.Wait(TimeSpan.FromMilliseconds(10));
+            }
         }
     }
 }
