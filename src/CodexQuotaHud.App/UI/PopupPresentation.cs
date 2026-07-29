@@ -146,8 +146,8 @@ public static class EdgeProgressThemeProvider
                 ["#FFBDF4FF", "#FF6FD9F5", "#FF9DE8FF"],
                 "#B8FFFFFF", -35, 11, 0.8, 0.48, 0.7),
             SkinId.Aurora => Create(
-                "#F20B211B", "#FF49D294",
-                ["#FF35C982", "#FF55D99A", "#FF28A987"],
+                "#F20B211B", "#FF5DDBA0",
+                ["#FF55D99A", "#FF62DFA5", "#FF3DBA91"],
                 "#806DDDA8", 28, 13, 1.1, 0.24, 0.44),
             SkinId.LiquidTank => Create(
                 "#F20C2430", "#FF59CDEA",

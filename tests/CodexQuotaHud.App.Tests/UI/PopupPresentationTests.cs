@@ -186,4 +186,20 @@ public sealed class PopupPresentationTests
                 .Distinct()
                 .Count());
     }
+
+    [Fact]
+    public void AuroraEdgeProgress_DoesNotStartWithADarkCap()
+    {
+        var theme = EdgeProgressThemeProvider.Get(SkinId.Aurora);
+        var fill = Assert.IsType<LinearGradientBrush>(theme.Fill);
+        var start = fill.GradientStops[0].Color;
+        var middle = fill.GradientStops[1].Color;
+
+        Assert.InRange(
+            Math.Abs(start.R - middle.R) +
+            Math.Abs(start.G - middle.G) +
+            Math.Abs(start.B - middle.B),
+            0,
+            40);
+    }
 }
