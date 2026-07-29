@@ -755,7 +755,9 @@ public partial class QuotaOrbWindow : Window
         EdgeProgressTrack.BorderBrush = edgeTheme.Border;
         EdgeProgressFill.Background = edgeTheme.Fill;
         EdgeProgressTexture.Background = edgeTheme.Texture;
+        EdgeProgressTexture.Opacity = edgeTheme.TextureOpacity;
         EdgeHandleGlow.Color = edgeTheme.GlowColor;
+        EdgeHandleGlow.Opacity = edgeTheme.GlowOpacity;
         HudDialPopupDecoration.Visibility =
             theme.Decoration == PopupDecorationKind.HudDial
                 ? Visibility.Visible : Visibility.Collapsed;

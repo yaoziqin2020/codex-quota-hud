@@ -128,7 +128,9 @@ public sealed record EdgeProgressTheme(
     MediaBrush Fill,
     MediaBrush Texture,
     MediaColor AccentColor,
-    MediaColor GlowColor);
+    MediaColor GlowColor,
+    double TextureOpacity,
+    double GlowOpacity);
 
 public static class EdgeProgressThemeProvider
 {
@@ -138,23 +140,23 @@ public static class EdgeProgressThemeProvider
             SkinId.EnergyRing => Create(
                 "#F20A101C", "#A15371FF",
                 ["#FF8B4DFF", "#FF43E6FF", "#FF63F5FF"],
-                "#A6FFFFFF", 45, 7, 1.2),
+                "#A6FFFFFF", 45, 7, 1.2, 0.62, 0.82),
             SkinId.LiquidGlass => Create(
                 "#D8142834", "#A2A9EAFF",
                 ["#FFBDF4FF", "#FF6FD9F5", "#FF9DE8FF"],
-                "#B8FFFFFF", -35, 11, 0.8),
+                "#B8FFFFFF", -35, 11, 0.8, 0.48, 0.7),
             SkinId.Aurora => Create(
-                "#F20D211B", "#A657E6A3",
-                ["#FF42E889", "#FFB9F56B", "#FF38D8A8"],
-                "#B8D4FFD7", 28, 13, 1.4),
+                "#F20B211B", "#8A4BC88D",
+                ["#FF35C982", "#FF55D99A", "#FF28A987"],
+                "#806DDDA8", 28, 13, 1.1, 0.24, 0.44),
             SkinId.LiquidTank => Create(
                 "#F20C2430", "#A259CDEA",
                 ["#FF84EBF6", "#FF39C7E5", "#FF506EEB"],
-                "#A8D9F8FF", 90, 9, 1),
+                "#A8D9F8FF", 90, 9, 1, 0.52, 0.72),
             _ => Create(
                 "#F20A1622", "#A238D9FF",
                 ["#FF58E6FA", "#FF24B8F2", "#FF4B7DFF"],
-                "#A6C4F7FF", 0, 6, 0.8)
+                "#A6C4F7FF", 0, 6, 0.8, 0.5, 0.78)
         };
 
     private static EdgeProgressTheme Create(
@@ -164,7 +166,9 @@ public static class EdgeProgressThemeProvider
         string textureColor,
         double angle,
         double texturePitch,
-        double textureThickness)
+        double textureThickness,
+        double textureOpacity,
+        double glowOpacity)
     {
         var trackBrush = Solid(track);
         var borderBrush = Solid(border);
@@ -181,7 +185,9 @@ public static class EdgeProgressThemeProvider
             fill,
             texture,
             accent,
-            accent);
+            accent,
+            textureOpacity,
+            glowOpacity);
     }
 
     private static SolidColorBrush Solid(string value)

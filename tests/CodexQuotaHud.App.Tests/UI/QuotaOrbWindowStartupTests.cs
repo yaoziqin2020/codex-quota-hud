@@ -195,6 +195,10 @@ public sealed class QuotaOrbWindowStartupTests
                 texture.Background.ToString());
             var glow = Assert.IsType<DropShadowEffect>(handle.Effect);
             Assert.Equal(theme.GlowColor, glow.Color);
+            Assert.Equal(theme.TextureOpacity, texture.Opacity);
+            Assert.Equal(theme.GlowOpacity, glow.Opacity);
+            Assert.True(theme.TextureOpacity <= 0.25);
+            Assert.True(theme.GlowOpacity <= 0.45);
             var auroraAccent = theme.AccentColor;
             Assert.True(
                 auroraAccent.G - auroraAccent.B >= 40,
