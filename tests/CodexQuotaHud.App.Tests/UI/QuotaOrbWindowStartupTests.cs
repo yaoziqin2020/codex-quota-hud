@@ -212,7 +212,7 @@ public sealed class QuotaOrbWindowStartupTests
     }
 
     [Fact]
-    public void EnergyRing_UsesAnAngularCoreAndEllipticalOrbit()
+    public void EnergyRing_UsesAHexagonalCoreAndEllipticalOrbit()
     {
         RunSta(() =>
         {
@@ -227,7 +227,7 @@ public sealed class QuotaOrbWindowStartupTests
                 Assert.IsType<ContentControl>(
                     window.FindName("SkinHost")).Content);
             var core = Assert.IsType<ShapePath>(
-                skin.FindName("EnergyCoreDiamond"));
+                skin.FindName("EnergyCoreHexagon"));
             var orbit = Assert.IsType<ShapeEllipse>(
                 skin.FindName("EnergyOrbit"));
 
