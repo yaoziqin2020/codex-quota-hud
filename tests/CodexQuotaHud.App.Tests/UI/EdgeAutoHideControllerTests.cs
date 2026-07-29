@@ -26,11 +26,11 @@ public sealed class EdgeAutoHideControllerTests
     }
 
     [Theory]
-    [InlineData(EdgeDockSide.Left, -2040, -1920, 300, 300)]
-    [InlineData(EdgeDockSide.Right, -12, -132, 300, 300)]
-    [InlineData(EdgeDockSide.Top, -900, -900, -80, 40)]
-    [InlineData(EdgeDockSide.Bottom, -900, -900, 1068, 948)]
-    public void Positions_LeaveTwelvePixelHandleAndExpandInsideWorkArea(
+    [InlineData(EdgeDockSide.Left, -2028, -1920, 300, 300)]
+    [InlineData(EdgeDockSide.Right, -24, -132, 300, 300)]
+    [InlineData(EdgeDockSide.Top, -900, -900, -68, 40)]
+    [InlineData(EdgeDockSide.Bottom, -900, -900, 1056, 948)]
+    public void Positions_LeaveTwentyFourPixelGlowAreaAndExpandInsideWorkArea(
         EdgeDockSide side,
         double collapsedLeft,
         double expandedLeft,

@@ -15,16 +15,23 @@
             <Grid.RenderTransform>
                 <RotateTransform x:Name="EnergyOrbitTransform" />
             </Grid.RenderTransform>
-            <Ellipse Margin="9" Stroke="#873BE8FF" StrokeThickness="1.4"
-                     StrokeDashArray="1,7" />
-            <Ellipse Width="8" Height="8" Fill="#D8FBFF"
-                     HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0">
+            <Ellipse x:Name="EnergyOrbit" Width="116" Height="76"
+                     Stroke="#A353E8FF" StrokeThickness="1.8"
+                     StrokeDashArray="4,3"
+                     RenderTransformOrigin=".5,.5">
+                <Ellipse.RenderTransform>
+                    <RotateTransform Angle="-24" />
+                </Ellipse.RenderTransform>
+            </Ellipse>
+            <Ellipse Width="10" Height="10" Fill="#D8FBFF"
+                     HorizontalAlignment="Center" VerticalAlignment="Top"
+                     Margin="0,23,0,0">
                 <Ellipse.Effect>
                     <DropShadowEffect Color="#41E7FF" BlurRadius="10" ShadowDepth="0" />
                 </Ellipse.Effect>
             </Ellipse>
-            <Ellipse Width="5" Height="5" Fill="#C389FF"
-                     HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0" />
+            <Path Data="M 104,43 L 111,48 L 104,53 L 97,48 Z"
+                  Fill="#E18B68FF" Stroke="#C9F2E8FF" StrokeThickness=".8" />
         </Grid>
 
         <controls:ProgressArc x:Name="SecondaryArc" Margin="9"
@@ -33,7 +40,17 @@
         <controls:ProgressArc x:Name="PrimaryArc" Margin="20"
                               Stroke="#FF37E5FF" TrackStroke="#3237D7ED"
                               StrokeThickness="6" />
-        <Ellipse Margin="30" Fill="#D90A1A27" Stroke="#5336E6FF" StrokeThickness="1" />
+        <Path x:Name="EnergyCoreDiamond"
+              Data="M 66,29 L 103,66 L 66,103 L 29,66 Z"
+              Fill="#E20A1626" Stroke="#8A7C5CFF" StrokeThickness="1.4">
+            <Path.Effect>
+                <DropShadowEffect Color="#623FE6FF" BlurRadius="9"
+                                  ShadowDepth="0" />
+            </Path.Effect>
+        </Path>
+        <Path Data="M 66,38 L 94,66 L 66,94 L 38,66 Z"
+              Fill="Transparent" Stroke="#423CE8FF"
+              StrokeThickness=".8" StrokeDashArray="3,3" />
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
             <TextBlock x:Name="PercentText" Foreground="#F8FDFF"
                        FontFamily="Segoe UI Variable Display" FontSize="23"

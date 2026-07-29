@@ -160,4 +160,30 @@ public sealed class PopupPresentationTests
                 Assert.True(color.B >= 0xB8);
             });
     }
+
+    [Fact]
+    public void EdgeProgressThemes_HaveDistinctFillsAndInternalTextures()
+    {
+        var themes = Enum.GetValues<SkinId>()
+            .Select(EdgeProgressThemeProvider.Get)
+            .ToArray();
+
+        Assert.Equal(
+            themes.Length,
+            themes
+                .Select(theme => string.Join(
+                    ",",
+                    Assert.IsType<LinearGradientBrush>(theme.Fill)
+                        .GradientStops
+                        .Select(stop => stop.Color.ToString())))
+                .Distinct()
+                .Count());
+        Assert.Equal(
+            themes.Length,
+            themes
+                .Select(theme => Assert.IsType<DrawingBrush>(
+                    theme.Texture).Viewport.Width)
+                .Distinct()
+                .Count());
+    }
 }

@@ -18,6 +18,9 @@ namespace CodexQuotaHud.App.UI;
 public partial class QuotaOrbWindow : Window
 {
     private const double PopupShadowMargin = 14;
+    private static readonly TimeSpan PointerDismissalWindow =
+        TimeSpan.FromMilliseconds(
+            System.Windows.Forms.SystemInformation.DoubleClickTime);
     private readonly QuotaOrbViewModel _viewModel;
     private readonly SkinController _skinController;
     private readonly OrbAnimationController _animationController;
@@ -243,6 +246,16 @@ public partial class QuotaOrbWindow : Window
             return;
         }
 
+        if (_detailsTogglePolicy.ShouldDismissPointerDown(
+                DetailsPopup.IsOpen,
+                PointerDismissalWindow))
+        {
+            e.Handled = true;
+            _orbClickController.CancelPendingSingleClick();
+            CloseDetailsPopup();
+            return;
+        }
+
         var clickCount = e.ClickCount;
         if (clickCount >= 2)
         {
@@ -415,8 +428,9 @@ public partial class QuotaOrbWindow : Window
     private async void OnDetailsPopupClosed(object? sender, EventArgs e)
     {
         _detailsTogglePolicy.ObserveClosed(
-            OrbRoot.IsMouseOver,
-            _closingDetailsProgrammatically);
+            IsPointerOverOrb(),
+            _closingDetailsProgrammatically,
+            PointerDismissalWindow);
         if (_allowClose)
         {
             return;
@@ -429,6 +443,15 @@ public partial class QuotaOrbWindow : Window
         catch (ObjectDisposedException)
         {
         }
+    }
+
+    private bool IsPointerOverOrb()
+    {
+        var pointer = Mouse.GetPosition(OrbRoot);
+        return pointer.X >= 0 &&
+               pointer.Y >= 0 &&
+               pointer.X <= OrbRoot.ActualWidth &&
+               pointer.Y <= OrbRoot.ActualHeight;
     }
 
     private void AnimateEdge(EdgeDockSide side, bool collapsed)
@@ -516,8 +539,8 @@ public partial class QuotaOrbWindow : Window
         bool animate)
     {
         var verticalPill = side is EdgeDockSide.Left or EdgeDockSide.Right;
-        EdgeHandle.Width = verticalPill ? 10 : 64;
-        EdgeHandle.Height = verticalPill ? 64 : 10;
+        EdgeHandle.Width = verticalPill ? 12 : 72;
+        EdgeHandle.Height = verticalPill ? 72 : 12;
         EdgeHandle.HorizontalAlignment = side switch
         {
             EdgeDockSide.Left => System.Windows.HorizontalAlignment.Right,
@@ -529,6 +552,14 @@ public partial class QuotaOrbWindow : Window
             EdgeDockSide.Top => System.Windows.VerticalAlignment.Bottom,
             EdgeDockSide.Bottom => System.Windows.VerticalAlignment.Top,
             _ => System.Windows.VerticalAlignment.Center
+        };
+        EdgeHandle.Margin = side switch
+        {
+            EdgeDockSide.Left => new Thickness(0, 0, 6, 0),
+            EdgeDockSide.Right => new Thickness(6, 0, 0, 0),
+            EdgeDockSide.Top => new Thickness(0, 0, 0, 6),
+            EdgeDockSide.Bottom => new Thickness(0, 6, 0, 0),
+            _ => default
         };
         EdgeHandle.IsHitTestVisible = collapsed;
         ApplyEdgeProgressState(side);
@@ -547,7 +578,7 @@ public partial class QuotaOrbWindow : Window
     {
         var vertical = side is EdgeDockSide.Left or EdgeDockSide.Right;
         var fillLength = EdgeProgressGeometry.FillLength(
-            trackLength: 64,
+            trackLength: 72,
             _viewModel.DisplayMode == QuotaDisplayMode.Hidden
                 ? 0
                 : _viewModel.PrimaryPercent);
@@ -587,7 +618,7 @@ public partial class QuotaOrbWindow : Window
 
     private void ToggleDetailsPopup()
     {
-        if (_detailsTogglePolicy.ConsumeSuppressedOpen())
+        if (_detailsTogglePolicy.IsOpenSuppressed)
         {
             return;
         }
@@ -710,6 +741,8 @@ public partial class QuotaOrbWindow : Window
     private void ApplyPopupTheme()
     {
         var theme = PopupThemeProvider.Get(_viewModel.SelectedSkin);
+        var edgeTheme = EdgeProgressThemeProvider.Get(
+            _viewModel.SelectedSkin);
         PopupCard.Background = theme.Background;
         PopupShadowHost.Background = theme.Background;
         PopupCard.BorderBrush = theme.Border;
@@ -718,10 +751,11 @@ public partial class QuotaOrbWindow : Window
         PopupCard.Resources["PopupSecondaryTextBrush"] =
             theme.SecondaryText;
         PopupShadow.Color = theme.ShadowColor;
-        EdgeProgressTrack.Background = theme.Background;
-        EdgeProgressTrack.BorderBrush = theme.Border;
-        EdgeProgressFill.Background = theme.Accent;
-        EdgeHandleGlow.Color = theme.ShadowColor;
+        EdgeProgressTrack.Background = edgeTheme.Track;
+        EdgeProgressTrack.BorderBrush = edgeTheme.Border;
+        EdgeProgressFill.Background = edgeTheme.Fill;
+        EdgeProgressTexture.Background = edgeTheme.Texture;
+        EdgeHandleGlow.Color = edgeTheme.GlowColor;
         HudDialPopupDecoration.Visibility =
             theme.Decoration == PopupDecorationKind.HudDial
                 ? Visibility.Visible : Visibility.Collapsed;

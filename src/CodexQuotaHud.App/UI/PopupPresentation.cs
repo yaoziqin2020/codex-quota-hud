@@ -99,7 +99,7 @@ public static class PopupThemeProvider
         {
             SkinId.EnergyRing => Create("#F20A1722", "#8A35E8FF", "#53ECFF", "#1DDCFF", PopupDecorationKind.EnergyRing),
             SkinId.LiquidGlass => Create("#E8162635", "#8AADEBFF", "#B9F1FF", "#8ADFFF", PopupDecorationKind.LiquidGlass),
-            SkinId.Aurora => Create("#F2171530", "#8A9B7CFF", "#79F3E2", "#9C6DFF", PopupDecorationKind.Aurora),
+            SkinId.Aurora => Create("#F212241F", "#8A57E6A3", "#62F2A0", "#44E89A", PopupDecorationKind.Aurora),
             SkinId.LiquidTank => Create("#ED102632", "#8A59CDEA", "#8DE9F5", "#3DCBE8", PopupDecorationKind.LiquidTank),
             _ => Create("#F21A202B", "#6638D9FF", "#53DCF8", "#24CFF2", PopupDecorationKind.HudDial)
         };
@@ -120,4 +120,135 @@ public static class PopupThemeProvider
             (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString(shadow),
             decoration);
     }
+}
+
+public sealed record EdgeProgressTheme(
+    MediaBrush Track,
+    MediaBrush Border,
+    MediaBrush Fill,
+    MediaBrush Texture,
+    MediaColor AccentColor,
+    MediaColor GlowColor);
+
+public static class EdgeProgressThemeProvider
+{
+    public static EdgeProgressTheme Get(SkinId skin) =>
+        skin switch
+        {
+            SkinId.EnergyRing => Create(
+                "#F20A101C", "#A15371FF",
+                ["#FF8B4DFF", "#FF43E6FF", "#FF63F5FF"],
+                "#A6FFFFFF", 45, 7, 1.2),
+            SkinId.LiquidGlass => Create(
+                "#D8142834", "#A2A9EAFF",
+                ["#FFBDF4FF", "#FF6FD9F5", "#FF9DE8FF"],
+                "#B8FFFFFF", -35, 11, 0.8),
+            SkinId.Aurora => Create(
+                "#F20D211B", "#A657E6A3",
+                ["#FF42E889", "#FFB9F56B", "#FF38D8A8"],
+                "#B8D4FFD7", 28, 13, 1.4),
+            SkinId.LiquidTank => Create(
+                "#F20C2430", "#A259CDEA",
+                ["#FF84EBF6", "#FF39C7E5", "#FF506EEB"],
+                "#A8D9F8FF", 90, 9, 1),
+            _ => Create(
+                "#F20A1622", "#A238D9FF",
+                ["#FF58E6FA", "#FF24B8F2", "#FF4B7DFF"],
+                "#A6C4F7FF", 0, 6, 0.8)
+        };
+
+    private static EdgeProgressTheme Create(
+        string track,
+        string border,
+        IReadOnlyList<string> fillColors,
+        string textureColor,
+        double angle,
+        double texturePitch,
+        double textureThickness)
+    {
+        var trackBrush = Solid(track);
+        var borderBrush = Solid(border);
+        var fill = Gradient(fillColors, angle);
+        var texture = Texture(
+            ParseColor(textureColor),
+            texturePitch,
+            textureThickness,
+            angle);
+        var accent = ParseColor(fillColors[0]);
+        return new EdgeProgressTheme(
+            trackBrush,
+            borderBrush,
+            fill,
+            texture,
+            accent,
+            accent);
+    }
+
+    private static SolidColorBrush Solid(string value)
+    {
+        var brush = new SolidColorBrush(ParseColor(value));
+        brush.Freeze();
+        return brush;
+    }
+
+    private static LinearGradientBrush Gradient(
+        IReadOnlyList<string> colors,
+        double angle)
+    {
+        var radians = angle * Math.PI / 180;
+        var vector = new System.Windows.Vector(
+            Math.Cos(radians),
+            Math.Sin(radians));
+        var start = new System.Windows.Point(
+            0.5 - (vector.X / 2),
+            0.5 - (vector.Y / 2));
+        var end = new System.Windows.Point(
+            0.5 + (vector.X / 2),
+            0.5 + (vector.Y / 2));
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = start,
+            EndPoint = end
+        };
+        for (var index = 0; index < colors.Count; index++)
+        {
+            brush.GradientStops.Add(new GradientStop(
+                ParseColor(colors[index]),
+                colors.Count == 1
+                    ? 0
+                    : (double)index / (colors.Count - 1)));
+        }
+
+        brush.Freeze();
+        return brush;
+    }
+
+    private static DrawingBrush Texture(
+        MediaColor color,
+        double pitch,
+        double thickness,
+        double angle)
+    {
+        var geometry = new LineGeometry(
+            new System.Windows.Point(0, pitch),
+            new System.Windows.Point(pitch, 0));
+        var pen = new System.Windows.Media.Pen(
+            new SolidColorBrush(color),
+            thickness);
+        var drawing = new GeometryDrawing(null, pen, geometry);
+        var brush = new DrawingBrush(drawing)
+        {
+            TileMode = TileMode.Tile,
+            Viewport = new System.Windows.Rect(0, 0, pitch, pitch),
+            ViewportUnits = BrushMappingMode.Absolute,
+            Stretch = Stretch.None,
+            Transform = new RotateTransform(angle / 4)
+        };
+        brush.Freeze();
+        return brush;
+    }
+
+    private static MediaColor ParseColor(string value) =>
+        (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString(
+            value);
 }

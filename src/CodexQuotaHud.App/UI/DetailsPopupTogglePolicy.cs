@@ -1,24 +1,46 @@
 namespace CodexQuotaHud.App.UI;
 
-internal sealed class DetailsPopupTogglePolicy
+internal sealed class DetailsPopupTogglePolicy(
+    Func<DateTimeOffset>? now = null)
 {
-    private bool _suppressNextOpen;
+    private readonly Func<DateTimeOffset> _now =
+        now ?? (() => DateTimeOffset.UtcNow);
+    private DateTimeOffset _suppressUntil = DateTimeOffset.MinValue;
 
     public void ObserveClosed(
         bool pointerOverOrb,
-        bool programmaticClose)
+        bool programmaticClose,
+        TimeSpan dismissalWindow)
     {
         if (!programmaticClose &&
             pointerOverOrb)
         {
-            _suppressNextOpen = true;
+            SuppressFor(dismissalWindow);
         }
     }
 
-    public bool ConsumeSuppressedOpen()
+    public bool ShouldDismissPointerDown(
+        bool popupOpen,
+        TimeSpan dismissalWindow)
     {
-        var suppress = _suppressNextOpen;
-        _suppressNextOpen = false;
-        return suppress;
+        if (popupOpen)
+        {
+            SuppressFor(dismissalWindow);
+            return true;
+        }
+
+        return IsOpenSuppressed;
+    }
+
+    public bool IsOpenSuppressed => _now() <= _suppressUntil;
+
+    private void SuppressFor(TimeSpan duration)
+    {
+        if (duration < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(duration));
+        }
+
+        _suppressUntil = _now() + duration;
     }
 }

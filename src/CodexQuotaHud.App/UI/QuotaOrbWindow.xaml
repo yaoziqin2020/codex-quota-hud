@@ -57,8 +57,8 @@
                 MouseLeftButtonDown="OnDragSurfaceMouseLeftButtonDown" />
 
         <Border x:Name="EdgeHandle"
-                Width="10" Height="64"
-                CornerRadius="5"
+                Width="12" Height="72"
+                CornerRadius="6"
                 Opacity="0"
                 IsHitTestVisible="False"
                 Background="Transparent"
@@ -67,22 +67,26 @@
                 MouseLeftButtonDown="OnEdgeHandleMouseLeftButtonDown">
             <Border.Effect>
                 <DropShadowEffect x:Name="EdgeHandleGlow"
-                                  BlurRadius="12"
+                                  BlurRadius="10"
                                   ShadowDepth="0"
                                   Opacity="0.9"
                                   Color="#24CFF2" />
             </Border.Effect>
             <Border x:Name="EdgeProgressTrack"
-                    CornerRadius="5"
+                    CornerRadius="6"
                     ClipToBounds="True"
                     Background="#F21A202B"
                     BorderBrush="#6638D9FF"
-                    BorderThickness="1">
+                    BorderThickness="1.2">
                 <Grid>
                     <Border x:Name="EdgeProgressFill"
                             Background="#53DCF8"
                             HorizontalAlignment="Stretch"
-                            VerticalAlignment="Bottom" />
+                            VerticalAlignment="Bottom">
+                        <Border x:Name="EdgeProgressTexture"
+                                IsHitTestVisible="False"
+                                Opacity="0.72" />
+                    </Border>
                 </Grid>
             </Border>
         </Border>
@@ -92,8 +96,9 @@
                Placement="Custom"
                AllowsTransparency="True" StaysOpen="False"
                Closed="OnDetailsPopupClosed">
-            <Grid x:Name="PopupChrome" Margin="14">
-                <Border x:Name="PopupShadowHost" Width="250" CornerRadius="12"
+            <Grid x:Name="PopupChrome" Width="278">
+                <Border x:Name="PopupShadowHost" Width="250" Margin="14"
+                        CornerRadius="12"
                         Background="#F21A202B">
                     <Border.Effect>
                     <DropShadowEffect x:Name="PopupShadow" BlurRadius="22"
@@ -101,7 +106,7 @@
                                       Color="#24CFF2" />
                     </Border.Effect>
                 </Border>
-                <Border x:Name="PopupCard" Width="250" Padding="14"
+                <Border x:Name="PopupCard" Width="250" Margin="14" Padding="14"
                         CornerRadius="12" ClipToBounds="True"
                         SizeChanged="OnPopupCardSizeChanged"
                         PreviewMouseDown="OnPopupPointerDown"

@@ -12,7 +12,7 @@ public enum EdgeDockSide
 public static class EdgeAutoHideGeometry
 {
     public const double DockThreshold = 16;
-    public const double VisibleHandleWidth = 12;
+    public const double VisibleHandleWidth = 24;
 
     public static EdgeDockSide DetectDockSide(
         double left,

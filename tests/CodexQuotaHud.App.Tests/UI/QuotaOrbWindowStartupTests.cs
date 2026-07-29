@@ -1,4 +1,5 @@
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Refresh;
 using CodexQuotaHud.Core.Settings;
 using System.Windows;
@@ -6,6 +7,8 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using CodexQuotaHud.Core.Models;
+using ShapeEllipse = System.Windows.Shapes.Ellipse;
+using ShapePath = System.Windows.Shapes.Path;
 
 namespace CodexQuotaHud.App.Tests.UI;
 
@@ -78,7 +81,10 @@ public sealed class QuotaOrbWindowStartupTests
             var popup = Assert.IsType<System.Windows.Controls.Primitives.Popup>(
                 window.FindName("DetailsPopup"));
 
-            Assert.Equal(new Thickness(14), chrome.Margin);
+            Assert.Equal(278, chrome.Width);
+            Assert.Equal(default, chrome.Margin);
+            Assert.Equal(new Thickness(14), shadow.Margin);
+            Assert.Equal(new Thickness(14), card.Margin);
             Assert.False(popup.StaysOpen);
             Assert.IsType<DropShadowEffect>(shadow.Effect);
             Assert.Null(card.Effect);
@@ -140,19 +146,21 @@ public sealed class QuotaOrbWindowStartupTests
                 window.FindName("EdgeProgressTrack"));
             var fill = Assert.IsType<Border>(
                 window.FindName("EdgeProgressFill"));
+            var texture = Assert.IsType<Border>(
+                window.FindName("EdgeProgressTexture"));
             Assert.Null(window.FindName("EdgeProgressSheen"));
 
             foreach (var (side, horizontal, vertical, width, height) in
                 new[]
                 {
                     (EdgeDockSide.Left, HorizontalAlignment.Right,
-                        VerticalAlignment.Center, 10d, 64d),
+                        VerticalAlignment.Center, 12d, 72d),
                     (EdgeDockSide.Right, HorizontalAlignment.Left,
-                        VerticalAlignment.Center, 10d, 64d),
+                        VerticalAlignment.Center, 12d, 72d),
                     (EdgeDockSide.Top, HorizontalAlignment.Center,
-                        VerticalAlignment.Bottom, 64d, 10d),
+                        VerticalAlignment.Bottom, 72d, 12d),
                     (EdgeDockSide.Bottom, HorizontalAlignment.Center,
-                        VerticalAlignment.Top, 64d, 10d)
+                        VerticalAlignment.Top, 72d, 12d)
                 })
             {
                 window.ApplyEdgeVisualState(side, collapsed: true, animate: false);
@@ -163,18 +171,33 @@ public sealed class QuotaOrbWindowStartupTests
                 Assert.Equal(width, handle.Width);
                 Assert.Equal(height, handle.Height);
                 Assert.True(handle.IsHitTestVisible);
+                Assert.Equal(
+                    side switch
+                    {
+                        EdgeDockSide.Left => new Thickness(0, 0, 6, 0),
+                        EdgeDockSide.Right => new Thickness(6, 0, 0, 0),
+                        EdgeDockSide.Top => new Thickness(0, 0, 0, 6),
+                        _ => new Thickness(0, 6, 0, 0)
+                    },
+                    handle.Margin);
             }
 
             viewModel.SelectedSkin = SkinId.Aurora;
-            var theme = PopupThemeProvider.Get(SkinId.Aurora);
+            var theme = EdgeProgressThemeProvider.Get(SkinId.Aurora);
             Assert.Equal(
-                theme.Background.ToString(),
+                theme.Track.ToString(),
                 track.Background.ToString());
             Assert.Equal(theme.Border.ToString(), track.BorderBrush.ToString());
-            Assert.Equal(theme.Accent.ToString(), fill.Background.ToString());
+            Assert.Equal(theme.Fill.ToString(), fill.Background.ToString());
             Assert.Equal(
-                theme.ShadowColor,
-                Assert.IsType<DropShadowEffect>(handle.Effect).Color);
+                theme.Texture.ToString(),
+                texture.Background.ToString());
+            var glow = Assert.IsType<DropShadowEffect>(handle.Effect);
+            Assert.Equal(theme.GlowColor, glow.Color);
+            var auroraAccent = theme.AccentColor;
+            Assert.True(
+                auroraAccent.G - auroraAccent.B >= 40,
+                "Aurora edge progress should read as green, not cyan.");
 
             window.ApplyEdgeVisualState(
                 EdgeDockSide.Bottom,
@@ -183,6 +206,33 @@ public sealed class QuotaOrbWindowStartupTests
             Assert.Equal(1, skin.Opacity);
             Assert.Equal(0, handle.Opacity);
             Assert.False(handle.IsHitTestVisible);
+
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void EnergyRing_UsesAnAngularCoreAndEllipticalOrbit()
+    {
+        RunSta(() =>
+        {
+            using var viewModel = new QuotaOrbViewModel(
+                new InertRefreshController(),
+                new InMemorySettingsStore(),
+                new AppSettings { SelectedSkin = SkinId.EnergyRing },
+                new InlineDispatcher(),
+                () => { });
+            var window = new QuotaOrbWindow(viewModel);
+            var skin = Assert.IsType<EnergyRingSkin>(
+                Assert.IsType<ContentControl>(
+                    window.FindName("SkinHost")).Content);
+            var core = Assert.IsType<ShapePath>(
+                skin.FindName("EnergyCoreDiamond"));
+            var orbit = Assert.IsType<ShapeEllipse>(
+                skin.FindName("EnergyOrbit"));
+
+            Assert.NotNull(core.Data);
+            Assert.True(orbit.Width > orbit.Height);
 
             window.CloseForExit();
         });
