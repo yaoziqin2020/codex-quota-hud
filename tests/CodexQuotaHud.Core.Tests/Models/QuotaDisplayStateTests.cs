@@ -4,6 +4,12 @@ namespace CodexQuotaHud.Core.Tests.Models;
 
 public sealed class QuotaDisplayStateTests
 {
+    [Fact]
+    public void DefaultSkinId_IsHudDial()
+    {
+        Assert.Equal(SkinId.HudDial, default(SkinId));
+    }
+
     [Theory]
     [InlineData(false, false, QuotaDisplayMode.Hidden)]
     [InlineData(true, false, QuotaDisplayMode.Single)]

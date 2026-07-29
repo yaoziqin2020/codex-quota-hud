@@ -4,7 +4,7 @@ public enum QuotaWindowKind { FiveHour, Weekly }
 
 public enum QuotaDisplayMode { Hidden, Single, Dual }
 
-public enum SkinId { EnergyRing, LiquidGlass, HudDial, Aurora, LiquidTank }
+public enum SkinId { HudDial, EnergyRing, LiquidGlass, Aurora, LiquidTank }
 
 public sealed record QuotaWindow(
     QuotaWindowKind Kind,
