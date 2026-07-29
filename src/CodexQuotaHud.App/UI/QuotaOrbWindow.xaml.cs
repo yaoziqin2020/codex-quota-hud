@@ -22,7 +22,9 @@ public partial class QuotaOrbWindow : Window
     private readonly SkinController _skinController;
     private readonly OrbAnimationController _animationController;
     private readonly EdgeAutoHideController _edgeAutoHideController;
+    private readonly DetailsPopupTogglePolicy _detailsTogglePolicy = new();
     private TaskCompletionSource? _expandAnimationCompletion;
+    private bool _closingDetailsProgrammatically;
     private bool _allowClose;
     private bool _isDragging;
     private bool _contextMenuOpen;
@@ -173,7 +175,7 @@ public partial class QuotaOrbWindow : Window
         if (!_viewModel.IsVisible)
         {
             _edgeAutoHideController.CancelPendingCollapse();
-            DetailsPopup.IsOpen = false;
+            CloseDetailsPopup();
             Hide();
             return;
         }
@@ -215,7 +217,7 @@ public partial class QuotaOrbWindow : Window
 
         e.Handled = true;
         _edgeAutoHideController.CancelPendingCollapse();
-        DetailsPopup.IsOpen = false;
+        CloseDetailsPopup();
         try
         {
             await RevealOrbAsync();
@@ -270,7 +272,7 @@ public partial class QuotaOrbWindow : Window
                 _ = RefreshAfterClickAsync();
                 break;
             case OrbPointerAction.None:
-                DetailsPopup.IsOpen = false;
+                CloseDetailsPopup();
                 ClampToNearestWorkArea(save: false);
                 UpdateDockAfterDrag();
                 break;
@@ -280,7 +282,7 @@ public partial class QuotaOrbWindow : Window
     private void OnContextMenuOpened(object sender, RoutedEventArgs e)
     {
         _contextMenuOpen = true;
-        DetailsPopup.IsOpen = false;
+        CloseDetailsPopup();
         _edgeAutoHideController.Expand();
         SetSkinCheck(HudDialMenuItem, SkinId.HudDial);
         SetSkinCheck(EnergyRingMenuItem, SkinId.EnergyRing);
@@ -403,6 +405,10 @@ public partial class QuotaOrbWindow : Window
 
     private async void OnDetailsPopupClosed(object? sender, EventArgs e)
     {
+        _detailsTogglePolicy.ObserveClosed(
+            OrbRoot.IsMouseOver,
+            Mouse.LeftButton == MouseButtonState.Pressed,
+            _closingDetailsProgrammatically);
         if (_allowClose)
         {
             return;
@@ -426,7 +432,7 @@ public partial class QuotaOrbWindow : Window
 
         if (collapsed)
         {
-            DetailsPopup.IsOpen = false;
+            CloseDetailsPopup();
         }
 
         var workArea = GetNearestWorkArea();
@@ -573,13 +579,36 @@ public partial class QuotaOrbWindow : Window
 
     private void ToggleDetailsPopup()
     {
+        if (_detailsTogglePolicy.ConsumeSuppressedOpen())
+        {
+            return;
+        }
+
         if (DetailsPopup.IsOpen)
         {
-            DetailsPopup.IsOpen = false;
+            CloseDetailsPopup();
             return;
         }
 
         ShowDetailsPopup();
+    }
+
+    private void CloseDetailsPopup()
+    {
+        if (!DetailsPopup.IsOpen)
+        {
+            return;
+        }
+
+        _closingDetailsProgrammatically = true;
+        try
+        {
+            DetailsPopup.IsOpen = false;
+        }
+        finally
+        {
+            _closingDetailsProgrammatically = false;
+        }
     }
 
     private async Task RefreshAfterClickAsync()
