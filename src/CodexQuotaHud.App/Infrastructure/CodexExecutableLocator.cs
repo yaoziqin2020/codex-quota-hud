@@ -13,6 +13,7 @@ public sealed class CodexExecutableLocator
     private readonly Func<IReadOnlyList<string>> _findOnPath;
     private readonly Func<string?> _getLocalAppData;
     private readonly Func<string, bool> _fileExists;
+    private readonly Func<string, IReadOnlyList<string>> _findUserLocalInstalls;
 
     public CodexExecutableLocator()
         : this(
@@ -20,7 +21,8 @@ public sealed class CodexExecutableLocator
             CodexProcessMonitor.FindRunningCodexExecutablePaths,
             FindCodexOnPath,
             () => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            File.Exists)
+            File.Exists,
+            FindUserLocalInstalls)
     {
     }
 
@@ -29,7 +31,8 @@ public sealed class CodexExecutableLocator
         Func<IReadOnlyList<string>> getRunningCodexExecutablePaths,
         Func<IReadOnlyList<string>> findOnPath,
         Func<string?> getLocalAppData,
-        Func<string, bool> fileExists)
+        Func<string, bool> fileExists,
+        Func<string, IReadOnlyList<string>> findUserLocalInstalls)
     {
         _getEnvironmentVariable =
             getEnvironmentVariable ?? throw new ArgumentNullException(nameof(getEnvironmentVariable));
@@ -39,6 +42,9 @@ public sealed class CodexExecutableLocator
         _findOnPath = findOnPath ?? throw new ArgumentNullException(nameof(findOnPath));
         _getLocalAppData = getLocalAppData ?? throw new ArgumentNullException(nameof(getLocalAppData));
         _fileExists = fileExists ?? throw new ArgumentNullException(nameof(fileExists));
+        _findUserLocalInstalls =
+            findUserLocalInstalls ??
+            throw new ArgumentNullException(nameof(findUserLocalInstalls));
     }
 
     public string? Find()
@@ -48,6 +54,20 @@ public sealed class CodexExecutableLocator
         if (environmentOverride is not null)
         {
             return environmentOverride;
+        }
+
+        var localAppData = _getLocalAppData();
+        if (!string.IsNullOrWhiteSpace(localAppData) &&
+            Path.IsPathFullyQualified(localAppData))
+        {
+            foreach (var candidate in _findUserLocalInstalls(localAppData))
+            {
+                var executable = ExistingAbsolutePath(candidate);
+                if (executable is not null)
+                {
+                    return executable;
+                }
+            }
         }
 
         foreach (var modulePath in _getRunningCodexExecutablePaths())
@@ -68,7 +88,6 @@ public sealed class CodexExecutableLocator
             }
         }
 
-        var localAppData = _getLocalAppData();
         if (string.IsNullOrWhiteSpace(localAppData) || !Path.IsPathFullyQualified(localAppData))
         {
             return null;
@@ -152,6 +171,59 @@ public sealed class CodexExecutableLocator
             exception is Win32Exception or InvalidOperationException)
         {
             return [];
+        }
+    }
+
+    private static IReadOnlyList<string> FindUserLocalInstalls(string localAppData)
+    {
+        var binDirectory = Path.Combine(
+            Path.GetFullPath(localAppData),
+            "OpenAI",
+            "Codex",
+            "bin");
+        try
+        {
+            if (!Directory.Exists(binDirectory) ||
+                (File.GetAttributes(binDirectory) & FileAttributes.ReparsePoint) != 0)
+            {
+                return [];
+            }
+
+            var candidates = new List<(string Path, DateTime LastWriteTimeUtc)>();
+            AddCandidate(Path.Combine(binDirectory, "codex.exe"), candidates);
+            foreach (var directory in Directory.EnumerateDirectories(
+                binDirectory,
+                "*",
+                SearchOption.TopDirectoryOnly))
+            {
+                if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+                {
+                    continue;
+                }
+
+                AddCandidate(Path.Combine(directory, "codex.exe"), candidates);
+            }
+
+            return candidates
+                .OrderByDescending(static candidate => candidate.LastWriteTimeUtc)
+                .ThenBy(static candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(static candidate => candidate.Path)
+                .ToArray();
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    private static void AddCandidate(
+        string path,
+        ICollection<(string Path, DateTime LastWriteTimeUtc)> candidates)
+    {
+        if (File.Exists(path))
+        {
+            candidates.Add((path, File.GetLastWriteTimeUtc(path)));
         }
     }
 }

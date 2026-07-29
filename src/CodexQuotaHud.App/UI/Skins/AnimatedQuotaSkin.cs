@@ -10,6 +10,9 @@ public abstract class AnimatedQuotaSkin :
     IQuotaSkin,
     IOrbAnimationTarget
 {
+    private const int IdleFrameRate = 4;
+    private const int RefreshingFrameRate = 24;
+
     private static readonly DependencyProperty AnimationRateProperty =
         DependencyProperty.Register(
             nameof(AnimationRate),
@@ -19,6 +22,7 @@ public abstract class AnimatedQuotaSkin :
 
     private readonly List<AnimationTrack> _tracks = [];
     private bool _started;
+    private int? _desiredFrameRate;
 
     public abstract SkinId Id { get; }
 
@@ -29,6 +33,12 @@ public abstract class AnimatedQuotaSkin :
         get => (double)GetValue(AnimationRateProperty);
         set => SetValue(AnimationRateProperty, value);
     }
+
+    internal IReadOnlyList<int?> ConfiguredFrameRates =>
+        _tracks
+            .Select(static track =>
+                Timeline.GetDesiredFrameRate(track.Storyboard))
+            .ToArray();
 
     public void Render(QuotaSkinState state)
     {
@@ -46,23 +56,28 @@ public abstract class AnimatedQuotaSkin :
             return;
         }
 
-        EnsureStarted();
+        var desiredFrameRate = state == OrbAnimationState.Refreshing
+            ? RefreshingFrameRate
+            : IdleFrameRate;
+        EnsureStarted(desiredFrameRate);
         var target = state == OrbAnimationState.Refreshing ? 1d : 0d;
         var duration = state == OrbAnimationState.Refreshing
             ? TimeSpan.FromMilliseconds(260)
             : TimeSpan.FromMilliseconds(600);
+        var rateTransition = new DoubleAnimation
+        {
+            To = target,
+            Duration = duration,
+            EasingFunction = new CubicEase
+            {
+                EasingMode = EasingMode.EaseInOut
+            },
+            FillBehavior = FillBehavior.HoldEnd
+        };
+        Timeline.SetDesiredFrameRate(rateTransition, desiredFrameRate);
         BeginAnimation(
             AnimationRateProperty,
-            new DoubleAnimation
-            {
-                To = target,
-                Duration = duration,
-                EasingFunction = new CubicEase
-                {
-                    EasingMode = EasingMode.EaseInOut
-                },
-                FillBehavior = FillBehavior.HoldEnd
-            },
+            rateTransition,
             HandoffBehavior.SnapshotAndReplace);
     }
 
@@ -145,15 +160,26 @@ public abstract class AnimatedQuotaSkin :
         skin.ApplySpeedRatios((double)eventArgs.NewValue);
     }
 
-    private void EnsureStarted()
+    private void EnsureStarted(int desiredFrameRate)
     {
-        if (_started)
+        if (_started && _desiredFrameRate == desiredFrameRate)
         {
             return;
         }
 
+        if (_started)
+        {
+            foreach (var track in _tracks)
+            {
+                track.Storyboard.Remove(this);
+            }
+        }
+
         foreach (var track in _tracks)
         {
+            Timeline.SetDesiredFrameRate(
+                track.Storyboard,
+                desiredFrameRate);
             track.Storyboard.Begin(
                 this,
                 HandoffBehavior.SnapshotAndReplace,
@@ -161,6 +187,7 @@ public abstract class AnimatedQuotaSkin :
         }
 
         _started = true;
+        _desiredFrameRate = desiredFrameRate;
         ApplySpeedRatios(AnimationRate);
     }
 
@@ -179,6 +206,7 @@ public abstract class AnimatedQuotaSkin :
         }
 
         _started = false;
+        _desiredFrameRate = null;
     }
 
     private void ApplySpeedRatios(double rate)

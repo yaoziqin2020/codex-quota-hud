@@ -17,6 +17,34 @@ public sealed class CodexProcessMonitorTests
     }
 
     [Fact]
+    public void DetectsCurrentPackagedCodexDesktopHostedByChatGptExecutable()
+    {
+        using var monitor = CreateMonitor(
+            currentProcessId: 100,
+            new FakeProcessSnapshot(
+                200,
+                "ChatGPT",
+                new nint(1),
+                @"C:\Program Files\WindowsApps\OpenAI.Codex_26.721.4979.0_x64__test\app\ChatGPT.exe"));
+
+        Assert.True(monitor.IsRunning);
+    }
+
+    [Fact]
+    public void IgnoresChatGptExecutableOutsideCodexDesktopPackage()
+    {
+        using var monitor = CreateMonitor(
+            currentProcessId: 100,
+            new FakeProcessSnapshot(
+                200,
+                "ChatGPT",
+                new nint(1),
+                @"C:\Tools\ChatGPT.exe"));
+
+        Assert.False(monitor.IsRunning);
+    }
+
+    [Fact]
     public void IgnoresCurrentHudProcess()
     {
         using var monitor = CreateMonitor(

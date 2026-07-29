@@ -18,6 +18,28 @@ public sealed class CodexExecutableLocatorTests
     }
 
     [Fact]
+    public void LocatorPrefersUserLocalCliOverInaccessiblePackagedDesktopCli()
+    {
+        const string localAppData = @"C:\Users\test\AppData\Local";
+        const string localCli =
+            localAppData + @"\OpenAI\Codex\bin\current\codex.exe";
+        const string desktopModule =
+            @"C:\Program Files\WindowsApps\OpenAI.Codex_26.721.4979.0_x64__test\app\ChatGPT.exe";
+        const string packagedCli =
+            @"C:\Program Files\WindowsApps\OpenAI.Codex_26.721.4979.0_x64__test\app\resources\codex.exe";
+
+        var locator = CreateLocator(
+            environmentOverride: null,
+            runningModulePaths: [desktopModule],
+            pathMatches: [packagedCli],
+            existingPaths: [localCli, packagedCli],
+            localAppData: localAppData,
+            userLocalMatches: [localCli]);
+
+        Assert.Equal(localCli, locator.Find());
+    }
+
+    [Fact]
     public void LocatorFallsBackToRunningCodexModuleThenPath()
     {
         const string desktopModule =
@@ -74,7 +96,8 @@ public sealed class CodexExecutableLocatorTests
         IReadOnlyList<string> runningModulePaths,
         IReadOnlyList<string> pathMatches,
         IReadOnlyList<string> existingPaths,
-        string? localAppData = @"C:\Users\test\AppData\Local")
+        string? localAppData = @"C:\Users\test\AppData\Local",
+        IReadOnlyList<string>? userLocalMatches = null)
     {
         var existing = existingPaths.ToHashSet(StringComparer.OrdinalIgnoreCase);
         return new CodexExecutableLocator(
@@ -85,6 +108,7 @@ public sealed class CodexExecutableLocatorTests
             getRunningCodexExecutablePaths: () => runningModulePaths,
             findOnPath: () => pathMatches,
             getLocalAppData: () => localAppData,
-            fileExists: existing.Contains);
+            fileExists: existing.Contains,
+            findUserLocalInstalls: _ => userLocalMatches ?? []);
     }
 }

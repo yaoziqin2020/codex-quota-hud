@@ -206,8 +206,22 @@ public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable, IAs
 
     private static bool IsCodexDesktop(IProcessSnapshot snapshot, int currentProcessId)
     {
-        if (snapshot.Id == currentProcessId ||
-            !string.Equals(snapshot.ProcessName, "Codex", StringComparison.OrdinalIgnoreCase))
+        if (snapshot.Id == currentProcessId)
+        {
+            return false;
+        }
+
+        var processName = snapshot.ProcessName;
+        var isCodexProcess = string.Equals(
+            processName,
+            "Codex",
+            StringComparison.OrdinalIgnoreCase);
+        var isPackagedChatGpt = string.Equals(
+                processName,
+                "ChatGPT",
+                StringComparison.OrdinalIgnoreCase) &&
+            IsCodexPackagePath(snapshot.ExecutablePath);
+        if (!isCodexProcess && !isPackagedChatGpt)
         {
             return false;
         }
@@ -225,15 +239,18 @@ public sealed class CodexProcessMonitor : ICodexProcessMonitor, IDisposable, IAs
 
         try
         {
-            return snapshot.ExecutablePath?.Contains(
-                "OpenAI.Codex_",
-                StringComparison.OrdinalIgnoreCase) == true;
+            return IsCodexPackagePath(snapshot.ExecutablePath);
         }
         catch (Exception exception) when (IsPerProcessInspectionFailure(exception))
         {
             return false;
         }
     }
+
+    private static bool IsCodexPackagePath(string? executablePath) =>
+        executablePath?.Contains(
+            "OpenAI.Codex_",
+            StringComparison.OrdinalIgnoreCase) == true;
 
     private static bool IsPerProcessInspectionFailure(Exception exception)
     {

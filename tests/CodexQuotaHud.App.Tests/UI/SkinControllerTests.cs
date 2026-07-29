@@ -128,6 +128,38 @@ public sealed class SkinControllerTests
             }
         });
 
+    [Fact]
+    public void BuiltInSkins_CapIdleAndRefreshingAnimationFrameRates() =>
+        RunSta(() =>
+        {
+            var controller = new SkinController();
+
+            foreach (var id in Enum.GetValues<SkinId>())
+            {
+                var skin = Assert.IsAssignableFrom<AnimatedQuotaSkin>(
+                    controller.Select(id));
+
+                skin.ApplyAnimationState(
+                    OrbAnimationState.Idle,
+                    animationsEnabled: true);
+                Assert.NotEmpty(skin.ConfiguredFrameRates);
+                Assert.All(
+                    skin.ConfiguredFrameRates,
+                    frameRate => Assert.Equal(4, frameRate));
+
+                skin.ApplyAnimationState(
+                    OrbAnimationState.Refreshing,
+                    animationsEnabled: true);
+                Assert.All(
+                    skin.ConfiguredFrameRates,
+                    frameRate => Assert.Equal(24, frameRate));
+
+                skin.ApplyAnimationState(
+                    OrbAnimationState.Hidden,
+                    animationsEnabled: true);
+            }
+        });
+
     private static void RunSta(Action action)
     {
         Exception? failure = null;
