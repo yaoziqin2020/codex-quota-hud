@@ -64,7 +64,8 @@
                 </Border.Effect>
             </Border>
 
-            <Grid Width="72" Height="96"
+            <Grid x:Name="VesselViewport"
+                  Width="72" Height="96"
                   HorizontalAlignment="Center"
                   VerticalAlignment="Center"
                   ClipToBounds="True">
@@ -74,85 +75,95 @@
                 </Grid.Clip>
 
                 <Rectangle Fill="#25152535" />
-                <Grid x:Name="LiquidLayer"
-                      Height="48"
-                      VerticalAlignment="Bottom"
-                      ClipToBounds="True">
+                <!-- The vessel owns the only water clip. The wave center is
+                     positioned at the actual quota waterline, so a high
+                     quota never clips its crest against a fill-height box. -->
+                <Canvas x:Name="LiquidLayer"
+                        Width="72"
+                        Height="96">
                     <Grid x:Name="TankSurfaceGroup"
-                          Width="104"
-                          Height="112"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Top"
-                          RenderTransformOrigin=".5,0">
-                        <Grid.RenderTransform>
-                            <TransformGroup>
-                                <RotateTransform x:Name="TankSurfaceRotateTransform" />
-                                <TranslateTransform x:Name="TankSurfaceTranslateTransform" />
-                            </TransformGroup>
-                        </Grid.RenderTransform>
-                        <Path x:Name="LiquidSurface"
-                              Data="M 0,4 C 7,4 10,0 18,0 C 26,0 29,8 38,8 C 47,8 50,0 59,0 C 68,0 71,8 80,8 C 89,8 93,0 104,2 L 104,112 L 0,112 Z">
-                            <Path.Fill>
+                          Width="144"
+                          Height="100"
+                          Canvas.Left="0"
+                          Canvas.Top="44">
+                        <!-- The body owns the quota height and never moves.
+                             Both wave caps overlap it, so their horizontal
+                             drift cannot expose a seam. -->
+                        <Rectangle x:Name="LiquidBody"
+                                   Margin="0,4,0,0">
+                            <Rectangle.Fill>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                    <GradientStop Color="#E556E6F3" Offset="0" />
-                                    <GradientStop Color="#D536B7EA" Offset=".36" />
+                                    <GradientStop Color="#DB45CDEB" Offset="0" />
+                                    <GradientStop Color="#D536B7EA" Offset=".28" />
                                     <GradientStop Color="#CD596DFF" Offset=".76" />
                                     <GradientStop Color="#D52E4EC3" Offset="1" />
                                 </LinearGradientBrush>
-                            </Path.Fill>
-                        </Path>
-                        <Path x:Name="LiquidSurfaceHighlight"
-                              Data="M 0,4 C 7,4 10,0 18,0 C 26,0 29,8 38,8 C 47,8 50,0 59,0 C 68,0 71,8 80,8 C 89,8 93,0 104,2"
-                              Stroke="#E8F4FFFF"
-                              StrokeThickness="1.5"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round">
-                            <Path.Effect>
-                                <DropShadowEffect Color="#B2F7FF"
-                                                  BlurRadius="4"
-                                                  ShadowDepth="0" />
-                            </Path.Effect>
-                        </Path>
-                        <Path Data="M 0,7 C 9,6 12,3 20,3 C 29,3 31,11 40,11 C 49,11 52,3 61,3 C 70,3 73,11 82,11 C 91,11 95,4 104,5"
-                              Stroke="#52FFFFFF"
-                              StrokeThickness="4"
-                              Opacity=".48" />
+                            </Rectangle.Fill>
+                        </Rectangle>
+
+                        <Grid Width="144" Height="100"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Top"
+                              Opacity=".52">
+                            <Grid.RenderTransform>
+                                <TranslateTransform x:Name="BackWaveTransform" />
+                            </Grid.RenderTransform>
+                            <Path x:Name="BackWaveSurface"
+                                  Data="M 0,4 C 4,0 8,0 12,4 C 16,8 20,8 24,4 C 28,0 32,0 36,4 C 40,8 44,8 48,4 C 52,0 56,0 60,4 C 64,8 68,8 72,4 C 76,0 80,0 84,4 C 88,8 92,8 96,4 C 100,0 104,0 108,4 C 112,8 116,8 120,4 C 124,0 128,0 132,4 C 136,8 140,8 144,4 L 144,100 L 0,100 Z"
+                                  Fill="#BD72DDF2" />
+                        </Grid>
+
+                        <Grid Width="144" Height="100"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Top"
+                              Opacity=".9">
+                            <Grid.RenderTransform>
+                                <TranslateTransform x:Name="FrontWaveTransform" />
+                            </Grid.RenderTransform>
+                            <Path x:Name="FrontWaveSurface"
+                                  Data="M 0,4 C 4,8 8,8 12,4 C 16,0 20,0 24,4 C 28,8 32,8 36,4 C 40,0 44,0 48,4 C 52,8 56,8 60,4 C 64,0 68,0 72,4 C 76,8 80,8 84,4 C 88,0 92,0 96,4 C 100,8 104,8 108,4 C 112,0 116,0 120,4 C 124,8 128,8 132,4 C 136,0 140,0 144,4 L 144,100 L 0,100 Z">
+                                <Path.Fill>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#EAF2FDFF" Offset="0" />
+                                        <GradientStop Color="#DD50D2EE" Offset=".24" />
+                                        <GradientStop Color="#D536B7EA" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Path.Fill>
+                            </Path>
+                            <Path Data="M 0,4 C 4,8 8,8 12,4 C 16,0 20,0 24,4 C 28,8 32,8 36,4 C 40,0 44,0 48,4 C 52,8 56,8 60,4 C 64,0 68,0 72,4 C 76,8 80,8 84,4 C 88,0 92,0 96,4 C 100,8 104,8 108,4 C 112,0 116,0 120,4 C 124,8 128,8 132,4 C 136,0 140,0 144,4"
+                                  Stroke="#CFF6FFFF"
+                                  StrokeThickness="1.2"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" />
+                        </Grid>
+
+                        <Grid Margin="0,4,0,0"
+                              ClipToBounds="True">
+                            <Ellipse x:Name="BubbleOne"
+                                     Width="5" Height="5"
+                                     Fill="#83F2FFFF"
+                                     Opacity="0"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Bottom"
+                                     Margin="46,0,0,9">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform x:Name="BubbleOneTransform" />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse x:Name="BubbleTwo"
+                                     Width="3.5" Height="3.5"
+                                     Fill="#A8FFFFFF"
+                                     Opacity="0"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Bottom"
+                                     Margin="17,0,0,5">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform x:Name="BubbleTwoTransform" />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Grid>
                     </Grid>
-                    <Ellipse x:Name="BubbleOne"
-                             Width="5" Height="5"
-                             Fill="#83F2FFFF"
-                             Opacity="0"
-                             HorizontalAlignment="Right"
-                             VerticalAlignment="Bottom"
-                             Margin="0,0,13,9">
-                        <Ellipse.RenderTransform>
-                            <TranslateTransform x:Name="BubbleOneTransform" />
-                        </Ellipse.RenderTransform>
-                    </Ellipse>
-                    <Ellipse x:Name="BubbleTwo"
-                             Width="3.5" Height="3.5"
-                             Fill="#A8FFFFFF"
-                             Opacity="0"
-                             HorizontalAlignment="Left"
-                             VerticalAlignment="Bottom"
-                             Margin="17,0,0,5">
-                        <Ellipse.RenderTransform>
-                            <TranslateTransform x:Name="BubbleTwoTransform" />
-                        </Ellipse.RenderTransform>
-                    </Ellipse>
-                    <Ellipse x:Name="BubbleThree"
-                             Width="7" Height="7"
-                             Stroke="#6FFFFFFF"
-                             StrokeThickness="1"
-                             Opacity="0"
-                             HorizontalAlignment="Right"
-                             VerticalAlignment="Bottom"
-                             Margin="0,0,27,7">
-                        <Ellipse.RenderTransform>
-                            <TranslateTransform x:Name="BubbleThreeTransform" />
-                        </Ellipse.RenderTransform>
-                    </Ellipse>
-                </Grid>
+                </Canvas>
 
                 <Path Data="M 18,13 C 9,27 9,61 18,77"
                       Stroke="#72FFFFFF"

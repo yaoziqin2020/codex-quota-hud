@@ -17,28 +17,32 @@ internal sealed class LiquidTankMotionController
     public LiquidTankMotionController(FrameworkElement owner)
     {
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
-        _tracks.Add(CreateWaveTrack());
+        _tracks.Add(CreateSurfaceWaveTrack(
+            "BackWaveTransform",
+            from: -24,
+            to: 0,
+            idleSeconds: 13,
+            refreshingSeconds: 2.8));
+        _tracks.Add(CreateSurfaceWaveTrack(
+            "FrontWaveTransform",
+            from: 0,
+            to: -24,
+            idleSeconds: 14,
+            refreshingSeconds: 3));
         _tracks.Add(CreateBubbleTrack(
             "BubbleOne",
             "BubbleOneTransform",
-            idleSeconds: 10.5,
-            refreshingSeconds: 2.5,
+            idleSeconds: 28,
+            refreshingSeconds: 4,
             beginDelaySeconds: 0,
             horizontalDrift: 4));
         _tracks.Add(CreateBubbleTrack(
             "BubbleTwo",
             "BubbleTwoTransform",
-            idleSeconds: 13,
-            refreshingSeconds: 2.9,
-            beginDelaySeconds: 3.2,
+            idleSeconds: 34,
+            refreshingSeconds: 4.6,
+            beginDelaySeconds: 8.5,
             horizontalDrift: -3));
-        _tracks.Add(CreateBubbleTrack(
-            "BubbleThree",
-            "BubbleThreeTransform",
-            idleSeconds: 9,
-            refreshingSeconds: 2.3,
-            beginDelaySeconds: 5.4,
-            horizontalDrift: 3));
     }
 
     internal int ConfiguredTrackCount => _tracks.Count;
@@ -48,6 +52,13 @@ internal sealed class LiquidTankMotionController
             .Select(static track =>
                 Timeline.GetDesiredFrameRate(track.Storyboard))
             .ToArray();
+
+    internal IReadOnlyList<LiquidSurfaceTrackDescriptor>
+        ConfiguredSurfaceTracks =>
+            _tracks
+                .Where(static track => track.Surface is not null)
+                .Select(static track => track.Surface!)
+                .ToArray();
 
     internal int ActiveClockCount =>
         _running ? _tracks.Count : 0;
@@ -109,36 +120,37 @@ internal sealed class LiquidTankMotionController
         _frameRate = null;
     }
 
-    private static MotionTrack CreateWaveTrack()
+    private static MotionTrack CreateSurfaceWaveTrack(
+        string transformName,
+        double from,
+        double to,
+        double idleSeconds,
+        double refreshingSeconds)
     {
-        const double idleSeconds = 9;
-        const double refreshingSeconds = 2.5;
-        var halfCycle = TimeSpan.FromSeconds(idleSeconds / 2);
         var storyboard = new Storyboard();
-        AddOscillation(
-            storyboard,
-            "TankSurfaceTranslateTransform",
-            "X",
-            from: -10,
-            to: 10,
-            halfCycle);
-        AddOscillation(
-            storyboard,
-            "TankSurfaceTranslateTransform",
-            "Y",
-            from: -1.4,
-            to: 1.4,
-            halfCycle);
-        AddOscillation(
-            storyboard,
-            "TankSurfaceRotateTransform",
-            "Angle",
-            from: -1.6,
-            to: 1.6,
-            halfCycle);
+        var animation = new DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = TimeSpan.FromSeconds(idleSeconds),
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+        Storyboard.SetTargetName(animation, transformName);
+        Storyboard.SetTargetProperty(
+            animation,
+            new PropertyPath("X"));
+        storyboard.Children.Add(animation);
+
         return new MotionTrack(
             storyboard,
-            idleSeconds / refreshingSeconds);
+            idleSeconds / refreshingSeconds,
+            new LiquidSurfaceTrackDescriptor(
+                transformName,
+                "X",
+                from,
+                to,
+                idleSeconds,
+                Wavelength: 24));
     }
 
     private static MotionTrack CreateBubbleTrack(
@@ -204,37 +216,20 @@ internal sealed class LiquidTankMotionController
 
         return new MotionTrack(
             storyboard,
-            idleSeconds / refreshingSeconds);
-    }
-
-    private static void AddOscillation(
-        Storyboard storyboard,
-        string targetName,
-        string property,
-        double from,
-        double to,
-        TimeSpan halfCycle)
-    {
-        var animation = new DoubleAnimation
-        {
-            From = from,
-            To = to,
-            Duration = halfCycle,
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase
-            {
-                EasingMode = EasingMode.EaseInOut
-            }
-        };
-        Storyboard.SetTargetName(animation, targetName);
-        Storyboard.SetTargetProperty(
-            animation,
-            new PropertyPath(property));
-        storyboard.Children.Add(animation);
+            idleSeconds / refreshingSeconds,
+            Surface: null);
     }
 
     private sealed record MotionTrack(
         Storyboard Storyboard,
-        double RefreshingSpeedRatio);
+        double RefreshingSpeedRatio,
+        LiquidSurfaceTrackDescriptor? Surface);
 }
+
+internal sealed record LiquidSurfaceTrackDescriptor(
+    string TargetName,
+    string PropertyPath,
+    double From,
+    double To,
+    double IdleSeconds,
+    double Wavelength);

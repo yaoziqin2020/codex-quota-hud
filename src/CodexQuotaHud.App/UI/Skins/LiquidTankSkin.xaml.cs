@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using CodexQuotaHud.App.UI.Animation;
 using CodexQuotaHud.Core.Models;
 
@@ -9,6 +10,7 @@ public partial class LiquidTankSkin :
     IOrbAnimationTarget
 {
     private const double LiquidCapacity = 96;
+    internal const double WaveCenterY = 4;
     private readonly LiquidTankMotionController _motionController;
 
     public LiquidTankSkin()
@@ -32,9 +34,21 @@ public partial class LiquidTankSkin :
     internal IReadOnlyList<int?> ConfiguredLiquidFrameRates =>
         _motionController.ConfiguredFrameRates;
 
+    internal IReadOnlyList<LiquidSurfaceTrackDescriptor>
+        ConfiguredLiquidSurfaceTracks =>
+            _motionController.ConfiguredSurfaceTracks;
+
+    internal double CurrentWaterlineY { get; private set; } = 48;
+
     protected override void RenderCore(QuotaSkinState state)
     {
-        LiquidLayer.Height = CalculateLiquidHeight(state.PrimaryPercent);
+        CurrentWaterlineY = CalculateWaterlineY(state.PrimaryPercent);
+        Canvas.SetTop(
+            TankSurfaceGroup,
+            CurrentWaterlineY - WaveCenterY);
+        LiquidLayer.Visibility = CurrentWaterlineY < LiquidCapacity
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         SecondaryArc.Progress = state.SecondaryPercent ?? 0;
         var secondaryVisibility = state.Mode == QuotaDisplayMode.Dual
             ? Visibility.Visible
@@ -45,12 +59,12 @@ public partial class LiquidTankSkin :
         LabelText.Text = state.PrimaryLabel;
     }
 
-    internal static double CalculateLiquidHeight(double remainingPercent)
+    internal static double CalculateWaterlineY(double remainingPercent)
     {
         var normalized = double.IsFinite(remainingPercent)
             ? Math.Clamp(remainingPercent, 0, 100)
             : 0;
-        return LiquidCapacity * normalized / 100;
+        return LiquidCapacity * (1 - normalized / 100);
     }
 
     void IOrbAnimationTarget.ApplyAnimationState(
