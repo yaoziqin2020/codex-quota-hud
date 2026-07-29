@@ -594,6 +594,9 @@ public partial class QuotaOrbWindow : Window
         EdgeProgressFill.Height = vertical
             ? fillLength
             : double.NaN;
+        EdgeProgressTexture.Margin = vertical
+            ? new Thickness(0, 6, 0, 6)
+            : new Thickness(6, 0, 6, 0);
     }
 
     private async Task RevealOrbAsync()

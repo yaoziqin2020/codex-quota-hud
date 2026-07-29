@@ -5,9 +5,11 @@
         xmlns:skins="clr-namespace:CodexQuotaHud.App.UI.Skins"
         Width="132" Height="132" Background="Transparent">
     <Grid Margin="4">
-        <Ellipse Margin="4" Fill="#E00D1020" Stroke="#807A5CFF" StrokeThickness="1">
+        <Ellipse x:Name="EnergyShell" Margin="4"
+                 Fill="#E00D1020" Stroke="#807A5CFF" StrokeThickness="1">
             <Ellipse.Effect>
-                <DropShadowEffect Color="#8B5CFF" BlurRadius="16" ShadowDepth="0" Opacity=".38" />
+                <DropShadowEffect Color="#8B5CFF" BlurRadius="11"
+                                  ShadowDepth="0" Opacity=".2" />
             </Ellipse.Effect>
         </Ellipse>
 
@@ -55,8 +57,9 @@
                        FontWeight="SemiBold" HorizontalAlignment="Center" />
             <TextBlock x:Name="LabelText" Foreground="#AEDDE9F3"
                        FontSize="10.5" HorizontalAlignment="Center" />
-            <TextBlock x:Name="RefreshGlyph" Text="SCANNING" Foreground="#7E76EDFF"
-                       FontSize="6.5" FontWeight="SemiBold"
+            <TextBlock x:Name="RefreshGlyph" Text="SCANNING"
+                       Foreground="#D7C8FF" FontSize="7"
+                       FontWeight="SemiBold"
                        HorizontalAlignment="Center" Margin="0,2,0,0" />
         </StackPanel>
     </Grid>

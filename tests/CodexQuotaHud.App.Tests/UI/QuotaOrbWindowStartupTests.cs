@@ -179,6 +179,11 @@ public sealed class QuotaOrbWindowStartupTests
                 Assert.Equal(height, handle.Height);
                 Assert.True(handle.IsHitTestVisible);
                 Assert.Equal(
+                    side is EdgeDockSide.Left or EdgeDockSide.Right
+                        ? new Thickness(0, 6, 0, 6)
+                        : new Thickness(6, 0, 6, 0),
+                    texture.Margin);
+                Assert.Equal(
                     side switch
                     {
                         EdgeDockSide.Left => new Thickness(0, 0, 6, 0),
@@ -208,7 +213,7 @@ public sealed class QuotaOrbWindowStartupTests
             Assert.Equal(theme.GlowColor, glow.Color);
             Assert.Equal(theme.TextureOpacity, texture.Opacity);
             Assert.Equal(theme.GlowOpacity, glow.Opacity);
-            Assert.True(theme.TextureOpacity <= 0.25);
+            Assert.True(theme.TextureOpacity <= 0.3);
             Assert.True(theme.GlowOpacity <= 0.45);
             var auroraAccent = theme.AccentColor;
             Assert.True(
@@ -246,9 +251,21 @@ public sealed class QuotaOrbWindowStartupTests
                 skin.FindName("EnergyCoreGlow"));
             var orbit = Assert.IsType<ShapeEllipse>(
                 skin.FindName("EnergyOrbit"));
+            var shell = Assert.IsType<ShapeEllipse>(
+                skin.FindName("EnergyShell"));
+            var status = Assert.IsType<TextBlock>(
+                skin.FindName("RefreshGlyph"));
 
             Assert.IsType<RadialGradientBrush>(core.Fill);
             Assert.True(orbit.Width > orbit.Height);
+            Assert.InRange(
+                Assert.IsType<DropShadowEffect>(shell.Effect).Opacity,
+                0,
+                0.25);
+            Assert.True(status.FontSize >= 7);
+            Assert.True(
+                Assert.IsType<SolidColorBrush>(status.Foreground).Color.R >=
+                0xC8);
 
             window.CloseForExit();
         });

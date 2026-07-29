@@ -181,10 +181,12 @@ public sealed class PopupPresentationTests
         Assert.Equal(
             themes.Length,
             themes
-                .Select(theme => Assert.IsType<DrawingBrush>(
-                    theme.Texture).Viewport.Width)
+                .Select(theme => theme.Material)
                 .Distinct()
                 .Count());
+        Assert.DoesNotContain(
+            themes,
+            theme => theme.Texture is DrawingBrush);
     }
 
     [Fact]

@@ -127,10 +127,20 @@ public sealed record EdgeProgressTheme(
     MediaBrush Border,
     MediaBrush Fill,
     MediaBrush Texture,
+    EdgeProgressMaterialKind Material,
     MediaColor AccentColor,
     MediaColor GlowColor,
     double TextureOpacity,
     double GlowOpacity);
+
+public enum EdgeProgressMaterialKind
+{
+    TechHighlight,
+    EnergyBloom,
+    GlassReflection,
+    AuroraWash,
+    LiquidLevel
+}
 
 public static class EdgeProgressThemeProvider
 {
@@ -140,50 +150,45 @@ public static class EdgeProgressThemeProvider
             SkinId.EnergyRing => Create(
                 "#F2111024", "#FF8D62FF",
                 ["#FF9A68FF", "#FFB85FE8", "#FF765DDE"],
-                "#A6E9D8FF", 45, 7, 1.2, 0.58, 0.76),
+                45, EdgeProgressMaterialKind.EnergyBloom, 0.38, 0.64),
             SkinId.LiquidGlass => Create(
                 "#D8142834", "#FFD0EEFF",
                 ["#FFBDF4FF", "#FF6FD9F5", "#FF9DE8FF"],
-                "#B8FFFFFF", -35, 11, 0.8, 0.48, 0.7),
+                -35, EdgeProgressMaterialKind.GlassReflection, 0.46, 0.58),
             SkinId.Aurora => Create(
                 "#F20B211B", "#FF5DDBA0",
                 ["#FF55D99A", "#FF62DFA5", "#FF3DBA91"],
-                "#806DDDA8", 28, 13, 1.1, 0.24, 0.44),
+                28, EdgeProgressMaterialKind.AuroraWash, 0.3, 0.4),
             SkinId.LiquidTank => Create(
                 "#F20C2430", "#FF59CDEA",
                 ["#FF84EBF6", "#FF39C7E5", "#FF506EEB"],
-                "#A8D9F8FF", 90, 9, 1, 0.52, 0.72),
+                90, EdgeProgressMaterialKind.LiquidLevel, 0.42, 0.58),
             _ => Create(
                 "#F20A1622", "#FF38D9FF",
                 ["#FF58E6FA", "#FF24B8F2", "#FF4B7DFF"],
-                "#A6C4F7FF", 0, 6, 0.8, 0.5, 0.78)
+                0, EdgeProgressMaterialKind.TechHighlight, 0.36, 0.62)
         };
 
     private static EdgeProgressTheme Create(
         string track,
         string border,
         IReadOnlyList<string> fillColors,
-        string textureColor,
         double angle,
-        double texturePitch,
-        double textureThickness,
+        EdgeProgressMaterialKind material,
         double textureOpacity,
         double glowOpacity)
     {
         var trackBrush = Solid(track);
         var borderBrush = Solid(border);
         var fill = Gradient(fillColors, angle);
-        var texture = Texture(
-            ParseColor(textureColor),
-            texturePitch,
-            textureThickness,
-            angle);
+        var texture = Material(material);
         var accent = ParseColor(fillColors[0]);
         return new EdgeProgressTheme(
             trackBrush,
             borderBrush,
             fill,
             texture,
+            material,
             accent,
             accent,
             textureOpacity,
@@ -229,27 +234,77 @@ public static class EdgeProgressThemeProvider
         return brush;
     }
 
-    private static DrawingBrush Texture(
-        MediaColor color,
-        double pitch,
-        double thickness,
-        double angle)
+    private static MediaBrush Material(EdgeProgressMaterialKind material)
     {
-        var geometry = new LineGeometry(
-            new System.Windows.Point(0, pitch),
-            new System.Windows.Point(pitch, 0));
-        var pen = new System.Windows.Media.Pen(
-            new SolidColorBrush(color),
-            thickness);
-        var drawing = new GeometryDrawing(null, pen, geometry);
-        var brush = new DrawingBrush(drawing)
+        GradientBrush brush = material switch
         {
-            TileMode = TileMode.Tile,
-            Viewport = new System.Windows.Rect(0, 0, pitch, pitch),
-            ViewportUnits = BrushMappingMode.Absolute,
-            Stretch = Stretch.None,
-            Transform = new RotateTransform(angle / 4)
+            EdgeProgressMaterialKind.EnergyBloom =>
+                new RadialGradientBrush
+                {
+                    Center = new System.Windows.Point(0.38, 0.5),
+                    GradientOrigin = new System.Windows.Point(0.28, 0.42),
+                    RadiusX = 0.72,
+                    RadiusY = 1
+                },
+            _ => new LinearGradientBrush
+            {
+                StartPoint = material == EdgeProgressMaterialKind.AuroraWash
+                    ? new System.Windows.Point(0, 0.2)
+                    : new System.Windows.Point(0, 0),
+                EndPoint = material == EdgeProgressMaterialKind.AuroraWash
+                    ? new System.Windows.Point(1, 0.8)
+                    : new System.Windows.Point(0, 1)
+            }
         };
+        var stops = material switch
+        {
+            EdgeProgressMaterialKind.TechHighlight =>
+                new[]
+                {
+                    ("#00FFFFFF", 0d),
+                    ("#70FFFFFF", 0.46),
+                    ("#18FFFFFF", 0.58),
+                    ("#00FFFFFF", 1d)
+                },
+            EdgeProgressMaterialKind.EnergyBloom =>
+                new[]
+                {
+                    ("#A8FFFFFF", 0d),
+                    ("#385DEBFF", 0.5),
+                    ("#00FFFFFF", 1d)
+                },
+            EdgeProgressMaterialKind.GlassReflection =>
+                new[]
+                {
+                    ("#AFFFFFFF", 0d),
+                    ("#42FFFFFF", 0.34),
+                    ("#08FFFFFF", 0.66),
+                    ("#00FFFFFF", 1d)
+                },
+            EdgeProgressMaterialKind.AuroraWash =>
+                new[]
+                {
+                    ("#005CFFD2", 0d),
+                    ("#786CFFD1", 0.48),
+                    ("#247FFFF0", 0.72),
+                    ("#005CFFD2", 1d)
+                },
+            _ => new[]
+                {
+                    ("#00FFFFFF", 0d),
+                    ("#18FFFFFF", 0.34),
+                    ("#86DFFFFF", 0.44),
+                    ("#20FFFFFF", 0.56),
+                    ("#00FFFFFF", 1d)
+                }
+        };
+        foreach (var (color, offset) in stops)
+        {
+            brush.GradientStops.Add(new GradientStop(
+                ParseColor(color),
+                offset));
+        }
+
         brush.Freeze();
         return brush;
     }

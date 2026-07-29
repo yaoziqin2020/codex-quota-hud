@@ -25,6 +25,6 @@ public partial class EnergyRingSkin : AnimatedQuotaSkin
             : Visibility.Collapsed;
         PercentText.Text = $"{state.PrimaryPercent:0}%";
         LabelText.Text = state.PrimaryLabel;
-        RefreshGlyph.Opacity = state.IsRefreshing ? 1 : .38;
+        RefreshGlyph.Opacity = state.IsRefreshing ? 1 : .72;
     }
 }
