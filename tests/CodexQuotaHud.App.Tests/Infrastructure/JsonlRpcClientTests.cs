@@ -74,6 +74,40 @@ public sealed class JsonlRpcClientTests
             client.RequestAsync("sample/read", null, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task RequestAsync_RejectsFutureRequests_AfterEndOfStream()
+    {
+        var output = new StringWriter();
+        var client = new JsonlRpcClient(output, new StringReader(string.Empty));
+
+        await Assert.ThrowsAsync<EndOfStreamException>(() =>
+            client.RequestAsync("first/read", null, CancellationToken.None));
+        var writtenBeforeRetry = output.ToString();
+
+        await Assert.ThrowsAsync<EndOfStreamException>(() =>
+            client.RequestAsync("second/read", null, CancellationToken.None)
+                .WaitAsync(TimeSpan.FromMilliseconds(200)));
+
+        Assert.Equal(writtenBeforeRetry, output.ToString());
+    }
+
+    [Fact]
+    public async Task RequestAsync_RejectsFutureRequests_AfterMalformedLine()
+    {
+        var output = new StringWriter();
+        var client = new JsonlRpcClient(output, new StringReader("not json\n"));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            client.RequestAsync("first/read", null, CancellationToken.None));
+        var writtenBeforeRetry = output.ToString();
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            client.RequestAsync("second/read", null, CancellationToken.None)
+                .WaitAsync(TimeSpan.FromMilliseconds(200)));
+
+        Assert.Equal(writtenBeforeRetry, output.ToString());
+    }
+
     private sealed class NeverEndingTextReader : TextReader
     {
         public override async Task<string?> ReadLineAsync()

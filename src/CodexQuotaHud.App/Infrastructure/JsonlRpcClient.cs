@@ -13,8 +13,10 @@ public sealed class JsonlRpcClient
     private readonly ConcurrentDictionary<long, TaskCompletionSource<JsonElement>> _pending = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly object _readerLock = new();
+    private readonly object _terminalLock = new();
     private long _nextId;
     private Task? _readerLoop;
+    private Exception? _terminalException;
 
     public JsonlRpcClient(TextWriter standardInput, TextReader standardOutput)
     {
@@ -32,17 +34,11 @@ public sealed class JsonlRpcClient
         var id = Interlocked.Increment(ref _nextId);
         var completion = new TaskCompletionSource<JsonElement>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!_pending.TryAdd(id, completion))
-        {
-            throw new InvalidOperationException("Could not register JSON-RPC request.");
-        }
+        RegisterPending(id, completion);
 
         using var registration = cancellationToken.Register(() =>
         {
-            if (_pending.TryRemove(id, out var pending))
-            {
-                pending.TrySetCanceled(cancellationToken);
-            }
+            CancelPending(id, cancellationToken);
         });
 
         EnsureReaderLoop();
@@ -52,17 +48,11 @@ public sealed class JsonlRpcClient
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            if (_pending.TryRemove(id, out var pending))
-            {
-                pending.TrySetCanceled(cancellationToken);
-            }
+            CancelPending(id, cancellationToken);
         }
         catch (Exception exception)
         {
-            if (_pending.TryRemove(id, out var pending))
-            {
-                pending.TrySetException(exception);
-            }
+            FailPendingRequest(id, exception);
         }
 
         return await completion.Task.ConfigureAwait(false);
@@ -88,7 +78,7 @@ public sealed class JsonlRpcClient
                 var line = await _standardOutput.ReadLineAsync().ConfigureAwait(false);
                 if (line is null)
                 {
-                    FailPending(new EndOfStreamException("Codex app-server closed its output stream."));
+                    SetTerminalException(new EndOfStreamException("Codex app-server closed its output stream."));
                     return;
                 }
 
@@ -109,7 +99,7 @@ public sealed class JsonlRpcClient
                     throw new InvalidDataException("JSON-RPC response id must be an integer.");
                 }
 
-                if (!_pending.TryRemove(id, out var completion))
+                if (!TryTakePending(id, out var completion))
                 {
                     continue;
                 }
@@ -139,11 +129,11 @@ public sealed class JsonlRpcClient
         }
         catch (JsonException exception)
         {
-            FailPending(new InvalidDataException("Malformed JSON-RPC line.", exception));
+            SetTerminalException(new InvalidDataException("Malformed JSON-RPC line.", exception));
         }
         catch (Exception exception)
         {
-            FailPending(exception);
+            SetTerminalException(exception);
         }
     }
 
@@ -184,14 +174,72 @@ public sealed class JsonlRpcClient
         }
     }
 
-    private void FailPending(Exception exception)
+    private void RegisterPending(long id, TaskCompletionSource<JsonElement> completion)
     {
-        foreach (var pair in _pending)
+        lock (_terminalLock)
         {
-            if (_pending.TryRemove(pair.Key, out var completion))
+            if (_terminalException is not null)
+            {
+                throw _terminalException;
+            }
+
+            if (!_pending.TryAdd(id, completion))
+            {
+                throw new InvalidOperationException("Could not register JSON-RPC request.");
+            }
+        }
+    }
+
+    private void CancelPending(long id, CancellationToken cancellationToken)
+    {
+        lock (_terminalLock)
+        {
+            if (_pending.TryRemove(id, out var completion))
+            {
+                completion.TrySetCanceled(cancellationToken);
+            }
+        }
+    }
+
+    private void FailPendingRequest(long id, Exception exception)
+    {
+        lock (_terminalLock)
+        {
+            if (_pending.TryRemove(id, out var completion))
             {
                 completion.TrySetException(exception);
             }
+        }
+    }
+
+    private bool TryTakePending(long id, out TaskCompletionSource<JsonElement> completion)
+    {
+        lock (_terminalLock)
+        {
+            return _pending.TryRemove(id, out completion!);
+        }
+    }
+
+    private void SetTerminalException(Exception exception)
+    {
+        List<TaskCompletionSource<JsonElement>> pending;
+        lock (_terminalLock)
+        {
+            if (_terminalException is not null)
+            {
+                return;
+            }
+
+            _terminalException = exception;
+            pending = _pending.ToArray()
+                .Where(pair => _pending.TryRemove(pair.Key, out _))
+                .Select(pair => pair.Value)
+                .ToList();
+        }
+
+        foreach (var completion in pending)
+        {
+            completion.TrySetException(exception);
         }
     }
 }

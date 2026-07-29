@@ -42,6 +42,48 @@ public sealed class CodexAppServerClientTests
         Assert.Null(second.Weekly);
     }
 
+    [Fact]
+    public async Task ReadAsync_CompletesSharedInitialization_AfterOriginalCallerCancels()
+    {
+        var process = new FakeAppServerProcess();
+        var client = new CodexAppServerClient(process);
+        using var cancellation = new CancellationTokenSource();
+
+        var canceledRead = client.ReadAsync(cancellation.Token);
+        await process.Input.ReadLineAsync();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledRead);
+
+        process.Output.WriteLine("""{"id":1,"result":{}}""");
+        Assert.Equal("{\"method\":\"initialized\"}",
+            await process.Input.ReadLineAsync().WaitAsync(TimeSpan.FromMilliseconds(200)));
+
+        var retry = client.ReadAsync(CancellationToken.None);
+        Assert.Equal("{\"method\":\"account/rateLimits/read\",\"id\":2}",
+            await process.Input.ReadLineAsync().WaitAsync(TimeSpan.FromMilliseconds(200)));
+        process.Output.WriteLine("""{"id":2,"result":{"rateLimits":{}}}""");
+        process.Output.Complete();
+
+        await retry;
+    }
+
+    [Fact]
+    public async Task ReadAsync_DoesNotRetryInitialize_AfterInitializationError()
+    {
+        var process = new FakeAppServerProcess();
+        var client = new CodexAppServerClient(process);
+
+        var firstRead = client.ReadAsync(CancellationToken.None);
+        await process.Input.ReadLineAsync();
+        process.Output.WriteLine("""{"id":1,"error":{"code":-32000,"message":"denied"}}""");
+        await Assert.ThrowsAsync<JsonlRpcException>(() => firstRead);
+
+        await Assert.ThrowsAsync<JsonlRpcException>(() =>
+            client.ReadAsync(CancellationToken.None).WaitAsync(TimeSpan.FromMilliseconds(200)));
+        await Assert.ThrowsAsync<TimeoutException>(() =>
+            process.Input.ReadLineAsync().WaitAsync(TimeSpan.FromMilliseconds(200)));
+    }
+
     private sealed class FakeAppServerProcess : IAppServerProcess
     {
         public RecordingTextWriter Input { get; } = new();
