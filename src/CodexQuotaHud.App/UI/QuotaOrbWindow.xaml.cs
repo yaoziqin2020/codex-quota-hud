@@ -19,10 +19,10 @@ public partial class QuotaOrbWindow : Window
 {
     private const double PopupShadowMargin = 14;
     private readonly QuotaOrbViewModel _viewModel;
-    private readonly HoverCloseController _hoverCloseController;
     private readonly SkinController _skinController;
     private readonly OrbAnimationController _animationController;
     private readonly EdgeAutoHideController _edgeAutoHideController;
+    private TaskCompletionSource? _expandAnimationCompletion;
     private bool _allowClose;
     private bool _isDragging;
     private bool _contextMenuOpen;
@@ -40,11 +40,8 @@ public partial class QuotaOrbWindow : Window
         SetSkinView(selected.View);
         _skinController.Render(viewModel.SkinState);
         ApplyAnimationState();
-        _hoverCloseController = new HoverCloseController(
-            () => Task.Delay(TimeSpan.FromMilliseconds(180)),
-            () => DetailsPopup.IsOpen = false);
         _edgeAutoHideController = new EdgeAutoHideController(
-            () => Task.Delay(TimeSpan.FromSeconds(1)),
+            () => Task.Delay(TimeSpan.FromSeconds(5)),
             side => AnimateEdge(side, collapsed: true),
             side => AnimateEdge(side, collapsed: false));
         DetailsPopup.CustomPopupPlacementCallback = PlaceDetailsPopup;
@@ -132,6 +129,7 @@ public partial class QuotaOrbWindow : Window
         else if (e.PropertyName == nameof(QuotaOrbViewModel.SkinState))
         {
             _skinController.Render(_viewModel.SkinState);
+            ApplyEdgeProgressState(_edgeAutoHideController.DockSide);
             _animationController.SetAnimationsEnabled(
                 _viewModel.AnimationsEnabled);
             ApplyAnimationState();
@@ -189,37 +187,36 @@ public partial class QuotaOrbWindow : Window
         _ = ScheduleEdgeCollapseAsync();
     }
 
-    private async void OnOrbMouseEnter(object sender, MouseEventArgs e)
+    private void OnOrbMouseEnter(object sender, MouseEventArgs e)
     {
-        _hoverCloseController.CancelPendingClose();
-        _edgeAutoHideController.Expand();
-        RefreshPopupPlacement();
-        DetailsPopup.IsOpen = true;
-        try
-        {
-            await _viewModel.OnHoverAsync();
-        }
-        catch
-        {
-        }
+        _edgeAutoHideController.CancelPendingCollapse();
     }
 
     private async void OnOrbMouseLeave(object sender, MouseEventArgs e)
     {
-        await _hoverCloseController.ScheduleCloseAsync();
         await ScheduleEdgeCollapseAsync();
     }
 
-    private void OnPopupMouseEnter(object sender, MouseEventArgs e)
+    private async void OnEdgeHandleMouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
     {
-        _hoverCloseController.CancelPendingClose();
+        if (e.ChangedButton != MouseButton.Left)
+        {
+            return;
+        }
+
+        e.Handled = true;
         _edgeAutoHideController.CancelPendingCollapse();
-    }
-
-    private async void OnPopupMouseLeave(object sender, MouseEventArgs e)
-    {
-        await _hoverCloseController.ScheduleCloseAsync();
-        await ScheduleEdgeCollapseAsync();
+        DetailsPopup.IsOpen = false;
+        try
+        {
+            await RevealOrbAsync();
+            await ScheduleEdgeCollapseAsync();
+        }
+        catch
+        {
+        }
     }
 
     private void OnDragSurfaceMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -229,9 +226,20 @@ public partial class QuotaOrbWindow : Window
             return;
         }
 
+        var clickCount = e.ClickCount;
+        if (PointerGesture.SelectAction(clickCount, moved: false) ==
+            OrbPointerAction.Refresh)
+        {
+            e.Handled = true;
+            ShowDetailsPopup();
+            _viewModel.RefreshCommand.Execute(parameter: null);
+            return;
+        }
+
+        var startLeft = Left;
+        var startTop = Top;
         _edgeAutoHideController.Expand();
         _edgeAutoHideController.CancelPendingCollapse();
-        DetailsPopup.IsOpen = false;
         CommitAnimatedPosition();
         _isDragging = true;
         try
@@ -243,13 +251,29 @@ public partial class QuotaOrbWindow : Window
             _isDragging = false;
         }
 
-        ClampToNearestWorkArea(save: false);
-        UpdateDockAfterDrag();
+        var moved = !PointerGesture.IsClick(
+            startLeft,
+            startTop,
+            Left,
+            Top);
+        switch (PointerGesture.SelectAction(clickCount, moved))
+        {
+            case OrbPointerAction.ToggleDetails:
+                ToggleDetailsPopup();
+                _ = RefreshAfterClickAsync();
+                break;
+            case OrbPointerAction.None:
+                DetailsPopup.IsOpen = false;
+                ClampToNearestWorkArea(save: false);
+                UpdateDockAfterDrag();
+                break;
+        }
     }
 
     private void OnContextMenuOpened(object sender, RoutedEventArgs e)
     {
         _contextMenuOpen = true;
+        DetailsPopup.IsOpen = false;
         _edgeAutoHideController.Expand();
         SetSkinCheck(HudDialMenuItem, SkinId.HudDial);
         SetSkinCheck(EnergyRingMenuItem, SkinId.EnergyRing);
@@ -271,8 +295,16 @@ public partial class QuotaOrbWindow : Window
         var workAreas = GetWorkAreas();
         var workArea = EdgeAutoHideGeometry.NearestWorkArea(
             Left, Top, width, height, workAreas);
-        var side = EdgeAutoHideGeometry.NearestDockSide(
+        var side = EdgeAutoHideGeometry.DockSideNearEdge(
             Left, Top, width, height, workArea, workAreas);
+        if (side == EdgeDockSide.None)
+        {
+            _edgeAutoHideController.Undock();
+            ApplyEdgeVisualState(side, collapsed: false, animate: false);
+            _viewModel.SavePosition(Left, Top);
+            return;
+        }
+
         var expanded = EdgeAutoHideGeometry.ExpandedPosition(
             side, Left, Top, width, height, workArea);
         Left = expanded.Left;
@@ -310,8 +342,16 @@ public partial class QuotaOrbWindow : Window
         var workAreas = GetWorkAreas();
         var workArea = EdgeAutoHideGeometry.NearestWorkArea(
             Left, Top, width, height, workAreas);
-        var side = EdgeAutoHideGeometry.NearestDockSide(
+        var side = EdgeAutoHideGeometry.DockSideNearEdge(
             Left, Top, width, height, workArea, workAreas);
+        if (side == EdgeDockSide.None)
+        {
+            _edgeAutoHideController.Undock();
+            ApplyEdgeVisualState(side, collapsed: false, animate: false);
+            _viewModel.SavePosition(Left, Top);
+            return;
+        }
+
         var expanded = EdgeAutoHideGeometry.ExpandedPosition(
             side, Left, Top, width, height, workArea);
         _edgeAutoHideController.SetDock(side);
@@ -326,18 +366,60 @@ public partial class QuotaOrbWindow : Window
     private Task<bool> ScheduleEdgeCollapseAsync() =>
         _edgeAutoHideController.ScheduleCollapseAsync(
             () =>
-                IsVisible &&
-                _viewModel.IsVisible &&
-                !_isDragging &&
-                !_contextMenuOpen &&
-                !DetailsPopup.IsMouseOver &&
-                !OrbContextMenu.IsOpen);
+                CanCollapseEdge(
+                    IsVisible,
+                    _viewModel.IsVisible,
+                    _isDragging,
+                    _contextMenuOpen,
+                    IsMouseOver,
+                    DetailsPopup.IsOpen,
+                    DetailsPopup.IsMouseOver,
+                    OrbContextMenu.IsOpen));
+
+    internal static bool CanCollapseEdge(
+        bool windowVisible,
+        bool displayVisible,
+        bool dragging,
+        bool contextMenuOpen,
+        bool pointerOverOrb,
+        bool popupOpen,
+        bool pointerOverPopup,
+        bool orbMenuOpen) =>
+        windowVisible &&
+        displayVisible &&
+        !dragging &&
+        !contextMenuOpen &&
+        !pointerOverOrb &&
+        !popupOpen &&
+        !pointerOverPopup &&
+        !orbMenuOpen;
+
+    private async void OnDetailsPopupClosed(object? sender, EventArgs e)
+    {
+        if (_allowClose)
+        {
+            return;
+        }
+
+        try
+        {
+            await ScheduleEdgeCollapseAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
 
     private void AnimateEdge(EdgeDockSide side, bool collapsed)
     {
         if (side == EdgeDockSide.None || !_viewModel.IsVisible)
         {
             return;
+        }
+
+        if (collapsed)
+        {
+            DetailsPopup.IsOpen = false;
         }
 
         var workArea = GetNearestWorkArea();
@@ -348,6 +430,15 @@ public partial class QuotaOrbWindow : Window
                 side, Left, Top, width, height, workArea)
             : EdgeAutoHideGeometry.ExpandedPosition(
                 side, Left, Top, width, height, workArea);
+        TaskCompletionSource? expandCompletion = null;
+        if (!collapsed)
+        {
+            _expandAnimationCompletion?.TrySetResult();
+            expandCompletion = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            _expandAnimationCompletion = expandCompletion;
+        }
+
         ApplyEdgeVisualState(side, collapsed, animate: true);
         var animation = new DoubleAnimation
         {
@@ -380,6 +471,7 @@ public partial class QuotaOrbWindow : Window
             Left = target.Left;
             Top = target.Top;
             RefreshPopupPlacement();
+            expandCompletion?.TrySetResult();
         };
         BeginAnimation(
             property,
@@ -403,8 +495,8 @@ public partial class QuotaOrbWindow : Window
         bool animate)
     {
         var verticalPill = side is EdgeDockSide.Left or EdgeDockSide.Right;
-        EdgeHandle.Width = verticalPill ? 6 : 44;
-        EdgeHandle.Height = verticalPill ? 44 : 6;
+        EdgeHandle.Width = verticalPill ? 10 : 64;
+        EdgeHandle.Height = verticalPill ? 64 : 10;
         EdgeHandle.HorizontalAlignment = side switch
         {
             EdgeDockSide.Left => System.Windows.HorizontalAlignment.Right,
@@ -417,6 +509,8 @@ public partial class QuotaOrbWindow : Window
             EdgeDockSide.Bottom => System.Windows.VerticalAlignment.Top,
             _ => System.Windows.VerticalAlignment.Center
         };
+        EdgeHandle.IsHitTestVisible = collapsed;
+        ApplyEdgeProgressState(side);
 
         SetOpacity(
             SkinHost,
@@ -426,6 +520,74 @@ public partial class QuotaOrbWindow : Window
             EdgeHandle,
             collapsed ? 1 : 0,
             animate);
+    }
+
+    private void ApplyEdgeProgressState(EdgeDockSide side)
+    {
+        var vertical = side is EdgeDockSide.Left or EdgeDockSide.Right;
+        var fillLength = EdgeProgressGeometry.FillLength(
+            trackLength: 64,
+            _viewModel.DisplayMode == QuotaDisplayMode.Hidden
+                ? 0
+                : _viewModel.PrimaryPercent);
+        EdgeProgressFill.HorizontalAlignment = vertical
+            ? System.Windows.HorizontalAlignment.Stretch
+            : System.Windows.HorizontalAlignment.Left;
+        EdgeProgressFill.VerticalAlignment = vertical
+            ? System.Windows.VerticalAlignment.Bottom
+            : System.Windows.VerticalAlignment.Stretch;
+        EdgeProgressFill.Width = vertical
+            ? double.NaN
+            : fillLength;
+        EdgeProgressFill.Height = vertical
+            ? fillLength
+            : double.NaN;
+        EdgeProgressSheen.Width = vertical ? 2 : double.NaN;
+        EdgeProgressSheen.Height = vertical ? double.NaN : 2;
+        EdgeProgressSheen.HorizontalAlignment = vertical
+            ? System.Windows.HorizontalAlignment.Left
+            : System.Windows.HorizontalAlignment.Stretch;
+        EdgeProgressSheen.VerticalAlignment = vertical
+            ? System.Windows.VerticalAlignment.Stretch
+            : System.Windows.VerticalAlignment.Top;
+    }
+
+    private async Task RevealOrbAsync()
+    {
+        _edgeAutoHideController.Expand();
+        var completion = _expandAnimationCompletion;
+        if (completion is not null)
+        {
+            await completion.Task;
+        }
+    }
+
+    private void ShowDetailsPopup()
+    {
+        RefreshPopupPlacement();
+        DetailsPopup.IsOpen = true;
+    }
+
+    private void ToggleDetailsPopup()
+    {
+        if (DetailsPopup.IsOpen)
+        {
+            DetailsPopup.IsOpen = false;
+            return;
+        }
+
+        ShowDetailsPopup();
+    }
+
+    private async Task RefreshAfterClickAsync()
+    {
+        try
+        {
+            await _viewModel.OnHoverAsync();
+        }
+        catch
+        {
+        }
     }
 
     private static void SetOpacity(
@@ -485,9 +647,7 @@ public partial class QuotaOrbWindow : Window
         [
             new CustomPopupPlacement(
                 new Point(placement.OffsetX, placement.OffsetY),
-                dock is EdgeDockSide.Top or EdgeDockSide.Bottom
-                    ? PopupPrimaryAxis.Horizontal
-                    : PopupPrimaryAxis.Vertical)
+                PopupPrimaryAxis.Vertical)
         ];
     }
 
@@ -513,7 +673,10 @@ public partial class QuotaOrbWindow : Window
         PopupCard.Resources["PopupSecondaryTextBrush"] =
             theme.SecondaryText;
         PopupShadow.Color = theme.ShadowColor;
-        EdgeHandle.Background = theme.Accent;
+        EdgeProgressTrack.Background = theme.Background;
+        EdgeProgressTrack.BorderBrush = theme.Border;
+        EdgeProgressFill.Background = theme.Accent;
+        EdgeProgressSheen.Background = theme.SecondaryText;
         EdgeHandleGlow.Color = theme.ShadowColor;
         HudDialPopupDecoration.Visibility =
             theme.Decoration == PopupDecorationKind.HudDial

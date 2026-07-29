@@ -132,6 +132,47 @@ public static class EdgeAutoHideGeometry
             .FirstOrDefault();
     }
 
+    public static EdgeDockSide DockSideNearEdge(
+        double left,
+        double top,
+        double width,
+        double height,
+        WorkArea workArea,
+        IReadOnlyList<WorkArea> workAreas,
+        double threshold = DockThreshold)
+    {
+        if (!double.IsFinite(left) ||
+            !double.IsFinite(top) ||
+            width <= 0 ||
+            height <= 0 ||
+            threshold < 0)
+        {
+            return EdgeDockSide.None;
+        }
+
+        var candidates = new[]
+        {
+            (Side: EdgeDockSide.Left,
+                Distance: Math.Abs(left - workArea.Left)),
+            (Side: EdgeDockSide.Right,
+                Distance: Math.Abs(
+                    left + width - (workArea.Left + workArea.Width))),
+            (Side: EdgeDockSide.Top,
+                Distance: Math.Abs(top - workArea.Top)),
+            (Side: EdgeDockSide.Bottom,
+                Distance: Math.Abs(
+                    top + height - (workArea.Top + workArea.Height)))
+        };
+        return candidates
+            .Where(candidate => candidate.Distance <= threshold)
+            .Where(candidate =>
+                IsExternalEdge(candidate.Side, workArea, workAreas))
+            .OrderBy(candidate => candidate.Distance)
+            .ThenBy(candidate => candidate.Side)
+            .Select(candidate => candidate.Side)
+            .FirstOrDefault();
+    }
+
     public static WindowPosition ExpandedPosition(
         EdgeDockSide side,
         double left,
@@ -265,6 +306,22 @@ public static class EdgeAutoHideGeometry
         Math.Max(firstStart, secondStart);
 }
 
+public static class EdgeProgressGeometry
+{
+    public static double FillLength(double trackLength, double percent)
+    {
+        if (!double.IsFinite(trackLength) || trackLength <= 0)
+        {
+            return 0;
+        }
+
+        var normalizedPercent = double.IsFinite(percent)
+            ? Math.Clamp(percent, 0, 100)
+            : 0;
+        return trackLength * normalizedPercent / 100;
+    }
+}
+
 internal sealed class EdgeAutoHideController(
     Func<Task> delayAsync,
     Action<EdgeDockSide> collapse,
@@ -274,6 +331,7 @@ internal sealed class EdgeAutoHideController(
     private bool _disposed;
 
     public EdgeDockSide DockSide { get; private set; }
+    public bool IsCollapsed { get; private set; }
 
     public void SetDock(EdgeDockSide side)
     {
@@ -288,6 +346,7 @@ internal sealed class EdgeAutoHideController(
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         CancelPendingCollapse();
+        IsCollapsed = false;
         if (DockSide != EdgeDockSide.None)
         {
             expand(DockSide);
@@ -316,6 +375,7 @@ internal sealed class EdgeAutoHideController(
             return false;
         }
 
+        IsCollapsed = true;
         collapse(DockSide);
         return true;
     }

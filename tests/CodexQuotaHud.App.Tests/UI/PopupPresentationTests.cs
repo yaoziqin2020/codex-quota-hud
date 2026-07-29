@@ -85,17 +85,16 @@ public sealed class PopupPresentationTests
     }
 
     [Theory]
-    [InlineData(EdgeDockSide.Top, PopupOpenDirection.Down, 128)]
-    [InlineData(EdgeDockSide.Bottom, PopupOpenDirection.Up, -204)]
-    public void Placement_TopAndBottomOpenInwardWithTenPixelInnerGap(
-        EdgeDockSide side,
-        PopupOpenDirection expectedDirection,
-        double expectedOffsetY)
+    [InlineData(EdgeDockSide.Left)]
+    [InlineData(EdgeDockSide.Right)]
+    [InlineData(EdgeDockSide.Top)]
+    [InlineData(EdgeDockSide.Bottom)]
+    public void Placement_DefaultsRightForEveryDockSideWhenRightHasRoom(
+        EdgeDockSide side)
     {
-        var orbTop = side == EdgeDockSide.Top ? 0 : 900;
         var result = PopupPlacementCalculator.Calculate(
             orbLeft: 800,
-            orbTop,
+            orbTop: 300,
             orbWidth: 132,
             orbHeight: 132,
             popupWidth: 278,
@@ -107,19 +106,33 @@ public sealed class PopupPresentationTests
             insetRight: 14,
             insetBottom: 14);
 
-        Assert.Equal(expectedDirection, result.Direction);
-        Assert.Equal(-73, result.OffsetX);
-        Assert.Equal(expectedOffsetY, result.OffsetY);
-        var innerTop = orbTop + result.OffsetY + 14;
-        var innerBottom = orbTop + result.OffsetY + 208 - 14;
-        if (side == EdgeDockSide.Top)
-        {
-            Assert.Equal(orbTop + 132 + 10, innerTop);
-        }
-        else
-        {
-            Assert.Equal(orbTop - 10, innerBottom);
-        }
+        Assert.Equal(PopupOpenDirection.Right, result.Direction);
+        Assert.Equal(128, result.OffsetX);
+        Assert.Equal(-38, result.OffsetY);
+        Assert.Equal(
+            800 + 132 + 10,
+            800 + result.OffsetX + 14);
+    }
+
+    [Fact]
+    public void Placement_FallsBackLeftOnlyWhenRightCannotFit()
+    {
+        var result = PopupPlacementCalculator.Calculate(
+            orbLeft: 1788,
+            orbTop: 300,
+            orbWidth: 132,
+            orbHeight: 132,
+            popupWidth: 278,
+            popupHeight: 208,
+            new WorkArea(0, 0, 1920, 1032),
+            EdgeDockSide.Top,
+            insetLeft: 14,
+            insetTop: 14,
+            insetRight: 14,
+            insetBottom: 14);
+
+        Assert.Equal(PopupOpenDirection.Left, result.Direction);
+        Assert.Equal(-274, result.OffsetX);
     }
 
     [Fact]

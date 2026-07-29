@@ -49,13 +49,14 @@ public sealed class EdgeAutoHideControllerTests
     }
 
     [Theory]
-    [InlineData(100, 400, EdgeDockSide.Top)]
-    [InlineData(1700, 400, EdgeDockSide.Right)]
-    [InlineData(985, 0, EdgeDockSide.Top)]
-    [InlineData(985, 900, EdgeDockSide.Bottom)]
-    [InlineData(-1900, 400, EdgeDockSide.Left)]
-    [InlineData(-1000, 900, EdgeDockSide.Bottom)]
-    public void NearestDockSide_UsesAllFourOuterEdgesAcrossBothMonitors(
+    [InlineData(420, 300, EdgeDockSide.None)]
+    [InlineData(4, 400, EdgeDockSide.None)]
+    [InlineData(1784, 400, EdgeDockSide.Right)]
+    [InlineData(985, 4, EdgeDockSide.Top)]
+    [InlineData(985, 904, EdgeDockSide.Bottom)]
+    [InlineData(-1916, 400, EdgeDockSide.Left)]
+    [InlineData(-1000, 944, EdgeDockSide.Bottom)]
+    public void DockSideNearEdge_OnlyDocksWithinThresholdAcrossBothMonitors(
         double left,
         double top,
         EdgeDockSide expected)
@@ -66,7 +67,7 @@ public sealed class EdgeAutoHideControllerTests
 
         Assert.Equal(
             expected,
-            EdgeAutoHideGeometry.NearestDockSide(
+            EdgeAutoHideGeometry.DockSideNearEdge(
                 left,
                 top,
                 width: 132,
@@ -76,14 +77,14 @@ public sealed class EdgeAutoHideControllerTests
     }
 
     [Fact]
-    public void NearestDockSide_ExcludesInternalMonitorSeam()
+    public void DockSideNearEdge_ExcludesInternalMonitorSeam()
     {
         var primary = new WorkArea(0, 40, 1920, 1040);
         var screens = new[] { SecondaryMonitor, primary };
 
         Assert.Equal(
-            EdgeDockSide.Top,
-            EdgeAutoHideGeometry.NearestDockSide(
+            EdgeDockSide.None,
+            EdgeAutoHideGeometry.DockSideNearEdge(
                 left: -140,
                 top: 300,
                 width: 132,
@@ -143,5 +144,24 @@ public sealed class EdgeAutoHideControllerTests
         Assert.False(await controller.ScheduleCollapseAsync(() => false));
         Assert.True(await controller.ScheduleCollapseAsync(() => true));
         Assert.Equal([EdgeDockSide.Left], collapsed);
+        Assert.True(controller.IsCollapsed);
+    }
+
+    [Theory]
+    [InlineData(-10, 0)]
+    [InlineData(0, 0)]
+    [InlineData(45, 28.8)]
+    [InlineData(90, 57.6)]
+    [InlineData(120, 64)]
+    public void ProgressLength_MapsClampedQuotaToVisibleTrack(
+        double percent,
+        double expected)
+    {
+        Assert.Equal(
+            expected,
+            EdgeProgressGeometry.FillLength(
+                trackLength: 64,
+                percent),
+            precision: 5);
     }
 }
