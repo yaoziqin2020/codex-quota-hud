@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.316
+
+      - name: Restore
+        run: dotnet restore CodexQuotaHud.sln
+
+      - name: Test
+        run: dotnet test CodexQuotaHud.sln -c Release --no-restore
+
+      - name: Build
+        run: dotnet build CodexQuotaHud.sln -c Release --no-restore
+
+      - name: Publish Windows package
+        shell: powershell
+        run: .\scripts\publish.ps1

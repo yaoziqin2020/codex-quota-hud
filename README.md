@@ -1,157 +1,175 @@
 # Codex Quota HUD
 
-Codex Quota HUD 是一个轻量的 Windows 桌面额度浮窗。它在 Codex Desktop
-运行时显示剩余额度，Codex 退出后自动隐藏浮窗；托盘图标会继续留在后台，
-便于立即刷新、切换皮肤或退出程序。
+[![CI](https://github.com/yaoziqin2020/codex-quota-hud/actions/workflows/ci.yml/badge.svg)](https://github.com/yaoziqin2020/codex-quota-hud/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/yaoziqin2020/codex-quota-hud)](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4B8BF5)](#系统要求--requirements)
 
-## 显示内容
+Codex Quota HUD 是一个轻量的 Windows 桌面额度浮窗。它读取本机
+`codex app-server` 返回的官方额度数据，以常驻桌面的动态浮窗、藏边进度条
+和数字托盘图标展示 5 小时与每周剩余额度。
 
-- 中央数字和内层视觉表示 **5 小时额度**的剩余百分比。
-- 外层视觉表示**每周额度**的剩余百分比。
-- 鼠标悬停可查看实际读到的额度、重置时间、最近更新时间和过期状态。
-- 后台每 60 秒刷新一次。悬停时如果数据已经超过 60 秒，会立即补一次刷新。
-- 读取期间动画平滑加速；完成后恢复慢速扫描。隐藏时动画停止。
+Codex Quota HUD is a lightweight Windows desktop companion that visualizes
+the five-hour and weekly quota data returned by the local
+`codex app-server`. It provides an animated floating HUD, a themed edge bar,
+and a numeric tray icon without scraping web pages or storing credentials.
 
-剩余百分比来自官方返回的 `usedPercent`，按
-`100 - usedPercent` 计算并限制在 `0%..100%`。
+> 这是一个独立开源项目，并非 OpenAI 官方产品。
+>
+> This is an independent open-source project and is not an official OpenAI
+> product.
 
-### 为什么可能没有 5 小时环
+![Codex Quota HUD overview](docs/assets/codex-quota-hud-overview.png)
 
-浮窗只显示官方 `codex app-server` 本次实际返回的额度窗口。若只返回每周
-额度，界面会自动退化为单层，并在中央标明“每周”；若只返回 5 小时额度，
-则中央标明“5 小时”。这不代表缺失的额度为 `0%`。
+## 功能 / Features
 
-当两项额度都读不到时，圆球会隐藏，避免用占位值冒充真实额度。此时可查看
-托盘状态进行排查。
+- 同时显示 5 小时额度与每周额度；缺少某一窗口时自动退化为单层显示
+- 后台每 60 秒刷新，双击浮窗可立即刷新
+- 单击查看重置时间、最近更新时间和当前剩余比例
+- 五套动态皮肤：科技仪表、双彩能量环、流体玻璃球、克制极光、液位储能舱
+- 读取期间动画加速，空闲时低帧率缓慢运行，隐藏后停止动画
+- 拖到显示器外侧边缘后自动收起为对应皮肤的额度进度条
+- 多显示器与不同 DPI 下按当前工作区保存和恢复位置
+- 托盘图标直接显示当前剩余百分比，并提供刷新、皮肤、动画和退出菜单
+- 单实例运行、静默启动、当前用户开机启动与安全卸载
+- 不读取浏览器 Cookie，不保存 OAuth Token，不开放网络端口
 
-## 五套皮肤
+## 下载与安装 / Download
 
-- `HudDial`：HUD 科技仪表，首次启动默认皮肤。
-- `EnergyRing`：双彩能量环。
-- `LiquidGlass`：流体玻璃球。
-- `Aurora`：克制极光。
-- `LiquidTank`：液位储能舱。
-
-右键圆球或托盘图标均可即时切换皮肤、开关动画。选择会保存在当前 Windows
-用户的本地设置中，下次启动继续使用。详情卡片也会随当前皮肤同步配色。
-
-把圆球拖到当前显示器工作区的左边或右边后，它会在鼠标离开约 1 秒后自动
-收起，只留下 12 像素的发光把手；鼠标移入会立即展开。顶部和底部不会触发
-自动隐藏。停靠位置会保存，多显示器和不同 DPI 下会按当前屏幕重新限制位置。
-
-## 系统要求
-
-- Windows 10/11 x64。
-- Codex Desktop 或可用的 `codex` CLI。
-- 源码构建需要 .NET SDK 9；发布后的自包含版本不需要另装 .NET Runtime。
-
-程序使用官方稳定的 `codex app-server` 标准输入输出 JSONL 协议。协议说明：
-[OpenAI Codex app-server README](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md)。
-
-## 构建与安装
-
-在仓库根目录打开 PowerShell：
+从 [最新 Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
+下载 `CodexQuotaHud-v1.0.0-win-x64.zip`，解压后在该目录运行：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
-发布脚本生成自包含、单文件、`win-x64` 版本到：
-
-```text
-artifacts\CodexQuotaHud-win-x64\
-```
-
-安装位置固定为：
+程序会安装到：
 
 ```text
 %LOCALAPPDATA%\Programs\CodexQuotaHud
 ```
 
-安装脚本会先把新版本复制到同盘临时目录，停止且只停止“可执行文件路径与上述
-安装位置完全匹配”的旧实例，再替换文件。它随后写入当前用户的启动项
-`Run\CodexQuotaHud`，内容为带引号的可执行文件路径加 `--background`，并以
-隐藏窗口方式启动一个实例。
+安装脚本会启动一个后台实例，并为当前 Windows 用户添加
+`Run\CodexQuotaHud` 启动项。不会弹出黑色命令窗口。
 
-### 更新
-
-拉取新代码后，重新运行发布和安装两条命令即可。更新不会删除浮窗位置、皮肤
-或动画偏好。
-
-### 卸载
+卸载：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
 ```
 
-卸载脚本只会停止可执行文件路径与安装目录匹配的 `CodexQuotaHud.App` 进程、
-删除 `Run\CodexQuotaHud` 这一项，并在严格校验路径后删除固定安装目录。它
-不会按进程名批量结束其它程序，也不会删除 `%LOCALAPPDATA%\Programs`、
-用户目录或其它同名文件夹。
+## 操作 / Controls
 
-## 使用
+| 操作 | 结果 |
+|---|---|
+| 单击浮窗 | 显示或关闭额度详情 |
+| 双击浮窗 | 立即刷新额度 |
+| 拖动浮窗 | 自由移动并保存位置 |
+| 右键浮窗 | 打开皮肤、动画、刷新和退出菜单 |
+| 移入藏边条 | 展开浮窗 |
+| 右键托盘图标 | 打开完整控制菜单 |
 
-1. 安装完成后，托盘区出现 Codex Quota HUD 图标；不会弹出黑色命令窗口。
-2. 打开 Codex Desktop。监视器检测到 Codex 后会立即读取一次额度。
-3. 读到至少一项额度时显示圆球；可拖动圆球，位置会自动保存。
-4. 右键圆球或托盘图标可切换皮肤、开关动画、立即刷新或退出。
-5. 同时再次启动程序不会创建第二个后台实例。
+浮窗靠近当前显示器的外侧边缘后，会在鼠标离开约 5 秒后收起，只留下
+24px 可见区域中的主题额度条。共享边缘不会误触发藏边；顶部、底部和副屏
+外侧边缘均按实际显示器布局判断。
 
-## 隐私
+## 额度显示 / Quota Display
+
+中央数字表示当前主要额度窗口：
+
+- 同时读到两项时：中央显示 5 小时额度，外层显示每周额度
+- 只读到每周额度时：自动显示为单层“每周”
+- 只读到 5 小时额度时：自动显示为单层“5 小时”
+- 两项都读不到时：隐藏浮窗，不用占位值冒充真实额度
+
+剩余百分比来自官方返回的 `usedPercent`，按
+`100 - usedPercent` 计算并限制在 `0%..100%`。
+
+## 五套皮肤 / Skins
+
+| ID | 名称 | 视觉特点 |
+|---|---|---|
+| `HudDial` | HUD 科技仪表 | 双向扫描刻度与青蓝仪表环 |
+| `EnergyRing` | 双彩能量环 | 紫罗兰能量弧与倾斜轨道 |
+| `LiquidGlass` | 流体玻璃球 | 半透明玻璃、柔光与流体感 |
+| `Aurora` | 克制极光 | 低饱和青绿极光带 |
+| `LiquidTank` | 液位储能舱 | 真实额度水位与缓慢波面 |
+
+皮肤、动画开关、窗口位置和最近成功刷新时间保存在当前用户的本地设置中。
+
+## 隐私与安全 / Privacy
 
 Codex Quota HUD：
 
-- 不读取或保存浏览器 Cookie；
-- 不保存 OAuth 令牌、账号信息或额度响应正文；
-- 不抓取 Codex 页面，也不调用私有网页接口；
-- 不开放本地或远程网络端口；
-- 只通过本机 `codex app-server` 子进程读取官方额度；
-- 只保存浮窗坐标、动画开关、皮肤和最近一次成功刷新时间。
+- 不读取或保存浏览器 Cookie
+- 不读取或保存 OAuth Token、账号信息或额度响应正文
+- 不抓取 Codex 网页，也不调用私有网页接口
+- 不开放本地或远程网络端口
+- 只通过本机 `codex app-server` 子进程读取额度
+- 只保存窗口坐标、动画开关、皮肤和最近成功刷新时间
 
-## 故障排查
+安装和卸载脚本只操作精确的
+`%LOCALAPPDATA%\Programs\CodexQuotaHud` 路径与当前用户启动项，并在移动、
+替换或删除前检查目标路径和重解析点。
 
-### 托盘存在但没有圆球
+## 系统要求 / Requirements
 
-这是以下情况的正常表现：
+- Windows 10/11 x64
+- Codex Desktop 或可用的 `codex` CLI
+- 从源码构建需要 .NET SDK `9.0.316`
+- Release 为自包含 `win-x64` 单文件版本，无需另装 .NET Runtime
 
-- Codex Desktop 没有运行；
-- 官方响应中 5 小时和每周额度都缺失；
-- 最近一次成功数据已经超过 5 分钟，旧数据不再展示。
+项目使用 `codex app-server` 的标准输入输出 JSONL 协议：
+[OpenAI Codex app-server README](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md)。
 
-先打开 Codex，再从托盘选择“立即刷新”。如果托盘显示“暂时读不到额度”，
-继续检查下面的 CLI。
-
-### 找不到或无法启动 app-server
-
-在 PowerShell 中检查：
+## 从源码运行 / Build from Source
 
 ```powershell
-Get-Command codex -ErrorAction SilentlyContinue
-codex --version
+git clone https://github.com/yaoziqin2020/codex-quota-hud.git
+cd codex-quota-hud
+dotnet restore .\CodexQuotaHud.sln
+dotnet test .\CodexQuotaHud.sln -c Release --no-restore
+dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 ```
 
-浮窗会优先使用 `CODEX_QUOTA_HUD_CODEX_PATH` 指定的 CLI，其次查找
-`%LOCALAPPDATA%\OpenAI\Codex\bin` 的用户本地 CLI，再尝试运行中的 Codex
-Desktop 资源、`PATH` 和 WindowsApps。特殊安装可设置当前用户环境变量
-`CODEX_QUOTA_HUD_CODEX_PATH` 为一个存在的绝对 `codex.exe` 路径，重启浮窗
-后生效。
+生成自包含版本：
 
-`codex app-server` 是长时间运行的 JSONL 服务，直接在终端启动后等待输入是
-正常现象；按 `Ctrl+C` 结束即可。若 CLI 本身报登录或版本错误，请先在 Codex
-中完成登录或更新 Codex。
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1
+```
 
-个别 Codex alpha 版本可能出现 `codex login status` 显示已登录，但
-`app-server` 的 `account/read` 仍返回空账号。这属于 CLI/app-server 认证
-复用问题；浮窗会保持隐藏并在托盘显示读不到额度，不会读取 `auth.json`
-内容、浏览器 Cookie，或自行保存令牌绕过。
+生成可发布 ZIP：
 
-### 托盘图标被折叠
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.0.0
+```
 
-Windows 可能把新图标收进托盘的“显示隐藏的图标”区域。可将它拖到任务栏
-常显区。
+## 项目结构 / Project Structure
 
-### 设置没有保存
+```text
+src/CodexQuotaHud.Core/       额度模型、映射、刷新状态和设置
+src/CodexQuotaHud.App/        WPF 浮窗、皮肤、托盘与 app-server 集成
+tests/                        Core 与 Windows UI 自动化测试
+scripts/                      发布、安装、卸载和 Release 打包脚本
+docs/                         设计、实现计划、验收记录和预览资源
+.github/workflows/            Windows CI
+```
 
-确认当前用户对 `%LOCALAPPDATA%` 有写权限。设置写入失败不会中断额度读取，
-但托盘和下次启动可能恢复默认皮肤 `HudDial`。
+## 验证 / Verification
+
+版本 `1.0.0` 当前包含 232 项自动化测试：
+
+- Core：55 项
+- App / UI：177 项
+
+```powershell
+dotnet test .\CodexQuotaHud.sln -c Release --no-restore
+dotnet build .\CodexQuotaHud.sln -c Release --no-restore
+```
+
+GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
+自包含发布检查。
+
+## 许可证 / License
+
+Released under the [MIT License](LICENSE).
