@@ -6,12 +6,10 @@ internal sealed class DetailsPopupTogglePolicy
 
     public void ObserveClosed(
         bool pointerOverOrb,
-        bool leftButtonPressed,
         bool programmaticClose)
     {
         if (!programmaticClose &&
-            pointerOverOrb &&
-            leftButtonPressed)
+            pointerOverOrb)
         {
             _suppressNextOpen = true;
         }

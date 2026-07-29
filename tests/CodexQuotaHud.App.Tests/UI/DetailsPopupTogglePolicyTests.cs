@@ -5,13 +5,12 @@ namespace CodexQuotaHud.App.Tests.UI;
 public sealed class DetailsPopupTogglePolicyTests
 {
     [Fact]
-    public void AutoCloseCausedByOrbClick_SuppressesReopenForSameClickOnly()
+    public void AutoCloseOverOrb_SuppressesReopenEvenAfterButtonWasReleased()
     {
         var policy = new DetailsPopupTogglePolicy();
 
         policy.ObserveClosed(
             pointerOverOrb: true,
-            leftButtonPressed: true,
             programmaticClose: false);
 
         Assert.True(policy.ConsumeSuppressedOpen());
@@ -25,7 +24,6 @@ public sealed class DetailsPopupTogglePolicyTests
 
         policy.ObserveClosed(
             pointerOverOrb: true,
-            leftButtonPressed: true,
             programmaticClose: true);
 
         Assert.False(policy.ConsumeSuppressedOpen());

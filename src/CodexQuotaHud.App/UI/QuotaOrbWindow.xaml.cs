@@ -23,6 +23,7 @@ public partial class QuotaOrbWindow : Window
     private readonly OrbAnimationController _animationController;
     private readonly EdgeAutoHideController _edgeAutoHideController;
     private readonly DetailsPopupTogglePolicy _detailsTogglePolicy = new();
+    private readonly OrbClickController _orbClickController;
     private TaskCompletionSource? _expandAnimationCompletion;
     private bool _closingDetailsProgrammatically;
     private bool _allowClose;
@@ -46,6 +47,11 @@ public partial class QuotaOrbWindow : Window
             () => Task.Delay(TimeSpan.FromSeconds(5)),
             side => AnimateEdge(side, collapsed: true),
             side => AnimateEdge(side, collapsed: false));
+        _orbClickController = new OrbClickController(
+            () => Task.Delay(TimeSpan.FromMilliseconds(
+                System.Windows.Forms.SystemInformation.DoubleClickTime)),
+            ToggleDetailsPopup,
+            () => _viewModel.RefreshCommand.Execute(parameter: null));
         DetailsPopup.CustomPopupPlacementCallback = PlaceDetailsPopup;
         ApplyPopupTheme();
         LocationChanged += (_, _) => RefreshPopupPlacement();
@@ -228,7 +234,9 @@ public partial class QuotaOrbWindow : Window
         }
     }
 
-    private void OnDragSurfaceMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private async void OnDragSurfaceMouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
     {
         if (e.LeftButton != MouseButtonState.Pressed)
         {
@@ -236,12 +244,10 @@ public partial class QuotaOrbWindow : Window
         }
 
         var clickCount = e.ClickCount;
-        if (PointerGesture.SelectAction(clickCount, moved: false) ==
-            OrbPointerAction.Refresh)
+        if (clickCount >= 2)
         {
             e.Handled = true;
-            ShowDetailsPopup();
-            _viewModel.RefreshCommand.Execute(parameter: null);
+            await _orbClickController.HandleClickAsync(clickCount);
             return;
         }
 
@@ -265,22 +271,25 @@ public partial class QuotaOrbWindow : Window
             startTop,
             Left,
             Top);
-        switch (PointerGesture.SelectAction(clickCount, moved))
+        if (!moved)
         {
-            case OrbPointerAction.ToggleDetails:
-                ToggleDetailsPopup();
+            if (await _orbClickController.HandleClickAsync(clickCount))
+            {
                 _ = RefreshAfterClickAsync();
-                break;
-            case OrbPointerAction.None:
-                CloseDetailsPopup();
-                ClampToNearestWorkArea(save: false);
-                UpdateDockAfterDrag();
-                break;
+            }
+
+            return;
         }
+
+        _orbClickController.CancelPendingSingleClick();
+        CloseDetailsPopup();
+        ClampToNearestWorkArea(save: false);
+        UpdateDockAfterDrag();
     }
 
     private void OnContextMenuOpened(object sender, RoutedEventArgs e)
     {
+        _orbClickController.CancelPendingSingleClick();
         _contextMenuOpen = true;
         CloseDetailsPopup();
         _edgeAutoHideController.Expand();
@@ -407,7 +416,6 @@ public partial class QuotaOrbWindow : Window
     {
         _detailsTogglePolicy.ObserveClosed(
             OrbRoot.IsMouseOver,
-            Mouse.LeftButton == MouseButtonState.Pressed,
             _closingDetailsProgrammatically);
         if (_allowClose)
         {
@@ -591,6 +599,11 @@ public partial class QuotaOrbWindow : Window
         }
 
         ShowDetailsPopup();
+    }
+
+    private void OnPopupPointerDown(object sender, MouseButtonEventArgs e)
+    {
+        CloseDetailsPopup();
     }
 
     private void CloseDetailsPopup()
