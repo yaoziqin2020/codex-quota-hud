@@ -101,7 +101,7 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal(
             DateTimeOffset.Parse("2026-07-29T03:04:05+00:00"),
             document.RootElement.GetProperty("LastSuccessfulRefresh").GetDateTimeOffset());
-        Assert.False(File.Exists(store.SettingsPath + ".tmp"));
+        Assert.Empty(TemporaryFiles());
         Assert.DoesNotContain(
             document.RootElement.EnumerateObject(),
             property =>
@@ -131,7 +131,41 @@ public sealed class SettingsStoreTests : IDisposable
 
         lockedTarget.Dispose();
         Assert.Equal(original, store.Load());
-        Assert.False(File.Exists(store.SettingsPath + ".tmp"));
+        Assert.Empty(TemporaryFiles());
+    }
+
+    [Fact]
+    public async Task Save_ConcurrentCallsEachCompleteAndLeaveOneWholeSettingsDocument()
+    {
+        const int writerCount = 16;
+        var store = CreateStore();
+        using var start = new Barrier(writerCount);
+        var candidates = Enumerable.Range(1, writerCount)
+            .Select(index => new AppSettings(
+                Left: index,
+                Top: index * 10,
+                AnimationsEnabled: index % 2 == 0,
+                SelectedSkin: (SkinId)(index % Enum.GetValues<SkinId>().Length),
+                LastSuccessfulRefresh: DateTimeOffset.Parse("2026-07-29T00:00:00+00:00")
+                    .AddMinutes(index)))
+            .ToArray();
+
+        var saves = candidates
+            .Select(settings => Task.Factory.StartNew(
+                () =>
+                {
+                    start.SignalAndWait();
+                    new SettingsStore(store.SettingsPath).Save(settings);
+                },
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default))
+            .ToArray();
+
+        await Task.WhenAll(saves).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Contains(store.Load(), candidates);
+        Assert.Empty(TemporaryFiles());
     }
 
     public void Dispose()
@@ -144,4 +178,9 @@ public sealed class SettingsStoreTests : IDisposable
 
     private SettingsStore CreateStore() =>
         new(Path.Combine(_directory, "settings.json"));
+
+    private string[] TemporaryFiles() =>
+        Directory.Exists(_directory)
+            ? Directory.GetFiles(_directory, "*.tmp")
+            : [];
 }

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CodexQuotaHud.Core.Models;
@@ -6,11 +7,15 @@ namespace CodexQuotaHud.Core.Settings;
 
 public sealed class SettingsStore
 {
+    private static readonly ConcurrentDictionary<string, object> SaveLocks =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter() }
     };
+
+    private readonly object _saveSync;
 
     public SettingsStore()
         : this(Path.Combine(
@@ -24,6 +29,7 @@ public sealed class SettingsStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsPath);
         SettingsPath = settingsPath;
+        _saveSync = SaveLocks.GetOrAdd(Path.GetFullPath(settingsPath), _ => new object());
     }
 
     public string SettingsPath { get; }
@@ -78,25 +84,29 @@ public sealed class SettingsStore
             Directory.CreateDirectory(directory);
         }
 
-        var temporaryPath = SettingsPath + ".tmp";
-        try
+        lock (_saveSync)
         {
-            using (var stream = new FileStream(
-                       temporaryPath,
-                       FileMode.Create,
-                       FileAccess.Write,
-                       FileShare.None))
+            var temporaryPath =
+                $"{SettingsPath}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+            try
             {
-                JsonSerializer.Serialize(stream, settings, SerializerOptions);
-                stream.Flush(flushToDisk: true);
-            }
+                using (var stream = new FileStream(
+                           temporaryPath,
+                           FileMode.Create,
+                           FileAccess.Write,
+                           FileShare.None))
+                {
+                    JsonSerializer.Serialize(stream, settings, SerializerOptions);
+                    stream.Flush(flushToDisk: true);
+                }
 
-            File.Move(temporaryPath, SettingsPath, overwrite: true);
-        }
-        catch
-        {
-            TryDelete(temporaryPath);
-            throw;
+                File.Move(temporaryPath, SettingsPath, overwrite: true);
+            }
+            catch
+            {
+                TryDelete(temporaryPath);
+                throw;
+            }
         }
     }
 
