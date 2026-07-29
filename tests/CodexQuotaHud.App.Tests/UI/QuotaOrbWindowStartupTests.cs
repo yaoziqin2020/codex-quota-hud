@@ -148,7 +148,10 @@ public sealed class QuotaOrbWindowStartupTests
                 window.FindName("EdgeProgressOutline"));
             var fill = Assert.IsType<Border>(
                 window.FindName("EdgeProgressFill"));
-            Assert.Equal(new CornerRadius(6), fill.CornerRadius);
+            Assert.Equal(new CornerRadius(3), handle.CornerRadius);
+            Assert.Equal(new CornerRadius(3), track.CornerRadius);
+            Assert.Equal(new CornerRadius(3), fill.CornerRadius);
+            Assert.Equal(new CornerRadius(3), outline.CornerRadius);
             var texture = Assert.IsType<Border>(
                 window.FindName("EdgeProgressTexture"));
             Assert.Null(window.FindName("EdgeProgressSheen"));

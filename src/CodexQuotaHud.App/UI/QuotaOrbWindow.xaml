@@ -58,7 +58,7 @@
 
         <Border x:Name="EdgeHandle"
                 Width="12" Height="72"
-                CornerRadius="6"
+                CornerRadius="3"
                 Opacity="0"
                 IsHitTestVisible="False"
                 Background="Transparent"
@@ -74,13 +74,13 @@
             </Border.Effect>
             <Grid>
                 <Border x:Name="EdgeProgressTrack"
-                        CornerRadius="6"
+                        CornerRadius="3"
                         ClipToBounds="True"
                         Background="#F21A202B">
                     <Grid>
                         <Border x:Name="EdgeProgressFill"
                                 Background="#53DCF8"
-                                CornerRadius="6"
+                                CornerRadius="3"
                                 HorizontalAlignment="Stretch"
                                 VerticalAlignment="Bottom">
                             <Border x:Name="EdgeProgressTexture"
@@ -90,7 +90,7 @@
                     </Grid>
                 </Border>
                 <Border x:Name="EdgeProgressOutline"
-                        CornerRadius="6"
+                        CornerRadius="3"
                         BorderBrush="#6638D9FF"
                         BorderThickness="1"
                         IsHitTestVisible="False" />
