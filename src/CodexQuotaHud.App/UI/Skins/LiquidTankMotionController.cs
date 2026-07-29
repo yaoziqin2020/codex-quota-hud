@@ -117,21 +117,21 @@ internal sealed class LiquidTankMotionController
         var storyboard = new Storyboard();
         AddOscillation(
             storyboard,
-            "TankWaveTranslateTransform",
+            "TankSurfaceTranslateTransform",
             "X",
             from: -10,
             to: 10,
             halfCycle);
         AddOscillation(
             storyboard,
-            "TankWaveTranslateTransform",
+            "TankSurfaceTranslateTransform",
             "Y",
             from: -1.4,
             to: 1.4,
             halfCycle);
         AddOscillation(
             storyboard,
-            "TankWaveRotateTransform",
+            "TankSurfaceRotateTransform",
             "Angle",
             from: -1.6,
             to: 1.6,

@@ -6,6 +6,7 @@ using CodexQuotaHud.App.UI.Animation;
 using CodexQuotaHud.App.UI.Controls;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Models;
+using ShapePath = System.Windows.Shapes.Path;
 
 namespace CodexQuotaHud.App.Tests.UI;
 
@@ -13,6 +14,7 @@ public sealed class LiquidTankSkinTests
 {
     [Theory]
     [InlineData(0, 0)]
+    [InlineData(1, .96)]
     [InlineData(25, 24)]
     [InlineData(50, 48)]
     [InlineData(100, 96)]
@@ -86,6 +88,30 @@ public sealed class LiquidTankSkinTests
         });
 
     [Fact]
+    public void LiquidBody_IsAClosedFilledWaveSharedWithItsSurfaceHighlight() =>
+        RunSta(() =>
+        {
+            var skin = new LiquidTankSkin();
+            var surfaceGroup = Assert.IsType<Grid>(
+                skin.FindName("TankSurfaceGroup"));
+            var liquidSurface = Assert.IsType<ShapePath>(
+                skin.FindName("LiquidSurface"));
+            var surfaceHighlight = Assert.IsType<ShapePath>(
+                skin.FindName("LiquidSurfaceHighlight"));
+            var geometry = liquidSurface.Data.GetFlattenedPathGeometry();
+
+            Assert.NotNull(liquidSurface.Fill);
+            Assert.Contains(geometry.Figures, figure => figure.IsClosed);
+            Assert.True(geometry.Bounds.Top <= .1);
+            Assert.DoesNotContain(
+                surfaceGroup.Children.Cast<UIElement>(),
+                child => child is Rectangle);
+            Assert.Same(surfaceGroup, liquidSurface.Parent);
+            Assert.Same(surfaceGroup, surfaceHighlight.Parent);
+            Assert.IsType<TransformGroup>(surfaceGroup.RenderTransform);
+        });
+
+    [Fact]
     public void Motion_UsesVisibleWaveAndStaggeredBubbleTracksWithUnifiedCaps() =>
         RunSta(() =>
         {
@@ -118,15 +144,15 @@ public sealed class LiquidTankSkinTests
             Assert.Equal(
                 0,
                 Assert.IsType<TranslateTransform>(
-                    skin.FindName("TankWaveTranslateTransform")).X);
+                    skin.FindName("TankSurfaceTranslateTransform")).X);
             Assert.Equal(
                 0,
                 Assert.IsType<TranslateTransform>(
-                    skin.FindName("TankWaveTranslateTransform")).Y);
+                    skin.FindName("TankSurfaceTranslateTransform")).Y);
             Assert.Equal(
                 0,
                 Assert.IsType<RotateTransform>(
-                    skin.FindName("TankWaveRotateTransform")).Angle);
+                    skin.FindName("TankSurfaceRotateTransform")).Angle);
             Assert.Equal(
                 0,
                 Assert.IsType<Ellipse>(

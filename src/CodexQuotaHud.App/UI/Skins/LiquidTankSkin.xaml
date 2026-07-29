@@ -78,41 +78,46 @@
                       Height="48"
                       VerticalAlignment="Bottom"
                       ClipToBounds="True">
-                    <Rectangle>
-                        <Rectangle.Fill>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                <GradientStop Color="#E556E6F3" Offset="0" />
-                                <GradientStop Color="#D536B7EA" Offset=".38" />
-                                <GradientStop Color="#CD596DFF" Offset=".78" />
-                                <GradientStop Color="#D52E4EC3" Offset="1" />
-                            </LinearGradientBrush>
-                        </Rectangle.Fill>
-                    </Rectangle>
-                    <Rectangle VerticalAlignment="Top" Height="15" Opacity=".52">
-                        <Rectangle.Fill>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                <GradientStop Color="#B5E9FDFF" Offset="0" />
-                                <GradientStop Color="#007CE5F5" Offset="1" />
-                            </LinearGradientBrush>
-                        </Rectangle.Fill>
-                    </Rectangle>
-                    <Path Data="M -8,7 C 4,1 15,12 27,6 C 40,0 52,11 64,5 C 72,2 78,6 82,8"
-                          Stroke="#E0F2FFFF"
-                          StrokeThickness="1.4"
-                          StrokeStartLineCap="Round"
-                          StrokeEndLineCap="Round"
-                          VerticalAlignment="Top">
-                        <Path.Effect>
-                            <DropShadowEffect Color="#B2F7FF" BlurRadius="4"
-                                              ShadowDepth="0" />
-                        </Path.Effect>
-                        <Path.RenderTransform>
+                    <Grid x:Name="TankSurfaceGroup"
+                          Width="104"
+                          Height="112"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Top"
+                          RenderTransformOrigin=".5,0">
+                        <Grid.RenderTransform>
                             <TransformGroup>
-                                <RotateTransform x:Name="TankWaveRotateTransform" />
-                                <TranslateTransform x:Name="TankWaveTranslateTransform" />
+                                <RotateTransform x:Name="TankSurfaceRotateTransform" />
+                                <TranslateTransform x:Name="TankSurfaceTranslateTransform" />
                             </TransformGroup>
-                        </Path.RenderTransform>
-                    </Path>
+                        </Grid.RenderTransform>
+                        <Path x:Name="LiquidSurface"
+                              Data="M 0,4 C 7,4 10,0 18,0 C 26,0 29,8 38,8 C 47,8 50,0 59,0 C 68,0 71,8 80,8 C 89,8 93,0 104,2 L 104,112 L 0,112 Z">
+                            <Path.Fill>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#E556E6F3" Offset="0" />
+                                    <GradientStop Color="#D536B7EA" Offset=".36" />
+                                    <GradientStop Color="#CD596DFF" Offset=".76" />
+                                    <GradientStop Color="#D52E4EC3" Offset="1" />
+                                </LinearGradientBrush>
+                            </Path.Fill>
+                        </Path>
+                        <Path x:Name="LiquidSurfaceHighlight"
+                              Data="M 0,4 C 7,4 10,0 18,0 C 26,0 29,8 38,8 C 47,8 50,0 59,0 C 68,0 71,8 80,8 C 89,8 93,0 104,2"
+                              Stroke="#E8F4FFFF"
+                              StrokeThickness="1.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round">
+                            <Path.Effect>
+                                <DropShadowEffect Color="#B2F7FF"
+                                                  BlurRadius="4"
+                                                  ShadowDepth="0" />
+                            </Path.Effect>
+                        </Path>
+                        <Path Data="M 0,7 C 9,6 12,3 20,3 C 29,3 31,11 40,11 C 49,11 52,3 61,3 C 70,3 73,11 82,11 C 91,11 95,4 104,5"
+                              Stroke="#52FFFFFF"
+                              StrokeThickness="4"
+                              Opacity=".48" />
+                    </Grid>
                     <Ellipse x:Name="BubbleOne"
                              Width="5" Height="5"
                              Fill="#83F2FFFF"
