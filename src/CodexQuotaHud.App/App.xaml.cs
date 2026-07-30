@@ -55,7 +55,7 @@ public partial class App : System.Windows.Application
             _processMonitor.RunningChanged += OnCodexRunningChanged;
             OnCodexRunningChanged(_processMonitor.IsRunning);
 
-            if (IsInteractiveLaunch(e.Args))
+            if (ShouldRegisterStartup(e.Args))
             {
                 if (!new StartupRegistration().TryEnable(out var error))
                 {
@@ -103,6 +103,16 @@ public partial class App : System.Windows.Application
                 argument,
                 "--background",
                 StringComparison.OrdinalIgnoreCase));
+
+    internal static bool IsPreviewLaunch(IReadOnlyList<string> arguments) =>
+        arguments.Any(
+            argument => string.Equals(
+                argument,
+                "--preview",
+                StringComparison.OrdinalIgnoreCase));
+
+    internal static bool ShouldRegisterStartup(IReadOnlyList<string> arguments) =>
+        IsInteractiveLaunch(arguments) && !IsPreviewLaunch(arguments);
 
     private void OnCodexRunningChanged(bool isRunning)
     {
