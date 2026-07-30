@@ -4,6 +4,7 @@ using CodexQuotaHud.Core.Settings;
 
 namespace CodexQuotaHud.App.Tests.Preview;
 
+[Collection(PreviewWpfCollection.Name)]
 public sealed class PreviewControlWindowTests
 {
     [Fact]
