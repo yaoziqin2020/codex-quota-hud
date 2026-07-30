@@ -163,6 +163,11 @@ then starts the executable at the same exact installation path. These source
 changes do not upgrade, deploy, or otherwise change the installed `v1.0.0`
 package. The two-direction desktop handoff is still a manual acceptance check
 and is not marked complete until it is performed on a Windows desktop.
+Before that check, either merge the reviewed feature branch and rebuild the
+existing shortcut target, or temporarily point the shortcut at the feature
+worktree's reviewed Release artifact. Record the exact tested Git commit and
+artifact path or hash with the acceptance result; a shortcut still targeting
+an older canonical-main build does not test this handoff.
 
 预览控制面板默认完整显示，并将大小和位置单独保存到
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
@@ -193,11 +198,11 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前源码包含 286 项自动化测试：
+当前源码包含 297 项自动化测试：
 
 - Core：55 项
-- App / UI：231 项
-- Total：286 项
+- App / UI：242 项
+- Total：297 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore

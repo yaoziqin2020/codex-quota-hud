@@ -2,6 +2,9 @@ namespace CodexQuotaHud.App.Tests;
 
 public sealed class AppLaunchModeTests
 {
+    private const string InstalledExecutablePath =
+        @"C:\Users\Test\AppData\Local\Programs\CodexQuotaHud\CodexQuotaHud.App.exe";
+
     [Theory]
     [InlineData(true)]
     [InlineData(true, "--other")]
@@ -37,6 +40,46 @@ public sealed class AppLaunchModeTests
         params string[] arguments)
     {
         Assert.Equal(expected, App.ShouldRegisterStartup(arguments));
+    }
+
+    [Fact]
+    public void InstalledExecutablePath_StartsShutdownListener()
+    {
+        Assert.True(App.ShouldStartInstalledShutdownListener(
+            InstalledExecutablePath,
+            InstalledExecutablePath));
+    }
+
+    [Fact]
+    public void InstalledExecutablePathComparison_IsCaseInsensitive()
+    {
+        Assert.True(App.ShouldStartInstalledShutdownListener(
+            InstalledExecutablePath.ToUpperInvariant(),
+            InstalledExecutablePath));
+    }
+
+    [Fact]
+    public void DevelopmentExecutablePath_DoesNotStartShutdownListener()
+    {
+        Assert.False(App.ShouldStartInstalledShutdownListener(
+            @"C:\src\CodexQuotaHud\bin\CodexQuotaHud.App.exe",
+            InstalledExecutablePath));
+    }
+
+    [Fact]
+    public void UnavailableExecutablePath_DoesNotStartShutdownListener()
+    {
+        Assert.False(App.ShouldStartInstalledShutdownListener(
+            currentExecutablePath: null,
+            InstalledExecutablePath));
+    }
+
+    [Fact]
+    public void InvalidExecutablePath_DoesNotStartShutdownListener()
+    {
+        Assert.False(App.ShouldStartInstalledShutdownListener(
+            "\0",
+            InstalledExecutablePath));
     }
 
     [Fact]
@@ -84,6 +127,32 @@ public sealed class AppLaunchModeTests
         Assert.Same(expectedLease, lease);
         Assert.Equal(0, normalCalls);
         Assert.Empty(messages);
+    }
+
+    [Fact]
+    public void PreviewLaunch_ThrowingReplacementAcquisitionReportsStableError()
+    {
+        var normalCalls = 0;
+        var messages = new List<string>();
+
+        var result = App.TryAcquireForLaunch(
+            preview: true,
+            acquireNormal: () =>
+            {
+                normalCalls++;
+                return new FakeLease();
+            },
+            acquirePreview: () =>
+                throw new ArgumentException("invalid installed path"),
+            showError: messages.Add,
+            out var lease);
+
+        Assert.False(result);
+        Assert.Null(lease);
+        Assert.Equal(0, normalCalls);
+        Assert.Equal(
+            ["开发预览启动失败，无法安全检查或替换已安装正式版。"],
+            messages);
     }
 
     [Fact]

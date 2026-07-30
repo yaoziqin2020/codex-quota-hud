@@ -40,8 +40,9 @@ internal sealed class InstalledAppShutdownCoordinator
             return true;
         }
 
-        _ = TrySignalShutdown();
-        lease = TryAcquireUntil(GracefulTimeout);
+        lease = TryAcquireUntil(
+            GracefulTimeout,
+            retryShutdownSignal: true);
         if (lease is not null)
         {
             error = null;
@@ -52,6 +53,13 @@ internal sealed class InstalledAppShutdownCoordinator
         try
         {
             var matches = FindInstalledProcesses(processes);
+            lease = _tryAcquire();
+            if (lease is not null)
+            {
+                error = null;
+                return true;
+            }
+
             if (matches.Count == 0)
             {
                 error = "未找到正在运行的已安装正式版，预览无法取得单实例锁。";
@@ -65,6 +73,13 @@ internal sealed class InstalledAppShutdownCoordinator
             }
 
             var process = matches[0];
+            lease = _tryAcquire();
+            if (lease is not null)
+            {
+                error = null;
+                return true;
+            }
+
             try
             {
                 process.Kill();
@@ -73,6 +88,10 @@ internal sealed class InstalledAppShutdownCoordinator
                     error = "无法关闭正在运行的正式版：等待正式版退出超时。";
                     return false;
                 }
+            }
+            catch (InvalidOperationException) when (HasExited(process))
+            {
+                return TryAcquireAfterProcessExit(out lease, out error);
             }
             catch (Exception exception)
             {
@@ -83,15 +102,7 @@ internal sealed class InstalledAppShutdownCoordinator
                 return false;
             }
 
-            lease = TryAcquireUntil(ForceExitTimeout);
-            if (lease is not null)
-            {
-                error = null;
-                return true;
-            }
-
-            error = "正式版已关闭，但单实例锁仍未释放。";
-            return false;
+            return TryAcquireAfterProcessExit(out lease, out error);
         }
         finally
         {
@@ -141,15 +152,51 @@ internal sealed class InstalledAppShutdownCoordinator
         return matches;
     }
 
-    private IDisposable? TryAcquireUntil(TimeSpan timeout)
+    private bool TryAcquireAfterProcessExit(
+        out IDisposable? lease,
+        out string? error)
+    {
+        lease = TryAcquireUntil(ForceExitTimeout);
+        if (lease is not null)
+        {
+            error = null;
+            return true;
+        }
+
+        error = "正式版已关闭，但单实例锁仍未释放。";
+        return false;
+    }
+
+    private static bool HasExited(IInstalledAppProcess process)
+    {
+        try
+        {
+            return process.HasExited;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private IDisposable? TryAcquireUntil(
+        TimeSpan timeout,
+        bool retryShutdownSignal = false)
     {
         var start = _platform.Timestamp;
         var frequency = _platform.TimestampFrequency;
         var timeoutTicks = timeout.TotalSeconds * frequency;
+        var shutdownSignaled =
+            !retryShutdownSignal || TrySignalShutdown();
 
         while (_platform.Timestamp - start < timeoutTicks)
         {
             _platform.Wait(RetryInterval);
+            if (!shutdownSignaled)
+            {
+                shutdownSignaled = TrySignalShutdown();
+            }
+
             var lease = _tryAcquire();
             if (lease is not null)
             {

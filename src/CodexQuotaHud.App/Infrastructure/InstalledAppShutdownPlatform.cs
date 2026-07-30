@@ -14,6 +14,7 @@ internal interface IInstalledAppShutdownPlatform
 internal interface IInstalledAppProcess : IDisposable
 {
     string? ExecutablePath { get; }
+    bool HasExited { get; }
     void Kill();
     bool WaitForExit(TimeSpan timeout);
 }
@@ -66,6 +67,7 @@ internal sealed class InstalledAppShutdownPlatform :
         IInstalledAppProcess
     {
         public string? ExecutablePath => process.MainModule?.FileName;
+        public bool HasExited => process.HasExited;
 
         public void Kill()
         {

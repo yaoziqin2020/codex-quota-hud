@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Diagnostics;
+using System.IO;
 using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.App.UI;
@@ -10,6 +11,9 @@ namespace CodexQuotaHud.App;
 
 public partial class App : System.Windows.Application
 {
+    internal const string PreviewStartupFailureMessage =
+        "开发预览启动失败，无法安全检查或替换已安装正式版。";
+
     private IDisposable? _singleInstance;
     private InstalledAppShutdownListener? _shutdownListener;
     private CodexProcessMonitor? _processMonitor;
@@ -30,12 +34,13 @@ public partial class App : System.Windows.Application
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var preview = IsPreviewLaunch(e.Args);
-        var installedAppLauncher = new InstalledAppLauncher();
+        InstalledAppLauncher? installedAppLauncher = null;
         var acquired = TryAcquireForLaunch(
             preview,
             () => SingleInstanceGuard.TryAcquire(),
             () =>
             {
+                installedAppLauncher = new InstalledAppLauncher();
                 var coordinator = new InstalledAppShutdownCoordinator(
                     () => SingleInstanceGuard.TryAcquire(),
                     installedAppLauncher.ExecutablePath,
@@ -64,7 +69,7 @@ public partial class App : System.Windows.Application
                 _previewComposition = new PreviewComposition(
                     Dispatcher,
                     RequestExit,
-                    installedAppLauncher);
+                    installedAppLauncher!);
                 _installedAppLauncher =
                     _previewComposition.InstalledAppLauncher;
                 _previewComposition.OpenInstalledRequested +=
@@ -73,8 +78,15 @@ public partial class App : System.Windows.Application
                 return;
             }
 
-            _shutdownListener = new InstalledAppShutdownListener(
-                () => Dispatcher.BeginInvoke(RequestExit));
+            var installedExecutablePath =
+                TryResolveInstalledExecutablePath();
+            if (ShouldStartInstalledShutdownListener(
+                    Environment.ProcessPath,
+                    installedExecutablePath))
+            {
+                _shutdownListener = new InstalledAppShutdownListener(
+                    () => Dispatcher.BeginInvoke(RequestExit));
+            }
             var settingsStore = new SettingsStore();
             var settings = settingsStore.Load();
             _processMonitor = new CodexProcessMonitor();
@@ -168,6 +180,35 @@ public partial class App : System.Windows.Application
     internal static bool ShouldRegisterStartup(IReadOnlyList<string> arguments) =>
         IsInteractiveLaunch(arguments) && !IsPreviewLaunch(arguments);
 
+    internal static bool ShouldStartInstalledShutdownListener(
+        string? currentExecutablePath,
+        string? installedExecutablePath)
+    {
+        if (string.IsNullOrWhiteSpace(currentExecutablePath) ||
+            string.IsNullOrWhiteSpace(installedExecutablePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            if (!Path.IsPathFullyQualified(currentExecutablePath) ||
+                !Path.IsPathFullyQualified(installedExecutablePath))
+            {
+                return false;
+            }
+
+            return string.Equals(
+                Path.GetFullPath(currentExecutablePath),
+                Path.GetFullPath(installedExecutablePath),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal static bool TryAcquireForLaunch(
         bool preview,
         Func<IDisposable?> acquireNormal,
@@ -181,7 +222,21 @@ public partial class App : System.Windows.Application
             return lease is not null;
         }
 
-        var result = acquirePreview();
+        (bool Success, IDisposable? Lease, string? Error) result;
+        try
+        {
+            result = acquirePreview();
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning(
+                "Could not prepare developer-preview startup: {0}",
+                exception);
+            lease = null;
+            showError(PreviewStartupFailureMessage);
+            return false;
+        }
+
         lease = result.Lease;
         if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
         {
@@ -189,6 +244,21 @@ public partial class App : System.Windows.Application
         }
 
         return result.Success;
+    }
+
+    private static string? TryResolveInstalledExecutablePath()
+    {
+        try
+        {
+            return new InstalledAppLauncher().ExecutablePath;
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning(
+                "Could not resolve installed HUD path for shutdown listener: {0}",
+                exception);
+            return null;
+        }
     }
 
     internal static void CompleteExit(

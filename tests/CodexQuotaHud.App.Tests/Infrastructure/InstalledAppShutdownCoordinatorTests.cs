@@ -45,6 +45,42 @@ public sealed class InstalledAppShutdownCoordinatorTests
     }
 
     [Fact]
+    public void ListenerAppearsDuringGrace_RetriesSignalWithoutForceKill()
+    {
+        var lease = new FakeLease();
+        var listenerAvailable = false;
+        var shutdownRequested = false;
+        var process = new FakeProcess(InstalledPath);
+        var platform = new FakePlatform(process)
+        {
+            SignalResultProvider = _ =>
+            {
+                if (!listenerAvailable)
+                {
+                    return false;
+                }
+
+                shutdownRequested = true;
+                return true;
+            },
+            OnWait = _ => listenerAvailable = true
+        };
+        var coordinator = CreateCoordinator(
+            platform,
+            () => shutdownRequested ? lease : null);
+
+        Assert.True(coordinator.TryAcquireForPreview(
+            out var acquired,
+            out var error));
+        Assert.Same(lease, acquired);
+        Assert.Null(error);
+        Assert.Equal(2, platform.SignalCalls);
+        Assert.Equal(0, platform.CaptureCalls);
+        Assert.Equal(0, process.KillCalls);
+        Assert.Equal(0, process.WaitForExitCalls);
+    }
+
+    [Fact]
     public void SignalAbsent_ExactPathIgnoringCase_KillsAndReturnsPostExitLease()
     {
         var lease = new FakeLease();
@@ -59,7 +95,7 @@ public sealed class InstalledAppShutdownCoordinatorTests
             out var error));
         Assert.Same(lease, acquired);
         Assert.Null(error);
-        Assert.Equal(1, platform.SignalCalls);
+        Assert.True(platform.SignalCalls > 1);
         Assert.Equal(1, platform.CaptureCalls);
         Assert.Equal(1, process.KillCalls);
         Assert.Equal(1, process.WaitForExitCalls);
@@ -85,10 +121,114 @@ public sealed class InstalledAppShutdownCoordinatorTests
             out var error));
         Assert.Same(lease, acquired);
         Assert.Null(error);
-        Assert.Equal(1, platform.SignalCalls);
+        Assert.True(platform.SignalCalls > 1);
         Assert.Equal(1, platform.CaptureCalls);
         Assert.Equal(1, process.KillCalls);
         Assert.Equal(1, process.WaitForExitCalls);
+        Assert.Equal(1, process.DisposeCalls);
+    }
+
+    [Fact]
+    public void LeaseBecomesAvailableDuringProcessCapture_ReturnsWithoutKilling()
+    {
+        var lease = new FakeLease();
+        var leaseAvailable = false;
+        var process = new FakeProcess(InstalledPath);
+        var platform = new FakePlatform(process)
+        {
+            OnCapture = () => leaseAvailable = true
+        };
+        var coordinator = CreateCoordinator(
+            platform,
+            () => leaseAvailable ? lease : null);
+
+        Assert.True(coordinator.TryAcquireForPreview(
+            out var acquired,
+            out var error));
+        Assert.Same(lease, acquired);
+        Assert.Null(error);
+        Assert.Equal(0, process.KillCalls);
+        Assert.Equal(0, process.WaitForExitCalls);
+        Assert.Equal(1, process.DisposeCalls);
+    }
+
+    [Fact]
+    public void LeaseBecomesAvailableDuringPathInspection_ReturnsWithoutKilling()
+    {
+        var lease = new FakeLease();
+        var leaseAvailable = false;
+        var process = new FakeProcess(
+            InstalledPath,
+            onPathRead: () => leaseAvailable = true);
+        var platform = new FakePlatform(process);
+        var coordinator = CreateCoordinator(
+            platform,
+            () => leaseAvailable ? lease : null);
+
+        Assert.True(coordinator.TryAcquireForPreview(
+            out var acquired,
+            out var error));
+        Assert.Same(lease, acquired);
+        Assert.Null(error);
+        Assert.Equal(0, process.KillCalls);
+        Assert.Equal(0, process.WaitForExitCalls);
+        Assert.Equal(1, process.DisposeCalls);
+    }
+
+    [Fact]
+    public void LeaseBecomesAvailableImmediatelyBeforeKill_ReturnsWithoutKilling()
+    {
+        var lease = new FakeLease();
+        var inspectionComplete = false;
+        var postInspectionAttempts = 0;
+        var process = new FakeProcess(
+            InstalledPath,
+            onPathRead: () => inspectionComplete = true);
+        var platform = new FakePlatform(process);
+        var coordinator = CreateCoordinator(
+            platform,
+            () =>
+            {
+                if (!inspectionComplete)
+                {
+                    return null;
+                }
+
+                postInspectionAttempts++;
+                return postInspectionAttempts == 2 ? lease : null;
+            });
+
+        Assert.True(coordinator.TryAcquireForPreview(
+            out var acquired,
+            out var error));
+        Assert.Same(lease, acquired);
+        Assert.Null(error);
+        Assert.Equal(2, postInspectionAttempts);
+        Assert.Equal(0, process.KillCalls);
+        Assert.Equal(0, process.WaitForExitCalls);
+        Assert.Equal(1, process.DisposeCalls);
+    }
+
+    [Fact]
+    public void AlreadyExitedDuringKill_RetriesAcquisitionWithoutWaitingAgain()
+    {
+        var lease = new FakeLease();
+        var process = new FakeProcess(
+            InstalledPath,
+            killError: new InvalidOperationException("already exited"),
+            hasExited: true);
+        var platform = new FakePlatform(process);
+        var coordinator = CreateCoordinator(
+            platform,
+            () => process.KillCalls == 1 ? lease : null);
+
+        Assert.True(coordinator.TryAcquireForPreview(
+            out var acquired,
+            out var error));
+        Assert.Same(lease, acquired);
+        Assert.Null(error);
+        Assert.Equal(1, process.KillCalls);
+        Assert.Equal(0, process.WaitForExitCalls);
         Assert.Equal(1, process.DisposeCalls);
     }
 
@@ -249,7 +389,10 @@ public sealed class InstalledAppShutdownCoordinatorTests
         public long Timestamp { get; private set; }
         public long TimestampFrequency => 1_000;
         public bool SignalResult { get; init; }
+        public Func<int, bool>? SignalResultProvider { get; init; }
         public Exception? SignalError { get; init; }
+        public Action? OnCapture { get; init; }
+        public Action<TimeSpan>? OnWait { get; init; }
         public int SignalCalls { get; private set; }
         public int CaptureCalls { get; private set; }
         public List<TimeSpan> Waits { get; } = [];
@@ -262,12 +405,13 @@ public sealed class InstalledAppShutdownCoordinatorTests
                 throw SignalError;
             }
 
-            return SignalResult;
+            return SignalResultProvider?.Invoke(SignalCalls) ?? SignalResult;
         }
 
         public IReadOnlyList<IInstalledAppProcess> CaptureProcesses()
         {
             CaptureCalls++;
+            OnCapture?.Invoke();
             return processes;
         }
 
@@ -276,6 +420,7 @@ public sealed class InstalledAppShutdownCoordinatorTests
             Waits.Add(duration);
             Timestamp += (long)Math.Round(
                 duration.TotalSeconds * TimestampFrequency);
+            OnWait?.Invoke(duration);
         }
     }
 
@@ -285,17 +430,22 @@ public sealed class InstalledAppShutdownCoordinatorTests
         private readonly Exception? _pathError;
         private readonly Exception? _killError;
         private readonly bool _waitForExitResult;
+        private readonly Action? _onPathRead;
 
         public FakeProcess(
             string? executablePath = null,
             Exception? pathError = null,
             Exception? killError = null,
-            bool waitForExitResult = true)
+            bool waitForExitResult = true,
+            Action? onPathRead = null,
+            bool hasExited = false)
         {
             _executablePath = executablePath;
             _pathError = pathError;
             _killError = killError;
             _waitForExitResult = waitForExitResult;
+            _onPathRead = onPathRead;
+            HasExited = hasExited;
         }
 
         public string? ExecutablePath
@@ -307,10 +457,12 @@ public sealed class InstalledAppShutdownCoordinatorTests
                     throw _pathError;
                 }
 
+                _onPathRead?.Invoke();
                 return _executablePath;
             }
         }
 
+        public bool HasExited { get; }
         public int KillCalls { get; private set; }
         public int WaitForExitCalls { get; private set; }
         public int DisposeCalls { get; private set; }

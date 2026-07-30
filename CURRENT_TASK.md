@@ -26,7 +26,7 @@ complete; the two-direction desktop acceptance and branch integration remain.
   preview.
 - Retained the reverse handoff: `退出预览并打开正式版` closes preview first and
   then opens the installed executable.
-- Increased the automated baseline to Core 55 + App/UI 231 = 286 tests.
+- Increased the automated baseline to Core 55 + App/UI 242 = 297 tests.
 - Published the standalone public repository and Windows x64 release.
 - Added MIT license, bilingual README, real five-skin preview, topics, CI, and
   release packaging.
@@ -38,12 +38,17 @@ complete; the two-direction desktop acceptance and branch integration remain.
 ## Next continuation point
 
 When GUI launch is authorized, perform the two-direction desktop acceptance
-from the canonical project root. Start the current installed `v1.0.0`, launch
-the existing `Codex Quota HUD 开发预览` shortcut, and confirm the installed HUD
-disappears before preview opens. Because `v1.0.0` predates the listener, this
-first direction should exercise the legacy exact-path fallback. Then click
-`退出预览并打开正式版` and confirm preview closes before exactly one installed
-tray/HUD returns.
+only after the existing preview shortcut targets the reviewed feature
+artifact. Either merge the reviewed feature branch and rebuild the canonical
+shortcut target, or temporarily retarget the shortcut to the feature
+worktree's reviewed Release artifact. Record the exact tested Git commit and
+artifact path or hash with the acceptance result.
+
+Start the current installed `v1.0.0`, launch the `Codex Quota HUD 开发预览`
+shortcut, and confirm the installed HUD disappears before preview opens.
+Because `v1.0.0` predates the listener, this first direction should exercise
+the legacy exact-path fallback. Then click `退出预览并打开正式版` and confirm
+preview closes before exactly one installed tray/HUD returns.
 
 The current source change did not upgrade or deploy installed `v1.0.0`.
 Graceful signalling remains unverified until a listener-enabled build is
