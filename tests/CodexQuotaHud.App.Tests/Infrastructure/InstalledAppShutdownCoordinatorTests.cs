@@ -68,6 +68,31 @@ public sealed class InstalledAppShutdownCoordinatorTests
     }
 
     [Fact]
+    public void ThrowingSignal_FallsBackToExactPathReplacement()
+    {
+        var lease = new FakeLease();
+        var process = new FakeProcess(InstalledPath);
+        var platform = new FakePlatform(process)
+        {
+            SignalError = new InvalidOperationException("signal failed")
+        };
+        var coordinator = CreateCoordinator(
+            platform,
+            () => process.WaitForExitCalls == 1 ? lease : null);
+
+        Assert.True(coordinator.TryAcquireForPreview(
+            out var acquired,
+            out var error));
+        Assert.Same(lease, acquired);
+        Assert.Null(error);
+        Assert.Equal(1, platform.SignalCalls);
+        Assert.Equal(1, platform.CaptureCalls);
+        Assert.Equal(1, process.KillCalls);
+        Assert.Equal(1, process.WaitForExitCalls);
+        Assert.Equal(1, process.DisposeCalls);
+    }
+
+    [Fact]
     public void SameNameDevelopmentExecutableAtAnotherPath_IsNotKilled()
     {
         var process = new FakeProcess(
@@ -224,6 +249,7 @@ public sealed class InstalledAppShutdownCoordinatorTests
         public long Timestamp { get; private set; }
         public long TimestampFrequency => 1_000;
         public bool SignalResult { get; init; }
+        public Exception? SignalError { get; init; }
         public int SignalCalls { get; private set; }
         public int CaptureCalls { get; private set; }
         public List<TimeSpan> Waits { get; } = [];
@@ -231,6 +257,11 @@ public sealed class InstalledAppShutdownCoordinatorTests
         public bool TrySignalShutdown()
         {
             SignalCalls++;
+            if (SignalError is not null)
+            {
+                throw SignalError;
+            }
+
             return SignalResult;
         }
 

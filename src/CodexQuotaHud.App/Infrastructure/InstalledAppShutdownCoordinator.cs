@@ -40,7 +40,7 @@ internal sealed class InstalledAppShutdownCoordinator
             return true;
         }
 
-        _ = _platform.TrySignalShutdown();
+        _ = TrySignalShutdown();
         lease = TryAcquireUntil(GracefulTimeout);
         if (lease is not null)
         {
@@ -96,6 +96,21 @@ internal sealed class InstalledAppShutdownCoordinator
         finally
         {
             DisposeProcesses(processes);
+        }
+    }
+
+    private bool TrySignalShutdown()
+    {
+        try
+        {
+            return _platform.TrySignalShutdown();
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning(
+                "Failed to signal installed-HUD shutdown: {0}",
+                exception);
+            return false;
         }
     }
 

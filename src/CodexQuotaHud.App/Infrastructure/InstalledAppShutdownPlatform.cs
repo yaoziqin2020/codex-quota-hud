@@ -24,8 +24,20 @@ internal sealed class InstalledAppShutdownPlatform :
     public long Timestamp => Stopwatch.GetTimestamp();
     public long TimestampFrequency => Stopwatch.Frequency;
 
-    public bool TrySignalShutdown() =>
-        InstalledAppShutdownListener.TrySignal();
+    public bool TrySignalShutdown()
+    {
+        try
+        {
+            return InstalledAppShutdownListener.TrySignal();
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning(
+                "Failed to signal installed-HUD shutdown: {0}",
+                exception);
+            return false;
+        }
+    }
 
     public IReadOnlyList<IInstalledAppProcess> CaptureProcesses()
     {
