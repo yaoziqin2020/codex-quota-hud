@@ -1,0 +1,63 @@
+<Window x:Class="CodexQuotaHud.App.Preview.PreviewControlWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Codex Quota HUD — 开发预览"
+        Width="360" Height="560" MinWidth="340" MinHeight="520"
+        WindowStartupLocation="CenterScreen" Topmost="False">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="18">
+            <TextBlock Text="模拟数据仅用于视觉预览，不代表真实额度。"
+                       TextWrapping="Wrap" Foreground="#C85B21"
+                       FontWeight="SemiBold" Margin="0,0,0,16" />
+
+            <TextBlock Text="额度状态" FontWeight="SemiBold" />
+            <ComboBox x:Name="DisplayChoiceBox" Margin="0,6,0,14"
+                      SelectionChanged="OnDisplayChoiceChanged" />
+
+            <TextBlock Text="5 小时剩余" FontWeight="SemiBold" />
+            <DockPanel Margin="0,6,0,14">
+                <TextBlock x:Name="FiveHourValueText" DockPanel.Dock="Right"
+                           Width="44" TextAlignment="Right" />
+                <Slider x:Name="FiveHourSlider" Minimum="0" Maximum="100"
+                        TickFrequency="1" ValueChanged="OnFiveHourChanged" />
+            </DockPanel>
+
+            <TextBlock Text="每周剩余" FontWeight="SemiBold" />
+            <DockPanel Margin="0,6,0,14">
+                <TextBlock x:Name="WeeklyValueText" DockPanel.Dock="Right"
+                           Width="44" TextAlignment="Right" />
+                <Slider x:Name="WeeklySlider" Minimum="0" Maximum="100"
+                        TickFrequency="1" ValueChanged="OnWeeklyChanged" />
+            </DockPanel>
+
+            <TextBlock Text="皮肤" FontWeight="SemiBold" />
+            <ComboBox x:Name="SkinBox" Margin="0,6,0,12"
+                      SelectionChanged="OnSkinChanged" />
+            <CheckBox x:Name="AnimationsCheckBox" Content="启用动画"
+                      IsChecked="True" Margin="0,4"
+                      Checked="OnAnimationsChanged"
+                      Unchecked="OnAnimationsChanged" />
+            <CheckBox x:Name="RefreshingCheckBox" Content="模拟刷新中"
+                      Margin="0,4,0,14"
+                      Checked="OnRefreshingChanged"
+                      Unchecked="OnRefreshingChanged" />
+
+            <TextBlock Text="详情" FontWeight="SemiBold" />
+            <UniformGrid Columns="2" Margin="0,6,0,14">
+                <Button Content="打开详情" Margin="0,0,4,0"
+                        Click="OnOpenDetails" />
+                <Button Content="关闭详情" Margin="4,0,0,0"
+                        Click="OnCloseDetails" />
+            </UniformGrid>
+
+            <TextBlock Text="藏边预览" FontWeight="SemiBold" />
+            <UniformGrid Columns="3" Margin="0,6,0,0">
+                <Button Content="展开" Margin="2" Click="OnExpand" />
+                <Button Content="上" Margin="2" Click="OnTopEdge" />
+                <Button Content="下" Margin="2" Click="OnBottomEdge" />
+                <Button Content="左" Margin="2" Click="OnLeftEdge" />
+                <Button Content="右" Margin="2" Click="OnRightEdge" />
+            </UniformGrid>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
