@@ -13,7 +13,9 @@ acceptance and branch integration remain.
 - Isolated preview mode from app-server, startup registration, and production
   settings.
 - Added skin, percentage, animation, details, and four-edge preview controls.
-- Increased the automated baseline to 253 tests.
+- Added a one-click handoff that releases preview's single-instance lock
+  before opening the installed normal HUD.
+- Increased the automated baseline to 260 tests.
 - Published the standalone public repository and Windows x64 release.
 - Added MIT license, bilingual README, real five-skin preview, topics, CI, and
   release packaging.
@@ -34,6 +36,10 @@ dotnet run --project .\src\CodexQuotaHud.App -- --preview
 The installed HUD currently owns the single-instance lock, so exit it from the
 tray before launching preview. The 2026-07-30 smoke attempt correctly exited
 without changing the production settings file.
+
+The new handoff button is covered by cleanup-order and process-launch tests.
+Its end-to-end visual handoff has not yet been run because that requires
+temporarily exiting the currently installed HUD.
 
 ## Manual checks for future UI changes
 

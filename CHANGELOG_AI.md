@@ -1,5 +1,18 @@
 # AI Change Log
 
+## 2026-07-30 — Preview handoff to installed HUD
+
+- Added `退出预览并打开正式版` to the developer preview control window.
+- Resolves the installed HUD only from the current-user Local App Data
+  installation path and disables the button when that executable is missing.
+- Defers process start until preview windows, tray resources, and the
+  single-instance guard have been cleaned up.
+- Contains missing-file and launch failures without interrupting shutdown.
+- Verified Core 55/55, App/UI 205/205, total 260/260, and a Release build with
+  zero warnings and zero errors.
+- End-to-end visual handoff remains a manual check; the installed `v1.0.0`
+  files and release assets were not modified.
+
 ## 2026-07-30 — Isolated developer preview
 
 - Added `--preview` composition before normal process-monitor and app-server

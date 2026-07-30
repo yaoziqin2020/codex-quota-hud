@@ -145,6 +145,10 @@ dotnet run --project .\src\CodexQuotaHud.App -- --preview
 `codex app-server`，不注册开机启动，也不写入正式设置。它用于视觉与交互
 验收，不能替代真实双额度数据恢复后的最终链路验证。
 
+控制面板底部的“退出预览并打开正式版”会先完整关闭预览并释放单实例锁，
+再启动 `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`。
+未安装正式版时按钮会禁用。
+
 生成自包含版本：
 
 ```powershell
@@ -170,10 +174,10 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前源码包含 253 项自动化测试：
+当前源码包含 260 项自动化测试：
 
 - Core：55 项
-- App / UI：198 项
+- App / UI：205 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore

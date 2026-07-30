@@ -19,6 +19,8 @@ public partial class App : System.Windows.Application
     private QuotaOrbWindow? _window;
     private TrayController? _tray;
     private PreviewComposition? _previewComposition;
+    private InstalledAppLauncher? _installedAppLauncher;
+    private int _openInstalledAfterExit;
     private int _shutdownStarted;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -40,6 +42,10 @@ public partial class App : System.Windows.Application
                 _previewComposition = new PreviewComposition(
                     Dispatcher,
                     RequestExit);
+                _installedAppLauncher =
+                    _previewComposition.InstalledAppLauncher;
+                _previewComposition.OpenInstalledRequested +=
+                    OnOpenInstalledRequested;
                 _previewComposition.Show();
                 return;
             }
@@ -92,20 +98,30 @@ public partial class App : System.Windows.Application
             _processMonitor.RunningChanged -= OnCodexRunningChanged;
         }
 
-        EmergencyCleanup(
-            () => _runningCoordinator?.DisposeAsync().AsTask()
-                .GetAwaiter().GetResult(),
-            () => _refreshService?.DisposeAsync().AsTask()
-                .GetAwaiter().GetResult(),
-            () => _quotaClient?.DisposeAsync().AsTask()
-                .GetAwaiter().GetResult(),
-            () => _processMonitor?.DisposeAsync().AsTask()
-                .GetAwaiter().GetResult(),
-            () => _tray?.Dispose(),
-            () => _previewComposition?.Dispose(),
-            () => _window?.CloseForExit(),
-            () => _viewModel?.Dispose(),
-            () => _singleInstance?.Dispose());
+        var openInstalled =
+            Interlocked.Exchange(ref _openInstalledAfterExit, 0) != 0;
+        string? launchError = null;
+        CompleteExit(
+            openInstalled,
+            () => EmergencyCleanup(
+                () => _runningCoordinator?.DisposeAsync().AsTask()
+                    .GetAwaiter().GetResult(),
+                () => _refreshService?.DisposeAsync().AsTask()
+                    .GetAwaiter().GetResult(),
+                () => _quotaClient?.DisposeAsync().AsTask()
+                    .GetAwaiter().GetResult(),
+                () => _processMonitor?.DisposeAsync().AsTask()
+                    .GetAwaiter().GetResult(),
+                () => _tray?.Dispose(),
+                () => _previewComposition?.Dispose(),
+                () => _window?.CloseForExit(),
+                () => _viewModel?.Dispose(),
+                () => _singleInstance?.Dispose()),
+            () => _installedAppLauncher?.TryLaunch(out launchError) == true,
+            message => Trace.TraceWarning(
+                "{0}{1}",
+                message,
+                launchError is null ? string.Empty : $": {launchError}"));
         base.OnExit(e);
     }
 
@@ -125,6 +141,30 @@ public partial class App : System.Windows.Application
 
     internal static bool ShouldRegisterStartup(IReadOnlyList<string> arguments) =>
         IsInteractiveLaunch(arguments) && !IsPreviewLaunch(arguments);
+
+    internal static void CompleteExit(
+        bool openInstalled,
+        Action cleanup,
+        Func<bool> launch,
+        Action<string> traceError)
+    {
+        ArgumentNullException.ThrowIfNull(cleanup);
+        ArgumentNullException.ThrowIfNull(launch);
+        ArgumentNullException.ThrowIfNull(traceError);
+        cleanup();
+        if (openInstalled && !launch())
+        {
+            traceError("正式版启动失败");
+        }
+    }
+
+    private void OnOpenInstalledRequested(object? sender, EventArgs e)
+    {
+        if (Interlocked.Exchange(ref _openInstalledAfterExit, 1) == 0)
+        {
+            RequestExit();
+        }
+    }
 
     private void OnCodexRunningChanged(bool isRunning)
     {
