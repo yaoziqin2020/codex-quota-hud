@@ -10,7 +10,8 @@ namespace CodexQuotaHud.App;
 
 public partial class App : System.Windows.Application
 {
-    private SingleInstanceGuard? _singleInstance;
+    private IDisposable? _singleInstance;
+    private InstalledAppShutdownListener? _shutdownListener;
     private CodexProcessMonitor? _processMonitor;
     private RestartableQuotaClient? _quotaClient;
     private QuotaRefreshService? _refreshService;
@@ -28,8 +29,29 @@ public partial class App : System.Windows.Application
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        _singleInstance = SingleInstanceGuard.TryAcquire();
-        if (_singleInstance is null)
+        var preview = IsPreviewLaunch(e.Args);
+        var installedAppLauncher = new InstalledAppLauncher();
+        var acquired = TryAcquireForLaunch(
+            preview,
+            () => SingleInstanceGuard.TryAcquire(),
+            () =>
+            {
+                var coordinator = new InstalledAppShutdownCoordinator(
+                    () => SingleInstanceGuard.TryAcquire(),
+                    installedAppLauncher.ExecutablePath,
+                    new InstalledAppShutdownPlatform());
+                var success = coordinator.TryAcquireForPreview(
+                    out var lease,
+                    out var error);
+                return (success, lease, error);
+            },
+            message => System.Windows.MessageBox.Show(
+                message,
+                "Codex Quota HUD — 开发预览",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning),
+            out _singleInstance);
+        if (!acquired)
         {
             Shutdown();
             return;
@@ -37,11 +59,12 @@ public partial class App : System.Windows.Application
 
         try
         {
-            if (IsPreviewLaunch(e.Args))
+            if (preview)
             {
                 _previewComposition = new PreviewComposition(
                     Dispatcher,
-                    RequestExit);
+                    RequestExit,
+                    installedAppLauncher);
                 _installedAppLauncher =
                     _previewComposition.InstalledAppLauncher;
                 _previewComposition.OpenInstalledRequested +=
@@ -50,6 +73,8 @@ public partial class App : System.Windows.Application
                 return;
             }
 
+            _shutdownListener = new InstalledAppShutdownListener(
+                () => Dispatcher.BeginInvoke(RequestExit));
             var settingsStore = new SettingsStore();
             var settings = settingsStore.Load();
             _processMonitor = new CodexProcessMonitor();
@@ -116,6 +141,7 @@ public partial class App : System.Windows.Application
                 () => _previewComposition?.Dispose(),
                 () => _window?.CloseForExit(),
                 () => _viewModel?.Dispose(),
+                () => _shutdownListener?.Dispose(),
                 () => _singleInstance?.Dispose()),
             () => _installedAppLauncher?.TryLaunch(out launchError) == true,
             message => Trace.TraceWarning(
@@ -141,6 +167,29 @@ public partial class App : System.Windows.Application
 
     internal static bool ShouldRegisterStartup(IReadOnlyList<string> arguments) =>
         IsInteractiveLaunch(arguments) && !IsPreviewLaunch(arguments);
+
+    internal static bool TryAcquireForLaunch(
+        bool preview,
+        Func<IDisposable?> acquireNormal,
+        Func<(bool Success, IDisposable? Lease, string? Error)> acquirePreview,
+        Action<string> showError,
+        out IDisposable? lease)
+    {
+        if (!preview)
+        {
+            lease = acquireNormal();
+            return lease is not null;
+        }
+
+        var result = acquirePreview();
+        lease = result.Lease;
+        if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
+        {
+            showError(result.Error);
+        }
+
+        return result.Success;
+    }
 
     internal static void CompleteExit(
         bool openInstalled,
@@ -293,6 +342,13 @@ public partial class App : System.Windows.Application
                 var viewModel = _viewModel;
                 _viewModel = null;
                 viewModel?.Dispose();
+                return ValueTask.CompletedTask;
+            },
+            () =>
+            {
+                var shutdownListener = _shutdownListener;
+                _shutdownListener = null;
+                shutdownListener?.Dispose();
                 return ValueTask.CompletedTask;
             },
             () =>

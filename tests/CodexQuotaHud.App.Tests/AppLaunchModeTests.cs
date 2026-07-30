@@ -40,6 +40,100 @@ public sealed class AppLaunchModeTests
     }
 
     [Fact]
+    public void PreviewLaunch_UsesReplacementAcquisitionAndReportsFailure()
+    {
+        var normalCalls = 0;
+        var messages = new List<string>();
+
+        var result = App.TryAcquireForLaunch(
+            preview: true,
+            acquireNormal: () =>
+            {
+                normalCalls++;
+                return new FakeLease();
+            },
+            acquirePreview: () => (false, null, "无法关闭正式版"),
+            showError: messages.Add,
+            out var lease);
+
+        Assert.False(result);
+        Assert.Null(lease);
+        Assert.Equal(0, normalCalls);
+        Assert.Equal(["无法关闭正式版"], messages);
+    }
+
+    [Fact]
+    public void PreviewLaunch_PreservesReplacementLeaseOnSuccess()
+    {
+        var expectedLease = new FakeLease();
+        var normalCalls = 0;
+        var messages = new List<string>();
+
+        var result = App.TryAcquireForLaunch(
+            preview: true,
+            acquireNormal: () =>
+            {
+                normalCalls++;
+                return new FakeLease();
+            },
+            acquirePreview: () => (true, expectedLease, null),
+            showError: messages.Add,
+            out var lease);
+
+        Assert.True(result);
+        Assert.Same(expectedLease, lease);
+        Assert.Equal(0, normalCalls);
+        Assert.Empty(messages);
+    }
+
+    [Fact]
+    public void NormalLaunch_DoesNotInvokeReplacementOrShowError()
+    {
+        var replacementCalls = 0;
+        var messages = new List<string>();
+
+        var result = App.TryAcquireForLaunch(
+            preview: false,
+            acquireNormal: () => null,
+            acquirePreview: () =>
+            {
+                replacementCalls++;
+                return (true, new FakeLease(), null);
+            },
+            showError: messages.Add,
+            out var lease);
+
+        Assert.False(result);
+        Assert.Null(lease);
+        Assert.Equal(0, replacementCalls);
+        Assert.Empty(messages);
+    }
+
+    [Fact]
+    public void NormalLaunch_PreservesSingleInstanceLeaseOnSuccess()
+    {
+        var expectedLease = new FakeLease();
+        var replacementCalls = 0;
+        var messages = new List<string>();
+
+        var result = App.TryAcquireForLaunch(
+            preview: false,
+            acquireNormal: () => expectedLease,
+            acquirePreview: () =>
+            {
+                replacementCalls++;
+                return (true, new FakeLease(), null);
+            },
+            showError: messages.Add,
+            out var lease);
+
+        Assert.True(result);
+        Assert.Same(expectedLease, lease);
+        Assert.Equal(0, replacementCalls);
+        Assert.Empty(messages);
+    }
+
+    [Fact]
     public void ExitHandoff_LaunchesOnlyAfterCleanup()
     {
         var events = new List<string>();
@@ -77,5 +171,12 @@ public sealed class AppLaunchModeTests
         Assert.Equal(0, normalLaunches);
         Assert.Null(exception);
         Assert.Equal(["cleanup", "正式版启动失败"], events);
+    }
+
+    private sealed class FakeLease : IDisposable
+    {
+        public void Dispose()
+        {
+        }
     }
 }
