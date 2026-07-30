@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Diagnostics;
 using CodexQuotaHud.App.Infrastructure;
+using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.App.UI;
 using CodexQuotaHud.Core.Refresh;
 using CodexQuotaHud.Core.Settings;
@@ -17,6 +18,7 @@ public partial class App : System.Windows.Application
     private QuotaOrbViewModel? _viewModel;
     private QuotaOrbWindow? _window;
     private TrayController? _tray;
+    private PreviewComposition? _previewComposition;
     private int _shutdownStarted;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -33,6 +35,15 @@ public partial class App : System.Windows.Application
 
         try
         {
+            if (IsPreviewLaunch(e.Args))
+            {
+                _previewComposition = new PreviewComposition(
+                    Dispatcher,
+                    RequestExit);
+                _previewComposition.Show();
+                return;
+            }
+
             var settingsStore = new SettingsStore();
             var settings = settingsStore.Load();
             _processMonitor = new CodexProcessMonitor();
@@ -91,6 +102,7 @@ public partial class App : System.Windows.Application
             () => _processMonitor?.DisposeAsync().AsTask()
                 .GetAwaiter().GetResult(),
             () => _tray?.Dispose(),
+            () => _previewComposition?.Dispose(),
             () => _window?.CloseForExit(),
             () => _viewModel?.Dispose(),
             () => _singleInstance?.Dispose());
@@ -179,6 +191,13 @@ public partial class App : System.Windows.Application
         }
 
         await BestEffortCleanup.RunAsync(
+            () =>
+            {
+                var previewComposition = _previewComposition;
+                _previewComposition = null;
+                previewComposition?.Dispose();
+                return ValueTask.CompletedTask;
+            },
             async () =>
             {
                 var coordinator = _runningCoordinator;
