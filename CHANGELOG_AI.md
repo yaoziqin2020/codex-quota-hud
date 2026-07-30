@@ -1,5 +1,26 @@
 # AI Change Log
 
+## 2026-07-30 — Symmetric installed/preview handoff
+
+- Launching the desktop `Codex Quota HUD 开发预览` shortcut now replaces the
+  installed HUD before preview creates its HUD or control window.
+- A listener-enabled installed build receives the shutdown request and exits
+  through normal application cleanup. Older installed builds use the fallback
+  only when the running executable is exactly
+  `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`; a same-name
+  process at another path is never force-closed.
+- If installed-mode replacement fails, the app displays a failure message and
+  does not open preview. The reverse handoff remains
+  `退出预览并打开正式版`, which cleans up preview before starting the exact
+  installed executable.
+- Verified by automated tests: Core 55/55, App/UI 231/231, total 286/286, plus
+  a Release build with zero warnings and zero errors.
+- The installed `v1.0.0` package and release assets were not upgraded,
+  deployed, or changed. No GUI process was launched for this task, so both
+  manual handoff directions remain unchecked. The current `v1.0.0` can later
+  verify the legacy exact-path fallback; graceful signalling remains unverified
+  until a listener-enabled build is installed.
+
 ## 2026-07-30 — Preview control window geometry
 
 - Increased the preview control default size to `380 × 650` so standard-DPI

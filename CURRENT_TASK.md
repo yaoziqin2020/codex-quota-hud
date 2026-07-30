@@ -2,9 +2,10 @@
 
 ## Status
 
-Version `1.0.0` is released. The isolated developer preview is implemented on
-`codex/preview-tool`; automated verification is complete, while final visual
-acceptance and branch integration remain.
+Version `1.0.0` is released. The isolated developer preview and the symmetric
+installed/preview handoff are implemented on
+`codex/preview-replaces-installed-app`. Automated regression verification is
+complete; the two-direction desktop acceptance and branch integration remain.
 
 ## Last completed work
 
@@ -17,7 +18,15 @@ acceptance and branch integration remain.
   before opening the installed normal HUD.
 - Increased the preview control default size to `380 × 650` and persist its
   geometry independently from normal HUD settings.
-- Increased the automated baseline to 267 tests.
+- Launching the desktop development-preview shortcut now closes installed mode
+  before preview opens. Listener-enabled installed builds exit through normal
+  cleanup; legacy builds fall back only when their executable is the exact
+  standard installation path. Same-name processes at other paths are not
+  force-closed, and a replacement failure shows a message without opening
+  preview.
+- Retained the reverse handoff: `退出预览并打开正式版` closes preview first and
+  then opens the installed executable.
+- Increased the automated baseline to Core 55 + App/UI 231 = 286 tests.
 - Published the standalone public repository and Windows x64 release.
 - Added MIT license, bilingual README, real five-skin preview, topics, CI, and
   release packaging.
@@ -28,20 +37,18 @@ acceptance and branch integration remain.
 
 ## Next continuation point
 
-Run final visual acceptance from the feature worktree, then integrate the
-feature branch into `main` without using the old conversation worktree:
+When GUI launch is authorized, perform the two-direction desktop acceptance
+from the canonical project root. Start the current installed `v1.0.0`, launch
+the existing `Codex Quota HUD 开发预览` shortcut, and confirm the installed HUD
+disappears before preview opens. Because `v1.0.0` predates the listener, this
+first direction should exercise the legacy exact-path fallback. Then click
+`退出预览并打开正式版` and confirm preview closes before exactly one installed
+tray/HUD returns.
 
-```powershell
-dotnet run --project .\src\CodexQuotaHud.App -- --preview
-```
-
-The installed HUD currently owns the single-instance lock, so exit it from the
-tray before launching preview. The 2026-07-30 smoke attempt correctly exited
-without changing the production settings file.
-
-The new handoff button is covered by cleanup-order and process-launch tests.
-Its end-to-end visual handoff has not yet been run because that requires
-temporarily exiting the currently installed HUD.
+The current source change did not upgrade or deploy installed `v1.0.0`.
+Graceful signalling remains unverified until a listener-enabled build is
+installed. No GUI process was launched for this handoff, so both manual
+directions remain unchecked.
 
 ## Manual checks for future UI changes
 
@@ -51,4 +58,8 @@ temporarily exiting the currently installed HUD.
 - Single-click toggle and double-click refresh separation.
 - Existing instance activation and tray percentage rendering.
 - All five skins in both full HUD and edge-bar states.
+- Installed-to-preview replacement through the legacy exact-path fallback.
+- Preview-to-installed reverse handoff, including exactly one returned
+  installed tray/HUD. The graceful listener path must be checked separately
+  after a listener-enabled build is installed.
 

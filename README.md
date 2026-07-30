@@ -149,6 +149,21 @@ dotnet run --project .\src\CodexQuotaHud.App -- --preview
 再启动 `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`。
 未安装正式版时按钮会禁用。
 
+The desktop **Codex Quota HUD Developer Preview** shortcut performs the
+opposite handoff: it closes installed mode before the preview HUD and control
+window open. A listener-enabled installed build exits through its normal
+cleanup path. Older installed builds, including the current `v1.0.0`, use a
+fallback only when the running executable resolves to the exact standard
+installation path above; a same-name process at any other path is never
+force-closed. If replacement cannot be completed, the shortcut shows a failure
+message and does not open preview.
+
+The reverse handoff remains **退出预览并打开正式版**: preview cleans up first and
+then starts the executable at the same exact installation path. These source
+changes do not upgrade, deploy, or otherwise change the installed `v1.0.0`
+package. The two-direction desktop handoff is still a manual acceptance check
+and is not marked complete until it is performed on a Windows desktop.
+
 预览控制面板默认完整显示，并将大小和位置单独保存到
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
@@ -178,10 +193,11 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前源码包含 267 项自动化测试：
+当前源码包含 286 项自动化测试：
 
 - Core：55 项
-- App / UI：212 项
+- App / UI：231 项
+- Total：286 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
