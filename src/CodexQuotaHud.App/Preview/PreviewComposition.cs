@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows.Threading;
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.Core.Settings;
 
 namespace CodexQuotaHud.App.Preview;
@@ -13,6 +14,14 @@ internal sealed class PreviewComposition : IDisposable
     public PreviewComposition(
         Dispatcher dispatcher,
         Action requestExit)
+        : this(dispatcher, requestExit, new InstalledAppLauncher())
+    {
+    }
+
+    internal PreviewComposition(
+        Dispatcher dispatcher,
+        Action requestExit,
+        InstalledAppLauncher installedAppLauncher)
     {
         ArgumentNullException.ThrowIfNull(dispatcher);
         _requestExit = requestExit ?? throw new ArgumentNullException(
@@ -32,8 +41,13 @@ internal sealed class PreviewComposition : IDisposable
             RefreshController,
             ViewModel,
             HudWindow);
-        ControlWindow = new PreviewControlWindow(Session);
+        InstalledAppLauncher = installedAppLauncher ??
+            throw new ArgumentNullException(nameof(installedAppLauncher));
+        ControlWindow = new PreviewControlWindow(
+            Session,
+            InstalledAppLauncher.IsAvailable);
         ControlWindow.ExitRequested += OnExitRequested;
+        ControlWindow.OpenInstalledRequested += OnOpenInstalledRequested;
         HudWindow.Closing += OnHudClosing;
     }
 
@@ -44,6 +58,8 @@ internal sealed class PreviewComposition : IDisposable
     internal TrayController Tray { get; }
     internal PreviewSession Session { get; }
     internal PreviewControlWindow ControlWindow { get; }
+    internal InstalledAppLauncher InstalledAppLauncher { get; }
+    public event EventHandler? OpenInstalledRequested;
 
     public void Show()
     {
@@ -65,6 +81,7 @@ internal sealed class PreviewComposition : IDisposable
         }
 
         ControlWindow.ExitRequested -= OnExitRequested;
+        ControlWindow.OpenInstalledRequested -= OnOpenInstalledRequested;
         HudWindow.Closing -= OnHudClosing;
         ControlWindow.Close();
         Tray.Dispose();
@@ -77,6 +94,14 @@ internal sealed class PreviewComposition : IDisposable
         if (Volatile.Read(ref _disposed) == 0)
         {
             _requestExit();
+        }
+    }
+
+    private void OnOpenInstalledRequested(object? sender, EventArgs e)
+    {
+        if (Volatile.Read(ref _disposed) == 0)
+        {
+            OpenInstalledRequested?.Invoke(this, EventArgs.Empty);
         }
     }
 

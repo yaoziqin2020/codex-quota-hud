@@ -1,5 +1,6 @@
 using System.Windows.Threading;
 using CodexQuotaHud.App.Preview;
+using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.Core.Models;
 
 namespace CodexQuotaHud.App.Tests.Preview;
@@ -26,6 +27,28 @@ public sealed class PreviewCompositionTests
             composition.Dispose();
             composition.Dispose();
             Assert.Equal(0, exits);
+        });
+    }
+
+    [Fact]
+    public void Composition_ForwardsInstalledHandoffOnce()
+    {
+        RunSta(() =>
+        {
+            using var composition = new PreviewComposition(
+                Dispatcher.CurrentDispatcher,
+                () => { },
+                new InstalledAppLauncher(
+                    @"C:\Present",
+                    _ => true,
+                    _ => true));
+            var requests = 0;
+            composition.OpenInstalledRequested += (_, _) => requests++;
+
+            composition.ControlWindow.RequestOpenInstalled();
+            composition.ControlWindow.RequestOpenInstalled();
+
+            Assert.Equal(1, requests);
         });
     }
 

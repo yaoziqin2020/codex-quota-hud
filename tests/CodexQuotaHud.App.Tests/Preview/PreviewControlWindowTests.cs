@@ -21,7 +21,9 @@ public sealed class PreviewControlWindowTests
                 new InlineDispatcher(),
                 () => { });
             var session = new PreviewSession(controller, viewModel, hud);
-            var window = new PreviewControlWindow(session);
+            var window = new PreviewControlWindow(
+                session,
+                installedAppAvailable: true);
 
             Assert.Equal("Codex Quota HUD — 开发预览", window.Title);
             Assert.False(window.Topmost);
@@ -38,6 +40,44 @@ public sealed class PreviewControlWindowTests
             Assert.Equal(72, viewModel.PrimaryPercent);
             Assert.True(viewModel.IsRefreshing);
             Assert.True(hud.DetailsOpen);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void InstalledHandoff_IsDisabledWhenMissingAndRaisedOnlyOnce()
+    {
+        RunSta(() =>
+        {
+            var controller = new PreviewQuotaRefreshController();
+            var hud = new RecordingHud();
+            using var viewModel = new QuotaOrbViewModel(
+                controller,
+                new InMemorySettingsStore(new AppSettings()),
+                new AppSettings(),
+                new InlineDispatcher(),
+                () => { });
+            var session = new PreviewSession(controller, viewModel, hud);
+            var missing = new PreviewControlWindow(
+                session,
+                installedAppAvailable: false);
+            Assert.False(missing.CanOpenInstalled);
+            Assert.Equal("未找到已安装正式版", missing.InstalledAppMessage);
+            missing.Close();
+
+            var window = new PreviewControlWindow(
+                session,
+                installedAppAvailable: true);
+            var handoffs = 0;
+            var exits = 0;
+            window.OpenInstalledRequested += (_, _) => handoffs++;
+            window.ExitRequested += (_, _) => exits++;
+
+            window.RequestOpenInstalled();
+            window.RequestOpenInstalled();
+
+            Assert.Equal(1, handoffs);
+            Assert.Equal(1, exits);
             window.Close();
         });
     }

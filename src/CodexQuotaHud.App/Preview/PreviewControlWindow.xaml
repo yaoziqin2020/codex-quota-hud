@@ -58,6 +58,17 @@
                 <Button Content="左" Margin="2" Click="OnLeftEdge" />
                 <Button Content="右" Margin="2" Click="OnRightEdge" />
             </UniformGrid>
+
+            <Separator Margin="0,16,0,12" />
+            <Button x:Name="OpenInstalledButton"
+                    Content="退出预览并打开正式版"
+                    Padding="10,8"
+                    FontWeight="SemiBold"
+                    Click="OnOpenInstalled" />
+            <TextBlock x:Name="InstalledAppMessageText"
+                       Margin="0,6,0,0"
+                       Foreground="#C85B21"
+                       TextAlignment="Center" />
         </StackPanel>
     </ScrollViewer>
 </Window>

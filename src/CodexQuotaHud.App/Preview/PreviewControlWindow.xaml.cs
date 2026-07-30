@@ -10,8 +10,11 @@ public partial class PreviewControlWindow : Window
 {
     private readonly PreviewSession _session;
     private bool _initialized;
+    private int _openInstalledRequested;
 
-    internal PreviewControlWindow(PreviewSession session)
+    internal PreviewControlWindow(
+        PreviewSession session,
+        bool installedAppAvailable)
     {
         InitializeComponent();
         _session = session ?? throw new ArgumentNullException(nameof(session));
@@ -23,10 +26,17 @@ public partial class PreviewControlWindow : Window
         WeeklySlider.Value = 34;
         FiveHourValueText.Text = "68%";
         WeeklyValueText.Text = "34%";
+        CanOpenInstalled = installedAppAvailable;
+        InstalledAppMessage = installedAppAvailable
+            ? null
+            : "未找到已安装正式版";
+        OpenInstalledButton.IsEnabled = CanOpenInstalled;
+        InstalledAppMessageText.Text = InstalledAppMessage;
         _initialized = true;
     }
 
     public event EventHandler? ExitRequested;
+    public event EventHandler? OpenInstalledRequested;
 
     internal PreviewDisplayChoice SelectedDisplayChoice =>
         DisplayChoiceBox.SelectedItem is PreviewDisplayChoice choice
@@ -35,6 +45,8 @@ public partial class PreviewControlWindow : Window
 
     internal double FiveHourPercent => FiveHourSlider.Value;
     internal double WeeklyPercent => WeeklySlider.Value;
+    internal bool CanOpenInstalled { get; }
+    internal string? InstalledAppMessage { get; }
 
     internal void SelectDisplayChoice(PreviewDisplayChoice choice)
     {
@@ -56,6 +68,18 @@ public partial class PreviewControlWindow : Window
 
     internal void ChangeDetails(bool value) =>
         _session.SetDetailsOpen(value);
+
+    internal void RequestOpenInstalled()
+    {
+        if (!CanOpenInstalled ||
+            Interlocked.Exchange(ref _openInstalledRequested, 1) != 0)
+        {
+            return;
+        }
+
+        OpenInstalledRequested?.Invoke(this, EventArgs.Empty);
+        ExitRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     protected override void OnClosing(CancelEventArgs e)
     {
@@ -141,4 +165,7 @@ public partial class PreviewControlWindow : Window
 
     private void OnBottomEdge(object sender, RoutedEventArgs e) =>
         _session.PreviewEdge(EdgeDockSide.Bottom);
+
+    private void OnOpenInstalled(object sender, RoutedEventArgs e) =>
+        RequestOpenInstalled();
 }
