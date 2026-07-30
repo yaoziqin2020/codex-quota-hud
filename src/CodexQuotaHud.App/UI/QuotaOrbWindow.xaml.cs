@@ -8,6 +8,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Controls.Primitives;
 using CodexQuotaHud.App.UI.Animation;
 using CodexQuotaHud.App.UI.Skins;
+using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.Core.Models;
 using MenuItem = System.Windows.Controls.MenuItem;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
@@ -15,7 +16,7 @@ using Point = System.Windows.Point;
 
 namespace CodexQuotaHud.App.UI;
 
-public partial class QuotaOrbWindow : Window
+public partial class QuotaOrbWindow : Window, IPreviewHud
 {
     private const double PopupShadowMargin = 14;
     private static readonly TimeSpan PointerDismissalWindow =
@@ -81,6 +82,46 @@ public partial class QuotaOrbWindow : Window
     {
         _allowClose = true;
         Close();
+    }
+
+    void IPreviewHud.SetDetailsOpen(bool isOpen)
+    {
+        if (isOpen)
+        {
+            ShowDetailsPopup();
+        }
+        else
+        {
+            CloseDetailsPopup();
+        }
+    }
+
+    void IPreviewHud.PreviewEdge(EdgeDockSide side)
+    {
+        if (side == EdgeDockSide.None || !Enum.IsDefined(side))
+        {
+            throw new ArgumentOutOfRangeException(nameof(side));
+        }
+
+        var workArea = GetNearestWorkArea();
+        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var collapsed = EdgeAutoHideGeometry.CollapsedPosition(
+            side, Left, Top, width, height, workArea);
+        _edgeAutoHideController.SetDock(side);
+        Left = collapsed.Left;
+        Top = collapsed.Top;
+        ApplyEdgeVisualState(side, collapsed: true, animate: false);
+    }
+
+    void IPreviewHud.ForceExpanded()
+    {
+        if (_edgeAutoHideController.DockSide == EdgeDockSide.None)
+        {
+            return;
+        }
+
+        _edgeAutoHideController.Expand();
     }
 
     protected override void OnClosing(CancelEventArgs e)
