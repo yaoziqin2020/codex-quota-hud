@@ -132,6 +132,19 @@ dotnet test .\CodexQuotaHud.sln -c Release --no-restore
 dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 ```
 
+### 开发预览 / Developer Preview
+
+当真实 5 小时额度暂时不可用时，可启动隔离的视觉预览工具：
+
+```powershell
+dotnet run --project .\src\CodexQuotaHud.App -- --preview
+```
+
+控制面板可切换双额度、仅 5 小时、仅每周和无额度状态，并调整百分比、
+皮肤、动画、详情及四方向藏边。预览数据只存在于内存，不连接
+`codex app-server`，不注册开机启动，也不写入正式设置。它用于视觉与交互
+验收，不能替代真实双额度数据恢复后的最终链路验证。
+
 生成自包含版本：
 
 ```powershell
@@ -157,10 +170,10 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-版本 `1.0.0` 当前包含 232 项自动化测试：
+当前源码包含 253 项自动化测试：
 
 - Core：55 项
-- App / UI：177 项
+- App / UI：198 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore

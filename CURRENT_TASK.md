@@ -2,11 +2,18 @@
 
 ## Status
 
-Version `1.0.0` is released and the `main` branch is healthy. There is no
-unfinished implementation task at handoff.
+Version `1.0.0` is released. The isolated developer preview is implemented on
+`codex/preview-tool`; automated verification is complete, while final visual
+acceptance and branch integration remain.
 
 ## Last completed work
 
+- Added `--preview` with a real HUD and separate developer control panel.
+- Added dual, five-hour-only, weekly-only, and no-quota synthetic states.
+- Isolated preview mode from app-server, startup registration, and production
+  settings.
+- Added skin, percentage, animation, details, and four-edge preview controls.
+- Increased the automated baseline to 253 tests.
 - Published the standalone public repository and Windows x64 release.
 - Added MIT license, bilingual README, real five-skin preview, topics, CI, and
   release packaging.
@@ -17,16 +24,16 @@ unfinished implementation task at handoff.
 
 ## Next continuation point
 
-Start from a fresh clone of GitHub `main` in:
+Run final visual acceptance from the feature worktree, then integrate the
+feature branch into `main` without using the old conversation worktree:
 
-`C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
+```powershell
+dotnet run --project .\src\CodexQuotaHud.App -- --preview
+```
 
-Before making a new change:
-
-1. Pull `origin/main`.
-2. Confirm `git status` is clean.
-3. Read `PROJECT_CONTEXT.md` and `CHANGELOG_AI.md`.
-4. State the exact UI or behavior change and its verification surface.
+The installed HUD currently owns the single-instance lock, so exit it from the
+tray before launching preview. The 2026-07-30 smoke attempt correctly exited
+without changing the production settings file.
 
 ## Manual checks for future UI changes
 

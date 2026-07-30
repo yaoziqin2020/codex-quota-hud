@@ -1,5 +1,20 @@
 # AI Change Log
 
+## 2026-07-30 — Isolated developer preview
+
+- Added `--preview` composition before normal process-monitor and app-server
+  construction.
+- Added deterministic dual, five-hour-only, weekly-only, and no-quota states
+  with adjustable percentages.
+- Added an in-memory settings store and separate developer control window.
+- Reused the production HUD, five skins, details popup, tray, animation state,
+  monitor work-area selection, and edge geometry.
+- Serialized the real-window preview tests after full-suite verification
+  exposed a parallel WPF/WinForms resource conflict.
+- Verified Core 55/55, App/UI 198/198, total 253/253, and a Release build with
+  zero warnings and zero errors.
+- The installed `v1.0.0` build and release assets were not changed.
+
 ## 2026-07-30 — Project handoff
 
 - Confirmed `main` is synchronized with

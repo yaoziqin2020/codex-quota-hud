@@ -48,8 +48,8 @@ Do not treat the old conversation worktree under
 ## Quality baseline
 
 - Core tests: 55
-- App/UI tests: 177
-- Total: 232
+- App/UI tests: 198
+- Total: 253
 - GitHub Windows CI covers restore, test, build, and self-contained publish.
 - The asynchronous test wait helper is time-based to remain stable on slower
   GitHub Windows runners.
@@ -69,7 +69,9 @@ Do not treat the old conversation worktree under
 - Make narrow changes and preserve established interaction semantics.
 - Treat multi-monitor edge behavior, click/double-click handling, and animation
   timing as regression-sensitive.
-- Run focused tests for changed behavior, then the full 232-test suite.
+- The developer preview is entered only with `--preview`; it uses synthetic
+  in-memory data and must never replace real app-server acceptance.
+- Run focused tests for changed behavior, then the full 253-test suite.
 - Update the installed build only when the user asks to deploy locally.
 - Do not move the release tag or replace release assets without an explicit
   release reason.
