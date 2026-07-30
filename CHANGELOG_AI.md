@@ -1,5 +1,17 @@
 # AI Change Log
 
+## 2026-07-30 — Preview control window geometry
+
+- Increased the preview control default size to `380 × 650` so standard-DPI
+  startup shows the full current control set without an initial scrollbar.
+- Added isolated geometry persistence at
+  `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`.
+- Restores and clamps valid size/position while retaining scrolling for small
+  screens and high DPI.
+- Does not persist simulated quota, skin, animation, or normal HUD settings.
+- Verified Core 55/55, App/UI 212/212, total 267/267, and a Release build with
+  zero warnings and zero errors.
+
 ## 2026-07-30 — Preview handoff to installed HUD
 
 - Added `退出预览并打开正式版` to the developer preview control window.

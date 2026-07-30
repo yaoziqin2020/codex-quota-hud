@@ -82,6 +82,63 @@ public sealed class PreviewControlWindowTests
         });
     }
 
+    [Fact]
+    public void WindowState_RestoresSavesAndClampsOffscreenGeometry()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "CodexQuotaHud-PreviewWindow",
+            Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new PreviewWindowStateStore(root);
+            store.Save(new PreviewWindowState(120, 80, 440, 720));
+
+            RunSta(() =>
+            {
+                var controller = new PreviewQuotaRefreshController();
+                var hud = new RecordingHud();
+                using var viewModel = new QuotaOrbViewModel(
+                    controller,
+                    new InMemorySettingsStore(new AppSettings()),
+                    new AppSettings(),
+                    new InlineDispatcher(),
+                    () => { });
+                var session = new PreviewSession(controller, viewModel, hud);
+                var window = new PreviewControlWindow(
+                    session,
+                    installedAppAvailable: true,
+                    store);
+
+                Assert.Equal(440, window.Width);
+                Assert.Equal(720, window.Height);
+                window.Left = 160;
+                window.Top = 90;
+                window.Width = 460;
+                window.Height = 740;
+                window.SaveWindowStateNow();
+                Assert.Equal(
+                    new PreviewWindowState(160, 90, 460, 740),
+                    store.Load());
+                window.Close();
+            });
+
+            var clamped = PreviewControlWindow.ClampState(
+                new PreviewWindowState(4000, 3000, 440, 720),
+                new WorkArea(0, 0, 1920, 1040));
+            Assert.Equal(
+                new PreviewWindowState(1480, 320, 440, 720),
+                clamped);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private static void RunSta(Action action)
     {
         Exception? failure = null;

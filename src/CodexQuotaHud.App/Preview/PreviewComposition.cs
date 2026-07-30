@@ -41,11 +41,13 @@ internal sealed class PreviewComposition : IDisposable
             RefreshController,
             ViewModel,
             HudWindow);
+        WindowStateStore = new PreviewWindowStateStore();
         InstalledAppLauncher = installedAppLauncher ??
             throw new ArgumentNullException(nameof(installedAppLauncher));
         ControlWindow = new PreviewControlWindow(
             Session,
-            InstalledAppLauncher.IsAvailable);
+            InstalledAppLauncher.IsAvailable,
+            WindowStateStore);
         ControlWindow.ExitRequested += OnExitRequested;
         ControlWindow.OpenInstalledRequested += OnOpenInstalledRequested;
         HudWindow.Closing += OnHudClosing;
@@ -59,6 +61,7 @@ internal sealed class PreviewComposition : IDisposable
     internal PreviewSession Session { get; }
     internal PreviewControlWindow ControlWindow { get; }
     internal InstalledAppLauncher InstalledAppLauncher { get; }
+    internal PreviewWindowStateStore WindowStateStore { get; }
     public event EventHandler? OpenInstalledRequested;
 
     public void Show()

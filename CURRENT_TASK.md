@@ -15,7 +15,9 @@ acceptance and branch integration remain.
 - Added skin, percentage, animation, details, and four-edge preview controls.
 - Added a one-click handoff that releases preview's single-instance lock
   before opening the installed normal HUD.
-- Increased the automated baseline to 260 tests.
+- Increased the preview control default size to `380 × 650` and persist its
+  geometry independently from normal HUD settings.
+- Increased the automated baseline to 267 tests.
 - Published the standalone public repository and Windows x64 release.
 - Added MIT license, bilingual README, real five-skin preview, topics, CI, and
   release packaging.

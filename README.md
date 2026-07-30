@@ -149,6 +149,10 @@ dotnet run --project .\src\CodexQuotaHud.App -- --preview
 再启动 `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`。
 未安装正式版时按钮会禁用。
 
+预览控制面板默认完整显示，并将大小和位置单独保存到
+`%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
+皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
+
 生成自包含版本：
 
 ```powershell
@@ -174,10 +178,10 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前源码包含 260 项自动化测试：
+当前源码包含 267 项自动化测试：
 
 - Core：55 项
-- App / UI：205 项
+- App / UI：212 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore

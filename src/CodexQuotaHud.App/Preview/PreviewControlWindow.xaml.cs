@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using CodexQuotaHud.App.UI;
 using CodexQuotaHud.Core.Models;
 
@@ -11,13 +12,29 @@ public partial class PreviewControlWindow : Window
     private readonly PreviewSession _session;
     private bool _initialized;
     private int _openInstalledRequested;
+    private readonly PreviewWindowStateStore? _windowStateStore;
+    private readonly DispatcherTimer _saveTimer;
+    private bool _loaded;
 
     internal PreviewControlWindow(
         PreviewSession session,
-        bool installedAppAvailable)
+        bool installedAppAvailable,
+        PreviewWindowStateStore? windowStateStore = null)
     {
         InitializeComponent();
         _session = session ?? throw new ArgumentNullException(nameof(session));
+        _windowStateStore = windowStateStore;
+        _saveTimer = new DispatcherTimer(
+            DispatcherPriority.Background,
+            Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(300)
+        };
+        _saveTimer.Tick += (_, _) =>
+        {
+            _saveTimer.Stop();
+            SaveWindowStateNow();
+        };
         DisplayChoiceBox.ItemsSource = Enum.GetValues<PreviewDisplayChoice>();
         SkinBox.ItemsSource = Enum.GetValues<SkinId>();
         DisplayChoiceBox.SelectedItem = PreviewDisplayChoice.Dual;
@@ -32,6 +49,10 @@ public partial class PreviewControlWindow : Window
             : "未找到已安装正式版";
         OpenInstalledButton.IsEnabled = CanOpenInstalled;
         InstalledAppMessageText.Text = InstalledAppMessage;
+        ApplySavedWindowState();
+        Loaded += (_, _) => _loaded = true;
+        LocationChanged += (_, _) => ScheduleWindowStateSave();
+        SizeChanged += (_, _) => ScheduleWindowStateSave();
         _initialized = true;
     }
 
@@ -81,10 +102,87 @@ public partial class PreviewControlWindow : Window
         ExitRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    internal void SaveWindowStateNow()
+    {
+        if (_windowStateStore is null ||
+            !double.IsFinite(Left) ||
+            !double.IsFinite(Top) ||
+            !double.IsFinite(Width) ||
+            !double.IsFinite(Height))
+        {
+            return;
+        }
+
+        _windowStateStore.Save(new PreviewWindowState(
+            Left, Top, Width, Height));
+    }
+
+    internal static PreviewWindowState ClampState(
+        PreviewWindowState state,
+        WorkArea workArea)
+    {
+        var width = Math.Min(state.Width, workArea.Width);
+        var height = Math.Min(state.Height, workArea.Height);
+        var position = WindowPositioning.Clamp(
+            state.Left,
+            state.Top,
+            width,
+            height,
+            workArea);
+        return new PreviewWindowState(
+            position.Left,
+            position.Top,
+            width,
+            height);
+    }
+
     protected override void OnClosing(CancelEventArgs e)
     {
+        _saveTimer.Stop();
+        SaveWindowStateNow();
         base.OnClosing(e);
         ExitRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplySavedWindowState()
+    {
+        if (_windowStateStore is null)
+        {
+            return;
+        }
+
+        var state = _windowStateStore.Load();
+        Width = state.Width;
+        Height = state.Height;
+        if (!double.IsFinite(state.Left) || !double.IsFinite(state.Top))
+        {
+            return;
+        }
+
+        var area = SystemParameters.WorkArea;
+        var clamped = ClampState(
+            state,
+            new WorkArea(
+                area.Left,
+                area.Top,
+                area.Width,
+                area.Height));
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = clamped.Left;
+        Top = clamped.Top;
+        Width = clamped.Width;
+        Height = clamped.Height;
+    }
+
+    private void ScheduleWindowStateSave()
+    {
+        if (!_loaded || _windowStateStore is null)
+        {
+            return;
+        }
+
+        _saveTimer.Stop();
+        _saveTimer.Start();
     }
 
     private void OnDisplayChoiceChanged(
