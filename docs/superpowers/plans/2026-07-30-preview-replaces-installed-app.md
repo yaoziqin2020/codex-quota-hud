@@ -579,7 +579,9 @@ From the canonical project root:
 6. Record whether the first direction used graceful signalling or the legacy
    exact-path fallback.
 
-If GUI launch is not authorized or the installed package remains `v1.0.0`,
-report the corresponding manual check as not performed; do not convert that
-absence into a pass.
+If GUI launch is authorized, use the currently installed `v1.0.0` to verify
+the legacy exact-path fallback and both handoff directions. Until a
+listener-enabled build is installed, report only the graceful-notification
+path as not performed. If GUI launch is not authorized, report all manual
+checks as not performed; do not convert their absence into a pass.
 
