@@ -8,7 +8,8 @@ param(
     [switch] $InternalTestMode,
     [string] $InternalArgumentCapturePath,
     [int] $InternalCompilerExitCode,
-    [switch] $InternalSkipFakeSetup
+    [switch] $InternalSkipFakeSetup,
+    [switch] $InternalFailStageCleanup
 )
 
 Set-StrictMode -Version Latest
@@ -60,7 +61,8 @@ else {
         -not [string]::IsNullOrWhiteSpace($InnoCompilerPath) -or
         -not [string]::IsNullOrWhiteSpace($InternalArgumentCapturePath) -or
         $InternalCompilerExitCode -ne 0 -or
-        $InternalSkipFakeSetup) {
+        $InternalSkipFakeSetup -or
+        $InternalFailStageCleanup) {
         throw 'Internal packaging hooks require -InternalTestMode.'
     }
 
@@ -72,6 +74,10 @@ $stage = Join-Path $releaseRoot $packageName
 $archive = Join-Path $releaseRoot "$packageName.zip"
 $setup = Join-Path $releaseRoot "CodexQuotaHud-Setup-v$Version.exe"
 $checksums = Join-Path $releaseRoot 'SHA256SUMS.txt'
+$manifestTemp = Join-Path `
+    $releaseRoot `
+    ('.SHA256SUMS-v{0}.{1}.tmp' -f `
+        $Version, [Guid]::NewGuid().ToString('N'))
 $published = if ($InternalTestMode) {
     Join-Path $releaseRoot ".internal-published-v$Version"
 }
@@ -107,6 +113,13 @@ try {
     Remove-ExactPath -Path $archive
     Remove-ExactPath -Path $setup
     Remove-ExactPath -Path $checksums
+    foreach ($staleManifest in @(Get-ChildItem `
+        -LiteralPath $releaseRoot `
+        -Filter ".SHA256SUMS-v$Version.*.tmp" `
+        -File `
+        -Force)) {
+        Remove-ExactPath -Path $staleManifest.FullName
+    }
     if ($InternalTestMode) {
         Remove-ExactPath -Path $published
     }
@@ -133,11 +146,11 @@ try {
         -LiteralPath (Join-Path $published 'CodexQuotaHud.App.exe') `
         -Destination $payload
     Copy-Item `
-        -LiteralPath (Join-Path $PSScriptRoot 'install.ps1') `
-        -Destination $scripts
+        -LiteralPath (Join-Path $PSScriptRoot 'install-production.ps1') `
+        -Destination (Join-Path $scripts 'install.ps1')
     Copy-Item `
-        -LiteralPath (Join-Path $PSScriptRoot 'uninstall.ps1') `
-        -Destination $scripts
+        -LiteralPath (Join-Path $PSScriptRoot 'uninstall-production.ps1') `
+        -Destination (Join-Path $scripts 'uninstall.ps1')
     Copy-Item `
         -LiteralPath (Join-Path $repositoryRoot 'README.md') `
         -Destination $stage
@@ -177,7 +190,7 @@ try {
         throw "Expected ZIP is missing: $archive"
     }
 
-    $packagingStage = 'checksum creation'
+    $packagingStage = 'temporary checksum creation'
     $setupHash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).
         Hash.ToLowerInvariant()
     $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).
@@ -186,22 +199,49 @@ try {
         "$setupHash  $([System.IO.Path]::GetFileName($setup))",
         "$archiveHash  $([System.IO.Path]::GetFileName($archive))"
     ) -join "`n"
-    [System.IO.File]::WriteAllText(
-        $checksums,
-        $manifest + "`n",
-        [System.Text.UTF8Encoding]::new($false))
+    $manifestBytes = [System.Text.UTF8Encoding]::new($false).GetBytes(
+        $manifest + "`n")
+    [System.IO.File]::WriteAllBytes($manifestTemp, $manifestBytes)
+    $writtenBytes = [System.IO.File]::ReadAllBytes($manifestTemp)
+    if (-not [string]::Equals(
+        [Convert]::ToBase64String($manifestBytes),
+        [Convert]::ToBase64String($writtenBytes),
+        [System.StringComparison]::Ordinal)) {
+        throw 'Temporary checksum manifest byte validation failed.'
+    }
+
+    $packagingStage = 'stage cleanup'
+    if ($InternalTestMode -and $InternalFailStageCleanup) {
+        throw 'Simulated stage cleanup failure.'
+    }
+    Remove-ExactPath -Path $stage
+    if ($InternalTestMode) {
+        Remove-ExactPath -Path $published
+    }
+
+    $packagingStage = 'atomic checksum commit'
+    Move-Item `
+        -LiteralPath $manifestTemp `
+        -Destination $checksums
 
     Write-Host "Release Setup created: $setup"
     Write-Host "Release ZIP created: $archive"
     Write-Host "Checksum manifest created: $checksums"
 }
 catch {
-    Remove-Item -LiteralPath $checksums -Force -ErrorAction SilentlyContinue
-    throw "Release packaging failed during $packagingStage. $($_.Exception.Message)"
-}
-finally {
-    Remove-ExactPath -Path $stage
-    if ($InternalTestMode) {
-        Remove-ExactPath -Path $published
+    $failureMessage =
+        "Release packaging failed during $packagingStage. $($_.Exception.Message)"
+    Remove-Item -LiteralPath $manifestTemp,$checksums `
+        -Force `
+        -ErrorAction SilentlyContinue
+    try {
+        Remove-ExactPath -Path $stage
+        if ($InternalTestMode) {
+            Remove-ExactPath -Path $published
+        }
     }
+    catch {
+        $failureMessage += " Cleanup also failed: $($_.Exception.Message)"
+    }
+    throw $failureMessage
 }

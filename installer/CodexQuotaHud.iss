@@ -66,8 +66,13 @@ Name: "previewdesktopicon"; Description: "{cm:PreviewDesktopTask}"; Flags: unche
 
 [Files]
 Source: "{#PublishedDir}\CodexQuotaHud.App.exe"; DestDir: "{app}"; Flags: ignoreversion
+#ifdef InternalTestRoot
 Source: "{#RepositoryRoot}\scripts\installer-lifecycle.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
 Source: "{#RepositoryRoot}\scripts\installer-lifecycle.ps1"; Flags: dontcopy
+#else
+Source: "{#RepositoryRoot}\scripts\installer-lifecycle-production.ps1"; DestDir: "{app}\scripts"; DestName: "installer-lifecycle.ps1"; Flags: ignoreversion
+Source: "{#RepositoryRoot}\scripts\installer-lifecycle-production.ps1"; DestName: "installer-lifecycle.ps1"; Flags: dontcopy
+#endif
 
 [Icons]
 #ifdef InternalTestRoot

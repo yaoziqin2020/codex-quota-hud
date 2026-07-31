@@ -61,6 +61,49 @@ public sealed class InstallerBuildTests
             entries,
             entry => entry.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
                 entry.Contains("Setup", StringComparison.OrdinalIgnoreCase));
+        foreach (var scriptName in new[]
+        {
+            "scripts/install.ps1",
+            "scripts/uninstall.ps1",
+        })
+        {
+            var script = ReadZipEntry(archive, scriptName);
+            Assert.DoesNotContain("InternalTest", script,
+                StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("LocalAppDataRoot", script,
+                StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("InternalShellRootPath", script,
+                StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void InstallerSources_SeparateProductionAndInternalTestHelpers()
+    {
+        var definition = File.ReadAllText(InnoDefinition);
+        var productionHelper = Path.Combine(
+            RepositoryRoot,
+            "scripts",
+            "installer-lifecycle-production.ps1");
+
+        Assert.True(File.Exists(productionHelper));
+        var productionSource = File.ReadAllText(productionHelper);
+        Assert.DoesNotContain("InternalTest", productionSource,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("LocalAppDataRoot", productionSource,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("InternalShellRootPath", productionSource,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "Source: \"{#RepositoryRoot}\\scripts\\installer-lifecycle-production.ps1\"",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains("#ifdef InternalTestRoot", definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Source: \"{#RepositoryRoot}\\scripts\\installer-lifecycle.ps1\"",
+            definition,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -129,7 +172,31 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
-    public async Task TestInstaller_RejectsMissingProductionInstallerBeforeBuild()
+    public async Task PackageRelease_CleanupFailureRemovesAllManifestFiles()
+    {
+        using var temp = new TemporaryDirectory();
+        var output = Path.Combine(temp.Path, "release");
+
+        var result = await RunPowerShellAsync(
+            PackageScript,
+            "-Version", "1.1.0",
+            "-OutputPath", output,
+            "-DotNetExecutable", CreateFakeDotNet(temp.Path),
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalTestMode",
+            "-InternalFailStageCleanup");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("stage cleanup", result.CombinedOutput,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
+        Assert.Empty(Directory.Exists(output)
+            ? Directory.GetFiles(output, "*SHA256SUMS*.tmp")
+            : Array.Empty<string>());
+    }
+
+    [Fact]
+    public async Task TestInstaller_RejectsNoncanonicalInstallerBeforeBuild()
     {
         using var temp = new TemporaryDirectory();
         var missing = Path.Combine(temp.Path, "CodexQuotaHud-Setup-v1.1.0.exe");
@@ -141,10 +208,47 @@ public sealed class InstallerBuildTests
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains(
-            "Production installer does not exist",
+            "InstallerPath must be exactly",
             result.CombinedOutput,
             StringComparison.Ordinal);
         Assert.Empty(Directory.GetFileSystemEntries(temp.Path));
+    }
+
+    [Fact]
+    public async Task TestInstaller_RejectsCanonicalCandidateWithoutManifest()
+    {
+        using var temp = new TemporaryDirectory();
+        var candidate = CreateFakeReleaseCandidate(
+            temp.Path,
+            manifestLine: null);
+
+        var result = await RunPowerShellAsync(
+            candidate.Script,
+            "-Version", "1.1.0",
+            "-InstallerPath", candidate.Installer);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Canonical checksum manifest does not exist",
+            result.CombinedOutput, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TestInstaller_RejectsCanonicalCandidateWithStaleHash()
+    {
+        using var temp = new TemporaryDirectory();
+        var candidate = CreateFakeReleaseCandidate(
+            temp.Path,
+            manifestLine:
+                $"{new string('0', 64)}  CodexQuotaHud-Setup-v1.1.0.exe\n");
+
+        var result = await RunPowerShellAsync(
+            candidate.Script,
+            "-Version", "1.1.0",
+            "-InstallerPath", candidate.Installer);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("hash does not match SHA256SUMS.txt",
+            result.CombinedOutput, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -174,6 +278,23 @@ public sealed class InstallerBuildTests
         var script = File.ReadAllText(TestInstallerScript);
 
         Assert.DoesNotContain(script, character => character > 0x7f);
+    }
+
+    [Fact]
+    public void TestInstallerScript_RequiresSnapshotsAndCleanupPostconditions()
+    {
+        var script = File.ReadAllText(TestInstallerScript);
+
+        Assert.Contains("productionRunSnapshot", script,
+            StringComparison.Ordinal);
+        Assert.Contains("productionUninstallSnapshot", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Internal uninstall key", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Cleanup postcondition failed", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Production registry snapshot changed", script,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -599,6 +720,42 @@ public sealed class InstallerBuildTests
         return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
+    private static string ReadZipEntry(ZipArchive archive, string name)
+    {
+        var entry = Assert.Single(archive.Entries, item =>
+            string.Equals(
+                item.FullName.Replace('\\', '/'),
+                name,
+                StringComparison.Ordinal));
+        using var reader = new StreamReader(entry.Open());
+        return reader.ReadToEnd();
+    }
+
+    private static FakeReleaseCandidate CreateFakeReleaseCandidate(
+        string tempRoot,
+        string? manifestLine)
+    {
+        var repository = Directory.CreateDirectory(
+            Path.Combine(tempRoot, "repository")).FullName;
+        var scripts = Directory.CreateDirectory(
+            Path.Combine(repository, "scripts")).FullName;
+        var release = Directory.CreateDirectory(
+            Path.Combine(repository, "artifacts", "release")).FullName;
+        var script = Path.Combine(scripts, "test-installer.ps1");
+        File.Copy(TestInstallerScript, script);
+        var installer = Path.Combine(
+            release,
+            "CodexQuotaHud-Setup-v1.1.0.exe");
+        File.WriteAllText(installer, "MZ fake release candidate");
+        if (manifestLine is not null)
+        {
+            File.WriteAllText(
+                Path.Combine(release, "SHA256SUMS.txt"),
+                manifestLine);
+        }
+        return new FakeReleaseCandidate(script, installer);
+    }
+
     private static string GetDefine(IEnumerable<string> arguments, string name)
     {
         var prefix = $"/D{name}=";
@@ -677,6 +834,10 @@ public sealed class InstallerBuildTests
     {
         public string CombinedOutput => StandardOutput + StandardError;
     }
+
+    private sealed record FakeReleaseCandidate(
+        string Script,
+        string Installer);
 
     private sealed class TemporaryDirectory : IDisposable
     {
