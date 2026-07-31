@@ -11,8 +11,8 @@ complete; the two-direction desktop acceptance and branch integration remain.
 
 - Added low-quota color alerts across the floating HUD's five skins, collapsed
   edge bars, tray percentage icon, and detail rows. Values above `20%` retain
-  normal skin colors; `>10%..20%` is Warning amber `#FFB547`; `<=10%` is
-  Critical red `#FF5A67`. Primary and secondary quotas are colored
+  normal skin colors; `>10%..20%` is Warning amber `#FFFFB547`; `<=10%` is
+  Critical red `#FFFF5A67`. Primary and secondary quotas are colored
   independently in dual mode.
 - The change is color-only: no flashing, popup, sound, setting, or refresh
   behavior changed. Developer Preview sliders are the manual boundary and

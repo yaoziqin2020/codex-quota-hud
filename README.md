@@ -88,7 +88,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
 ### Low-quota alert colors
 
 - Above `20%` keeps the selected skin's normal color. `>10%..20%` is Warning
-  amber `#FFB547`; `<=10%` is Critical red `#FF5A67`.
+  amber `#FFFFB547`; `<=10%` is Critical red `#FFFF5A67`.
 - In dual-quota mode, the primary and secondary quotas are classified and
   colored independently. The alert color is shown on the floating HUD (all
   five skins), collapsed edge bar, tray percentage icon, and detail rows.

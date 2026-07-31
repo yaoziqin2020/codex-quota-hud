@@ -18,8 +18,8 @@ Repository: https://github.com/yaoziqin2020/codex-quota-hud
 - Edge docking on the external edges of multi-monitor layouts.
 - Themed edge progress bars and a numeric system-tray icon.
 - Low-quota colors apply independently to each available quota: values above
-  `20%` keep the normal skin color, `>10%..20%` use Warning amber `#FFB547`,
-  and `<=10%` use Critical red `#FF5A67`. They appear on all five floating-HUD
+  `20%` keep the normal skin color, `>10%..20%` use Warning amber `#FFFFB547`,
+  and `<=10%` use Critical red `#FFFF5A67`. They appear on all five floating-HUD
   skins, collapsed edge bars, tray icon, and detail rows. This is color-only:
   no flashing, popup, sound, settings, or refresh behavior changes.
 - Single-instance behavior and current-user startup support.

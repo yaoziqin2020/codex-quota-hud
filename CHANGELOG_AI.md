@@ -4,8 +4,8 @@
 
 - Added a shared alert policy across all five floating-HUD skins, collapsed
   edge bars, tray percentage icon, and detail rows. Above `20%` retains the
-  normal skin color; `>10%..20%` is Warning amber `#FFB547`; `<=10%` is
-  Critical red `#FF5A67`.
+  normal skin color; `>10%..20%` is Warning amber `#FFFFB547`; `<=10%` is
+  Critical red `#FFFF5A67`.
 - Dual quotas are classified and colored independently. The change adds no
   flashing, popup, sound, setting, or refresh behavior. Developer Preview
   sliders remain the manual boundary and mixed-state inspection tool.
