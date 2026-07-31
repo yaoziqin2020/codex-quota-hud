@@ -24,6 +24,7 @@ public sealed class PackagingScriptTests
 
         var result = await RunPowerShellAsync(
             Script("publish.ps1"),
+            "-Version", "1.1.0",
             "-ProjectPath", Path.Combine(RepositoryRoot, "src", "CodexQuotaHud.App",
                 "CodexQuotaHud.App.csproj"),
             "-OutputPath", output,
@@ -42,7 +43,27 @@ public sealed class PackagingScriptTests
         AssertContainsPair(arguments, "--self-contained", "true");
         Assert.Contains("-p:PublishSingleFile=true", arguments);
         Assert.Contains("-p:IncludeNativeLibrariesForSelfExtract=true", arguments);
+        Assert.Contains("-p:Version=1.1.0", arguments);
+        Assert.Contains("-p:FileVersion=1.1.0.0", arguments);
+        Assert.Contains("-p:AssemblyVersion=1.1.0.0", arguments);
         AssertContainsPair(arguments, "-o", Path.GetFullPath(output));
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("1.1")]
+    [InlineData("v1.1.0")]
+    [InlineData("1.1.0-beta")]
+    public async Task Publish_RejectsNonReleaseVersion(string version)
+    {
+        using var temp = new TemporaryDirectory();
+        var result = await RunPowerShellAsync(
+            Script("publish.ps1"),
+            "-Version", version,
+            "-OutputPath", Path.Combine(temp.Path, "published"),
+            "-InternalTestMode");
+
+        Assert.NotEqual(0, result.ExitCode);
     }
 
     [Fact]

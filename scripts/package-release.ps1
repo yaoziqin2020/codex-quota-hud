@@ -17,7 +17,7 @@ $published = Join-Path `
     $repositoryRoot `
     'artifacts\CodexQuotaHud-win-x64'
 
-& (Join-Path $PSScriptRoot 'publish.ps1')
+& (Join-Path $PSScriptRoot 'publish.ps1') -Version $Version
 
 if (Test-Path -LiteralPath $stage) {
     Remove-Item -LiteralPath $stage -Recurse -Force

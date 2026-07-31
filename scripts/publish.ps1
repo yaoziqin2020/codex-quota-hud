@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param(
+    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [string] $Version = '1.1.0',
     [string] $ProjectPath,
     [string] $OutputPath,
     [string] $DotNetExecutable = 'dotnet',
@@ -32,6 +34,7 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 $projectFullPath = [System.IO.Path]::GetFullPath($ProjectPath)
 $outputFullPath = [System.IO.Path]::GetFullPath($OutputPath)
 $expectedOutputPath = [System.IO.Path]::GetFullPath($defaultOutputPath)
+$fourPartVersion = "$Version.0"
 
 if (-not (Test-Path -LiteralPath $projectFullPath -PathType Leaf)) {
     throw "Project file does not exist: $projectFullPath"
@@ -80,6 +83,9 @@ $publishArguments = @(
     '--self-contained', 'true',
     '-p:PublishSingleFile=true',
     '-p:IncludeNativeLibrariesForSelfExtract=true',
+    "-p:Version=$Version",
+    "-p:FileVersion=$fourPartVersion",
+    "-p:AssemblyVersion=$fourPartVersion",
     '-o', $outputFullPath
 )
 
