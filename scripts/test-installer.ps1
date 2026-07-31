@@ -623,6 +623,10 @@ try {
     Write-Host "Isolated installer root: $internalRoot"
     Write-Host "Isolated test ID: $internalTestId"
 }
+catch {
+    Write-Error ("Smoke failure stack: " + $_.ScriptStackTrace)
+    throw
+}
 finally {
     $cleanupErrors = [System.Collections.ArrayList]::new()
     if (-not [string]::IsNullOrWhiteSpace($internalTestId)) {
