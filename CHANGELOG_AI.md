@@ -17,6 +17,10 @@
   the installer scripts and later workflow steps. This prevents PowerShell 7's
   module path from being inherited by nested Windows PowerShell test processes
   and hiding the built-in `Get-FileHash` command.
+- Made shortcut inspection locale-neutral in installer smoke tests. It still
+  verifies the exact executable path and `--preview`; when WScript cannot read
+  a Unicode `.lnk` filename on an English runner, it verifies both values from
+  the shortcut binary instead of treating an empty COM result as product data.
 
 ## 2026-07-31 — Final installer shortcut and uninstall acceptance
 

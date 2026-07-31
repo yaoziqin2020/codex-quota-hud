@@ -119,6 +119,58 @@ function Assert-Missing {
     }
 }
 
+function Assert-PreviewShortcut {
+    param(
+        [Parameter(Mandatory = $true)][string] $ShortcutPath,
+        [Parameter(Mandatory = $true)][string] $ExpectedTarget)
+
+    $shell = New-Object -ComObject WScript.Shell
+    try {
+        $shortcut = $shell.CreateShortcut($ShortcutPath)
+        $target = [string]$shortcut.TargetPath
+        $arguments = [string]$shortcut.Arguments
+    }
+    finally {
+        if ($null -ne $shell) {
+            [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject(
+                $shell)
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($target)) {
+        if (-not (Test-PathEquals $target $ExpectedTarget) -or
+            -not [string]::Equals(
+                $arguments.Trim(),
+                '--preview',
+                [System.StringComparison]::Ordinal)) {
+            throw 'Preview desktop link has an unexpected target or arguments.'
+        }
+        return
+    }
+
+    $bytes = [System.IO.File]::ReadAllBytes($ShortcutPath)
+    $asciiText = [System.Text.Encoding]::ASCII.GetString($bytes)
+    $unicodeText = [System.Text.Encoding]::Unicode.GetString($bytes)
+    $targetFound =
+        $asciiText.IndexOf(
+            $ExpectedTarget,
+            [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+        $unicodeText.IndexOf(
+            $ExpectedTarget,
+            [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    $argumentsFound =
+        $asciiText.IndexOf(
+            '--preview',
+            [System.StringComparison]::Ordinal) -ge 0 -or
+        $unicodeText.IndexOf(
+            '--preview',
+            [System.StringComparison]::Ordinal) -ge 0
+    if (-not $targetFound -or -not $argumentsFound) {
+        throw 'Preview desktop link binary has an unexpected target or arguments.'
+    }
+    Write-Host 'Preview desktop link verified with locale-neutral binary fallback.'
+}
+
 function Invoke-SetupProcess {
     param(
         [Parameter(Mandatory = $true)][string] $Path,
@@ -470,25 +522,9 @@ try {
     }
     $previewDesktop = $initialDesktopLinks[0].FullName
     [void]$isolatedShortcutPaths.Add($previewDesktop)
-    $shell = New-Object -ComObject WScript.Shell
-    try {
-        $previewShortcut = $shell.CreateShortcut($previewDesktop)
-        if (-not (Test-PathEquals `
-                $previewShortcut.TargetPath `
-                $installedExecutable) -or
-            -not [string]::Equals(
-                $previewShortcut.Arguments.Trim(),
-                '--preview',
-                [System.StringComparison]::Ordinal)) {
-            throw 'Preview desktop link has an unexpected target or arguments.'
-        }
-    }
-    finally {
-        if ($null -ne $shell) {
-            [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject(
-                $shell)
-        }
-    }
+    Assert-PreviewShortcut `
+        -ShortcutPath $previewDesktop `
+        -ExpectedTarget $installedExecutable
     $startupValue = Get-ItemPropertyValue `
         -LiteralPath $runRegistryPath `
         -Name $runValueName `
@@ -548,25 +584,9 @@ try {
             "found $($previewLinks.Count).")
     }
     $previewDesktop = $previewLinks[0].FullName
-    $shell = New-Object -ComObject WScript.Shell
-    try {
-        $previewShortcut = $shell.CreateShortcut($previewDesktop)
-        if (-not (Test-PathEquals `
-                $previewShortcut.TargetPath `
-                $installedExecutable) -or
-            -not [string]::Equals(
-                $previewShortcut.Arguments.Trim(),
-                '--preview',
-                [System.StringComparison]::Ordinal)) {
-            throw 'Preview desktop link has an unexpected target or arguments.'
-        }
-    }
-    finally {
-        if ($null -ne $shell) {
-            [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject(
-                $shell)
-        }
-    }
+    Assert-PreviewShortcut `
+        -ShortcutPath $previewDesktop `
+        -ExpectedTarget $installedExecutable
     if (Get-RegistryValuePresenceChecked `
         -RelativeKey $productionRunRelativeKey `
         -ValueName $runValueName) {
