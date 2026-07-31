@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Controls;
 using CodexQuotaHud.App.UI.Animation;
+using CodexQuotaHud.App.UI;
 using CodexQuotaHud.Core.Models;
+using Media = System.Windows.Media;
 
 namespace CodexQuotaHud.App.UI.Skins;
 
@@ -12,10 +14,20 @@ public partial class LiquidTankSkin :
     private const double LiquidCapacity = 96;
     internal const double WaveCenterY = 4;
     private readonly LiquidTankMotionController _motionController;
+    private readonly Media.Brush _normalLiquidBodyFill;
+    private readonly Media.Brush _normalBackWaveFill;
+    private readonly Media.Brush _normalFrontWaveFill;
+    private readonly Media.Brush _normalPercentForeground;
+    private readonly Media.Brush _normalSecondaryStroke;
 
     public LiquidTankSkin()
     {
         InitializeComponent();
+        _normalLiquidBodyFill = LiquidBody.Fill;
+        _normalBackWaveFill = BackWaveSurface.Fill;
+        _normalFrontWaveFill = FrontWaveSurface.Fill;
+        _normalPercentForeground = PercentText.Foreground;
+        _normalSecondaryStroke = SecondaryArc.Stroke;
         ConfigureSlosh(
             nameof(TankAmbientTransform),
             idleSeconds: 22,
@@ -42,6 +54,21 @@ public partial class LiquidTankSkin :
 
     protected override void RenderCore(QuotaSkinState state)
     {
+        LiquidBody.Fill = QuotaAlertPalette.ResolveBrush(
+            state.PrimaryAlert,
+            _normalLiquidBodyFill);
+        BackWaveSurface.Fill = QuotaAlertPalette.ResolveBrush(
+            state.PrimaryAlert,
+            _normalBackWaveFill);
+        FrontWaveSurface.Fill = QuotaAlertPalette.ResolveBrush(
+            state.PrimaryAlert,
+            _normalFrontWaveFill);
+        PercentText.Foreground = QuotaAlertPalette.ResolveBrush(
+            state.PrimaryAlert,
+            _normalPercentForeground);
+        SecondaryArc.Stroke = QuotaAlertPalette.ResolveBrush(
+            state.SecondaryAlert ?? QuotaAlertLevel.Normal,
+            _normalSecondaryStroke);
         CurrentWaterlineY = CalculateWaterlineY(state.PrimaryPercent);
         Canvas.SetTop(
             TankSurfaceGroup,

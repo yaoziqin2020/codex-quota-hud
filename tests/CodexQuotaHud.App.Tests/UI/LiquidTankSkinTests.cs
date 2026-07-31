@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using CodexQuotaHud.App.UI.Animation;
+using CodexQuotaHud.App.UI;
 using CodexQuotaHud.App.UI.Controls;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Models;
@@ -12,6 +13,90 @@ namespace CodexQuotaHud.App.Tests.UI;
 
 public sealed class LiquidTankSkinTests
 {
+    [Fact]
+    public void Alerts_RecolorOnlyQuotaBearingElementsAndRestoreNormalBrushes() =>
+        RunSta(() =>
+        {
+            var skin = new LiquidTankSkin();
+            var liquidBody = Assert.IsType<Rectangle>(skin.FindName("LiquidBody"));
+            var backWave = Assert.IsType<ShapePath>(skin.FindName("BackWaveSurface"));
+            var frontWave = Assert.IsType<ShapePath>(skin.FindName("FrontWaveSurface"));
+            var percentText = Assert.IsType<TextBlock>(skin.FindName("PercentText"));
+            var secondaryArc = Assert.IsType<ProgressArc>(skin.FindName("SecondaryArc"));
+            var crest = Assert.IsType<ShapePath>(skin.FindName("FrontWaveSurface"))
+                .Parent is Grid frontWaveGrid
+                ? Assert.IsType<ShapePath>(frontWaveGrid.Children[1])
+                : throw new InvalidOperationException("Front wave crest was not found.");
+            var vesselViewport = Assert.IsType<Grid>(skin.FindName("VesselViewport"));
+            var vessel = Assert.IsType<Grid>(vesselViewport.Parent);
+            var vesselFrame = Assert.IsType<Border>(vessel.Children[0]);
+
+            skin.Render(CreateState(75, 80));
+            var normalLiquid = liquidBody.Fill;
+            var normalBackWave = backWave.Fill;
+            var normalFrontWave = frontWave.Fill;
+            var normalPercent = percentText.Foreground;
+            var normalSecondary = secondaryArc.Stroke;
+            var normalCrest = crest.Stroke;
+            var normalFrame = vesselFrame.BorderBrush;
+
+            skin.Render(CreateState(20, 9));
+
+            AssertPrimaryWarning(
+                liquidBody.Fill,
+                backWave.Fill,
+                frontWave.Fill,
+                percentText.Foreground);
+            Assert.Same(QuotaAlertPalette.CriticalBrush, secondaryArc.Stroke);
+            AssertEquivalentBrush(normalCrest, crest.Stroke);
+            AssertEquivalentBrush(normalFrame, vesselFrame.BorderBrush);
+
+            skin.Render(CreateState(9, 20));
+
+            AssertPrimaryCritical(
+                liquidBody.Fill,
+                backWave.Fill,
+                frontWave.Fill,
+                percentText.Foreground);
+            Assert.Same(QuotaAlertPalette.WarningBrush, secondaryArc.Stroke);
+            AssertEquivalentBrush(normalCrest, crest.Stroke);
+            AssertEquivalentBrush(normalFrame, vesselFrame.BorderBrush);
+
+            skin.Render(CreateState(75, 80));
+
+            AssertEquivalentBrush(normalLiquid, liquidBody.Fill);
+            AssertEquivalentBrush(normalBackWave, backWave.Fill);
+            AssertEquivalentBrush(normalFrontWave, frontWave.Fill);
+            AssertEquivalentBrush(normalPercent, percentText.Foreground);
+            AssertEquivalentBrush(normalSecondary, secondaryArc.Stroke);
+        });
+
+    private static QuotaSkinState CreateState(double primary, double secondary) =>
+        new(
+            primary,
+            secondary,
+            "5 hours",
+            QuotaDisplayMode.Dual,
+            IsRefreshing: false,
+            AnimationsEnabled: true);
+
+    private static void AssertPrimaryWarning(params Brush?[] brushes) =>
+        Assert.All(
+            brushes,
+            brush => Assert.Same(QuotaAlertPalette.WarningBrush, brush));
+
+    private static void AssertPrimaryCritical(params Brush?[] brushes) =>
+        Assert.All(
+            brushes,
+            brush => Assert.Same(QuotaAlertPalette.CriticalBrush, brush));
+
+    private static void AssertEquivalentBrush(Brush? expected, Brush? actual)
+    {
+        Assert.NotNull(expected);
+        Assert.NotNull(actual);
+        Assert.Equal(expected.ToString(), actual.ToString());
+    }
+
     [Theory]
     [InlineData(0, 96)]
     [InlineData(25, 72)]
