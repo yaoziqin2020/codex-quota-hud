@@ -1,5 +1,19 @@
 # AI Change Log
 
+## 2026-08-01 — Public v1.1.0 release
+
+- Finalized the bilingual README and release notes to match the shipped
+  startup-plus-Developer-Preview shortcut behavior and `387/387` test baseline.
+- Created and pushed annotated tag `v1.1.0` at `205e7e5`, then published the
+  non-draft, non-prerelease GitHub Release as latest.
+- Uploaded `CodexQuotaHud-Setup-v1.1.0.exe`,
+  `CodexQuotaHud-v1.1.0-win-x64.zip`, and `SHA256SUMS.txt`. GitHub-reported
+  sizes and SHA-256 digests match the local final assets.
+- Installed the published Setup locally with exit code `0`. The installed
+  executable reports `1.1.0+205e7e5...`, matches the published binary hash,
+  retains formal `--background` startup, and keeps the desktop shortcut on
+  `--preview`.
+
 ## 2026-07-31 — Final installer shortcut and uninstall acceptance
 
 - Changed the release Setup default to current-user startup plus a Developer

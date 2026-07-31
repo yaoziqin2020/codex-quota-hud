@@ -1,16 +1,16 @@
 # Current Task
 
-## v1.1.0 installer release candidate — locally accepted
+## v1.1.0 — released
 
-The installer implementation is committed on the feature branch at `1f15100`.
+The installer implementation is published from tag commit `205e7e5`.
 Fresh Release verification passed Core `55/55`, App/UI `332/332`, total
 `387/387`; `dotnet build` reported `0` warnings and `0` errors. Final packaging
 produced:
 
-- `CodexQuotaHud-Setup-v1.1.0.exe` — 50,882,622 bytes, SHA-256
-  `2fe3877974a3ee24904b0c63f858e4f94eb61d3bbb0768cbbd951963fed3266c`
-- `CodexQuotaHud-v1.1.0-win-x64.zip` — 68,202,656 bytes, SHA-256
-  `c6d563813ffc26a18a4fac1d82637db1cebf60c930aaf240defb93c31617544a`
+- `CodexQuotaHud-Setup-v1.1.0.exe` — 50,884,027 bytes, SHA-256
+  `9704080b7136273ac182bdb9a816553ebda62438e2efe1b7f3e639417c76b1cf`
+- `CodexQuotaHud-v1.1.0-win-x64.zip` — 68,202,697 bytes, SHA-256
+  `9b8e64d7b8d14cd6fdc3d0321b04d3299873e39051bb9aef39a62ce01f2e5594`
 
 The production Setup contains no internal smoke hooks. A separately compiled
 temporary Setup passed clean install, upgrade/task replacement, default
@@ -22,16 +22,19 @@ modes. The final Setup installed with exit code `0`; installed and published
 executable hashes match. Startup runs the formal HUD with `--background`. The
 desktop contains only `Codex Quota HUD 开发预览` with `--preview`; the legacy
 normal desktop link is absent. The normal Start-menu entry remains. Both
-settings files retained their pre-install hashes. No tag, upload, push, or
-GitHub Release update has been performed.
+uninstall modes and settings preservation passed real acceptance. The final published
+Setup was installed again with exit code `0`; the installed executable version
+is `1.1.0+205e7e5...` and its hash matches the published binary.
+
+GitHub Release `v1.1.0` is public, marked latest, and is neither a draft nor a
+prerelease. Setup, ZIP, and `SHA256SUMS.txt` are uploaded and their online sizes
+and SHA-256 digests match the local release assets.
 
 ## Status
 
-Version `1.0.0` is released. The isolated developer preview and the symmetric
-installed/preview handoff are included in the locally installed `v1.1.0`
-candidate. Installer implementation and local acceptance are complete on
-`feat/inno-setup-installer-20260731`; branch integration, push, tag, asset
-upload, and GitHub Release publication remain.
+Version `1.1.0` is released. The implementation is integrated into `main`, tag
+`v1.1.0` is pushed, the GitHub Release and all three assets are public, and the
+published Setup is installed locally. No release action remains.
 
 ## Last completed work
 
@@ -88,13 +91,12 @@ settings, or refresh behavior was introduced.
 For optional GUI acceptance, start the installed normal HUD, then launch the
 desktop `Codex Quota HUD 开发预览` shortcut and confirm the normal HUD exits
 before preview opens. Click `退出预览并打开正式版` and confirm preview closes
-before exactly one installed HUD returns. The installed `v1.1.0` candidate is
+before exactly one installed HUD returns. The installed `v1.1.0` release is
 listener-enabled, so this now exercises graceful signalling rather than the
-legacy fallback. Record commit `1f15100` and the final Setup hash above.
+legacy fallback. Record tag commit `205e7e5` and the final Setup hash above.
 
-If the user decides to publish `v1.1.0`, review the feature branch and final
-assets, then explicitly authorize push, tag creation, asset upload, and GitHub
-Release publication. Do not infer that authorization from local acceptance.
+Future work should start from user feedback or the optional GUI checks above;
+do not reopen the completed installer release unless a concrete issue appears.
 
 ## Manual checks for future UI changes
 
