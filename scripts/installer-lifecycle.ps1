@@ -3,7 +3,10 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet(
         'PrepareInstall',
+        'SnapshotLegacyState',
         'CommitInstall',
+        'DiscardLegacyState',
+        'CompensateLegacyInstall',
         'RollbackInstall',
         'PrepareUninstall',
         'PurgeSettings')]
@@ -12,12 +15,17 @@ param(
     [string] $InstallPath,
     [string] $LocalAppDataRoot,
     [string] $LegacyBackupPath,
+    [string] $LegacyShellStatePath,
     [switch] $InternalTestMode,
     [string] $InternalProcessSnapshotPath,
     [string] $InternalActionLogPath,
     [switch] $InternalSkipShutdownSignal,
     [int] $InternalRollbackCopyFailureAfterItemCount,
-    [string] $InternalPrepareBackupFailureReparseTargetPath
+    [string] $InternalPrepareBackupFailureReparseTargetPath,
+    [string] $InternalShellRootPath,
+    [switch] $InternalCurrentRunValueExists,
+    [AllowEmptyString()]
+    [string] $InternalCurrentRunValue
 )
 
 Set-StrictMode -Version Latest
@@ -27,6 +35,7 @@ $script:TestActions = [System.Collections.ArrayList]::new()
 $script:ValidatedInternalProcessSnapshotPath = $null
 $script:ValidatedInternalActionLogPath = $null
 $script:ValidatedBackupFailureTarget = $null
+$script:ValidatedInternalShellRootPath = $null
 
 function Get-NormalizedPath {
     param([Parameter(Mandatory = $true)][string] $Path)
@@ -274,6 +283,40 @@ function Get-ValidatedLegacyBackupTarget {
     }
     catch {
         throw 'Legacy backup suffix must be a GUID.'
+    }
+
+    Assert-NoReparsePointTree -Path $target -Boundary $localRoot
+    Assert-ResolvedPathEqualsExpected -Path $target
+    return $target
+}
+
+function Get-ValidatedLegacyShellStateTarget {
+    param(
+        [Parameter(Mandatory = $true)][string] $StatePath,
+        [Parameter(Mandatory = $true)][string] $LocalAppDataRoot)
+
+    $localRoot = Get-NormalizedPath $LocalAppDataRoot
+    $programs = Get-NormalizedPath (Join-Path $localRoot 'Programs')
+    $target = Get-NormalizedPath $StatePath
+    $parent = Get-NormalizedPath (Split-Path -Path $target -Parent)
+    if (-not (Test-PathEquals $parent $programs)) {
+        throw "Legacy shell state must stay directly under Programs: $programs"
+    }
+
+    $prefix = 'CodexQuotaHud.legacy-shell-state.'
+    $leaf = Split-Path -Path $target -Leaf
+    if (-not $leaf.StartsWith(
+            $prefix,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Legacy shell state must use the exact $prefix prefix."
+    }
+
+    $suffix = $leaf.Substring($prefix.Length)
+    try {
+        [void][Guid]::Parse($suffix)
+    }
+    catch {
+        throw 'Legacy shell state suffix must be a GUID.'
     }
 
     Assert-NoReparsePointTree -Path $target -Boundary $localRoot
@@ -612,6 +655,336 @@ function Remove-LegacyInstallBackup {
             Destination = $BackupPath
         }
     }
+}
+
+function Get-ManagedShellPaths {
+    if ($InternalTestMode) {
+        $desktop = Join-Path $script:ValidatedInternalShellRootPath 'Desktop'
+        $programs = Join-Path `
+            $script:ValidatedInternalShellRootPath `
+            'StartMenu\Programs'
+    }
+    else {
+        $desktop = [Environment]::GetFolderPath(
+            [Environment+SpecialFolder]::DesktopDirectory)
+        $programs = Join-Path `
+            ([Environment]::GetFolderPath(
+                [Environment+SpecialFolder]::ApplicationData)) `
+            'Microsoft\Windows\Start Menu\Programs'
+    }
+
+    # Windows PowerShell 5 treats UTF-8 scripts without a BOM as ANSI. Build
+    # the localized filename from code points so the helper remains portable.
+    $previewSuffix = -join @(
+        [char]0x5F00,
+        [char]0x53D1,
+        [char]0x9884,
+        [char]0x89C8)
+
+    return [pscustomobject]@{
+        NormalDesktop = Join-Path $desktop 'Codex Quota HUD.lnk'
+        PreviewDesktop = Join-Path `
+            $desktop `
+            ("Codex Quota HUD $previewSuffix.lnk")
+        StartMenu = Join-Path $programs 'Codex Quota HUD.lnk'
+    }
+}
+
+function Get-CurrentStartupRunState {
+    if ($InternalTestMode) {
+        return [pscustomobject]@{
+            Exists = [bool]$InternalCurrentRunValueExists
+            Value = if ($InternalCurrentRunValueExists) {
+                [string]$InternalCurrentRunValue
+            }
+            else {
+                $null
+            }
+        }
+    }
+
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey(
+        'Software\Microsoft\Windows\CurrentVersion\Run',
+        $false)
+    if ($null -eq $key) {
+        return [pscustomobject]@{ Exists = $false; Value = $null }
+    }
+
+    try {
+        $exists = @($key.GetValueNames()) -contains 'CodexQuotaHud'
+        $value = if ($exists) {
+            [string]$key.GetValue(
+                'CodexQuotaHud',
+                $null,
+                [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        }
+        else {
+            $null
+        }
+        return [pscustomobject]@{ Exists = $exists; Value = $value }
+    }
+    finally {
+        $key.Dispose()
+    }
+}
+
+function Assert-SnapshotSourceFileSafe {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.PSIsContainer -or
+        ($item.Attributes -band
+            [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Legacy shell snapshot source must be a regular file: $Path"
+    }
+}
+
+function Snapshot-LegacyShellState {
+    param([Parameter(Mandatory = $true)][string] $StatePath)
+
+    if (Test-Path -LiteralPath $StatePath) {
+        throw "Legacy shell state already exists: $StatePath"
+    }
+
+    $shell = Get-ManagedShellPaths
+    $run = Get-CurrentStartupRunState
+    $entries = @(
+        [pscustomobject]@{
+            Property = 'NormalDesktopExists'
+            Source = $shell.NormalDesktop
+            Backup = 'NormalDesktop.lnk'
+        },
+        [pscustomobject]@{
+            Property = 'PreviewDesktopExists'
+            Source = $shell.PreviewDesktop
+            Backup = 'PreviewDesktop.lnk'
+        },
+        [pscustomobject]@{
+            Property = 'StartMenuExists'
+            Source = $shell.StartMenu
+            Backup = 'StartMenu.lnk'
+        }
+    )
+
+    try {
+        New-Item -ItemType Directory -Path $StatePath | Out-Null
+        $manifest = [ordered]@{
+            Version = 1
+            RunValueExists = [bool]$run.Exists
+            RunValue = $run.Value
+        }
+        foreach ($entry in $entries) {
+            $exists = Test-Path -LiteralPath $entry.Source -PathType Leaf
+            $manifest[$entry.Property] = [bool]$exists
+            if ($exists) {
+                Assert-SnapshotSourceFileSafe -Path $entry.Source
+                Copy-Item `
+                    -LiteralPath $entry.Source `
+                    -Destination (Join-Path $StatePath $entry.Backup)
+            }
+        }
+
+        $json = ConvertTo-Json -InputObject $manifest -Compress
+        [System.IO.File]::WriteAllText(
+            (Join-Path $StatePath 'CodexQuotaHud.LegacyShellState.json'),
+            $json,
+            [System.Text.UTF8Encoding]::new($false))
+    }
+    catch {
+        if (Test-Path -LiteralPath $StatePath) {
+            Remove-DirectoryTreeWithoutFollowingReparsePoints `
+                -Path $StatePath `
+                -Boundary (Split-Path -Path $StatePath -Parent)
+        }
+        throw
+    }
+
+    if ($InternalTestMode) {
+        Add-TestAction -Action 'SnapshotLegacyState' -Properties @{
+            Destination = $StatePath
+        }
+    }
+}
+
+function Remove-ExactStartupRunValue {
+    if ($InternalTestMode) {
+        Add-TestAction -Action 'RemoveRunValue' -Properties @{
+            Name = 'CodexQuotaHud'
+        }
+        return
+    }
+
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey(
+        'Software\Microsoft\Windows\CurrentVersion\Run',
+        $true)
+    if ($null -eq $key) {
+        return
+    }
+
+    try {
+        $key.DeleteValue('CodexQuotaHud', $false)
+    }
+    finally {
+        $key.Dispose()
+    }
+}
+
+function Set-ExactStartupRunValue {
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string] $Value)
+
+    if ($InternalTestMode) {
+        Add-TestAction -Action 'SetRunValue' -Properties @{
+            Name = 'CodexQuotaHud'
+            Value = $Value
+        }
+        return
+    }
+
+    $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey(
+        'Software\Microsoft\Windows\CurrentVersion\Run')
+    try {
+        $key.SetValue(
+            'CodexQuotaHud',
+            $Value,
+            [Microsoft.Win32.RegistryValueKind]::String)
+    }
+    finally {
+        $key.Dispose()
+    }
+}
+
+function Remove-ExactNewUninstallRegistration {
+    $name = '{7F6E38C7-5928-4A18-9C9B-9B6D9B90D314}_is1'
+    if ($InternalTestMode) {
+        Add-TestAction -Action 'RemoveUninstallKey' -Properties @{
+            Name = $name
+        }
+        return
+    }
+
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree(
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\$name",
+        $false)
+}
+
+function Remove-ExactNewUninstallerFiles {
+    param([Parameter(Mandatory = $true)][string] $InstallPath)
+
+    if (-not (Test-Path -LiteralPath $InstallPath -PathType Container)) {
+        return
+    }
+
+    foreach ($file in @(Get-ChildItem -LiteralPath $InstallPath -File -Force)) {
+        if ($file.Name -match '^unins\d{3}\.(exe|dat|msg)$') {
+            Remove-Item -LiteralPath $file.FullName -Force
+            if ($InternalTestMode) {
+                Add-TestAction -Action 'RemoveUninstallerFile' -Properties @{
+                    Destination = $file.FullName
+                }
+            }
+        }
+    }
+}
+
+function Restore-ManagedShortcut {
+    param(
+        [Parameter(Mandatory = $true)][bool] $Existed,
+        [Parameter(Mandatory = $true)][string] $BackupPath,
+        [Parameter(Mandatory = $true)][string] $Destination)
+
+    if (-not $Existed) {
+        if ($InternalTestMode) {
+            Add-TestAction -Action 'RemoveManagedShortcut' -Properties @{
+                Destination = $Destination
+            }
+        }
+        if (Test-Path -LiteralPath $Destination) {
+            Remove-Item -LiteralPath $Destination -Force
+        }
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $BackupPath -PathType Leaf)) {
+        throw "Legacy shell shortcut backup is missing: $BackupPath"
+    }
+    Assert-SnapshotSourceFileSafe -Path $BackupPath
+    $parent = Split-Path -Path $Destination -Parent
+    if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    Copy-Item -LiteralPath $BackupPath -Destination $Destination -Force
+}
+
+function Compensate-LegacyInstall {
+    param(
+        [Parameter(Mandatory = $true)][string] $InstallPath,
+        [Parameter(Mandatory = $true)][string] $StatePath)
+
+    if (-not (Test-Path -LiteralPath $StatePath)) {
+        return
+    }
+
+    Assert-NoReparsePointTree `
+        -Path $StatePath `
+        -Boundary (Split-Path -Path $StatePath -Parent)
+    $markerPath = Join-Path `
+        $StatePath `
+        'CodexQuotaHud.LegacyShellState.json'
+    if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+        throw "Legacy shell state marker is missing: $markerPath"
+    }
+    $marker = Get-Content -LiteralPath $markerPath -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+    if ([int]$marker.Version -ne 1) {
+        throw 'Legacy shell state marker version is invalid.'
+    }
+
+    $shell = Get-ManagedShellPaths
+    foreach ($path in @(
+        $shell.NormalDesktop,
+        $shell.PreviewDesktop,
+        $shell.StartMenu)) {
+        if (Test-Path -LiteralPath $path) {
+            Remove-Item -LiteralPath $path -Force
+        }
+    }
+    Remove-ExactStartupRunValue
+
+    Restore-ManagedShortcut `
+        -Existed ([bool]$marker.NormalDesktopExists) `
+        -BackupPath (Join-Path $StatePath 'NormalDesktop.lnk') `
+        -Destination $shell.NormalDesktop
+    Restore-ManagedShortcut `
+        -Existed ([bool]$marker.PreviewDesktopExists) `
+        -BackupPath (Join-Path $StatePath 'PreviewDesktop.lnk') `
+        -Destination $shell.PreviewDesktop
+    Restore-ManagedShortcut `
+        -Existed ([bool]$marker.StartMenuExists) `
+        -BackupPath (Join-Path $StatePath 'StartMenu.lnk') `
+        -Destination $shell.StartMenu
+    if ([bool]$marker.RunValueExists) {
+        Set-ExactStartupRunValue -Value ([string]$marker.RunValue)
+    }
+
+    Remove-ExactNewUninstallRegistration
+    Remove-ExactNewUninstallerFiles -InstallPath $InstallPath
+    Remove-DirectoryTreeWithoutFollowingReparsePoints `
+        -Path $StatePath `
+        -Boundary (Split-Path -Path $StatePath -Parent)
+}
+
+function Discard-LegacyShellState {
+    param([Parameter(Mandatory = $true)][string] $StatePath)
+
+    if (-not (Test-Path -LiteralPath $StatePath)) {
+        return
+    }
+    Assert-NoReparsePointTree `
+        -Path $StatePath `
+        -Boundary (Split-Path -Path $StatePath -Parent)
+    Remove-DirectoryTreeWithoutFollowingReparsePoints `
+        -Path $StatePath `
+        -Boundary (Split-Path -Path $StatePath -Parent)
 }
 
 function Remove-ValidatedSettingsDirectory {
@@ -977,6 +1350,13 @@ try {
                     -Path $InternalPrepareBackupFailureReparseTargetPath `
                     -TestRoot $testRoot
         }
+
+        if (-not [string]::IsNullOrWhiteSpace($InternalShellRootPath)) {
+            $script:ValidatedInternalShellRootPath =
+                Get-ValidatedInternalDirectoryPath `
+                    -Path $InternalShellRootPath `
+                    -TestRoot $testRoot
+        }
     }
     else {
         if (-not [string]::IsNullOrWhiteSpace($LocalAppDataRoot) -and
@@ -993,7 +1373,10 @@ try {
             $InternalSkipShutdownSignal -or
             $InternalRollbackCopyFailureAfterItemCount -ne 0 -or
             -not [string]::IsNullOrWhiteSpace(
-                $InternalPrepareBackupFailureReparseTargetPath)) {
+                $InternalPrepareBackupFailureReparseTargetPath) -or
+            -not [string]::IsNullOrWhiteSpace($InternalShellRootPath) -or
+            $InternalCurrentRunValueExists -or
+            -not [string]::IsNullOrWhiteSpace($InternalCurrentRunValue)) {
             throw 'Internal lifecycle hooks require -InternalTestMode.'
         }
     }
@@ -1008,6 +1391,26 @@ try {
             -BackupPath $LegacyBackupPath `
             -LocalAppDataRoot $localRoot
     }
+    $shellState = $null
+    if (-not [string]::IsNullOrWhiteSpace($LegacyShellStatePath)) {
+        $shellState = Get-ValidatedLegacyShellStateTarget `
+            -StatePath $LegacyShellStatePath `
+            -LocalAppDataRoot $localRoot
+    }
+
+    if ($Action -in @(
+        'SnapshotLegacyState',
+        'DiscardLegacyState',
+        'CompensateLegacyInstall')) {
+        if ($null -eq $shellState) {
+            throw "$Action requires -LegacyShellStatePath."
+        }
+        if ($InternalTestMode -and
+            [string]::IsNullOrWhiteSpace(
+                $script:ValidatedInternalShellRootPath)) {
+            throw "$Action internal test mode requires -InternalShellRootPath."
+        }
+    }
 
     switch ($Action) {
         'PrepareInstall' {
@@ -1018,6 +1421,9 @@ try {
                     -BackupPath $backup
             }
         }
+        'SnapshotLegacyState' {
+            Snapshot-LegacyShellState -StatePath $shellState
+        }
         'PrepareUninstall' {
             Stop-ExactInstalledInstance -ExecutablePath $executable
         }
@@ -1027,6 +1433,14 @@ try {
                     -InstallPath $target `
                     -BackupPath $backup
             }
+        }
+        'DiscardLegacyState' {
+            Discard-LegacyShellState -StatePath $shellState
+        }
+        'CompensateLegacyInstall' {
+            Compensate-LegacyInstall `
+                -InstallPath $target `
+                -StatePath $shellState
         }
         'RollbackInstall' {
             if ($null -ne $backup) {

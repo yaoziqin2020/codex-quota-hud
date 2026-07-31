@@ -33,6 +33,22 @@ english.PurgeSettingsTask=Also remove personal settings and preview window state
 chinesesimp.PurgeSettingsTask=同时删除个人设置和预览窗口状态
 english.LifecycleFailure=Codex Quota HUD could not be prepared safely.
 chinesesimp.LifecycleFailure=无法安全准备 Codex Quota HUD。
+english.LaunchAfterInstall=Launch Codex Quota HUD
+chinesesimp.LaunchAfterInstall=启动 Codex Quota HUD
+english.GuidCreateFailure=Windows could not create a migration identifier.
+chinesesimp.GuidCreateFailure=Windows 无法创建迁移标识符。
+english.GuidFormatFailure=Windows could not format the migration identifier.
+chinesesimp.GuidFormatFailure=Windows 无法格式化迁移标识符。
+english.PowerShellStartFailure=PowerShell could not start (code %1).
+chinesesimp.PowerShellStartFailure=无法启动 PowerShell（代码 %1）。
+english.LifecycleExitFailure=The lifecycle helper exited with code %1.
+chinesesimp.LifecycleExitFailure=生命周期助手已退出，代码为 %1。
+english.HelperExtractFailure=The lifecycle helper could not be extracted: %1
+chinesesimp.HelperExtractFailure=无法提取生命周期助手：%1
+english.HelperCopyFailure=The lifecycle helper could not be copied from %1 to %2.
+chinesesimp.HelperCopyFailure=无法将生命周期助手从 %1 复制到 %2。
+english.LaunchFailure=Codex Quota HUD could not be launched (code %1).
+chinesesimp.LaunchFailure=无法启动 Codex Quota HUD（代码 %1）。
 
 [Tasks]
 Name: "startup"; Description: "{cm:StartupTask}"; Flags: checkedonce
@@ -52,9 +68,6 @@ Name: "{autodesktop}\Codex Quota HUD 开发预览"; Filename: "{app}\CodexQuotaH
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "CodexQuotaHud"; ValueData: """{app}\CodexQuotaHud.App.exe"" --background"; Tasks: startup; Flags: uninsdeletevalue
 
-[Run]
-Filename: "{app}\CodexQuotaHud.App.exe"; Description: "{cm:LaunchProgram,Codex Quota HUD}"; Flags: nowait postinstall skipifsilent; Check: MayLaunchInstalledApp
-
 [Code]
 const
   RunRegistryKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
@@ -65,8 +78,10 @@ var
   SetupLifecyclePath: String;
   UninstallLifecyclePath: String;
   LegacyBackupPath: String;
+  LegacyShellStatePath: String;
   LegacyPrepared: Boolean;
   InstallCompleted: Boolean;
+  LaunchAfterInstallCheckBox: TNewCheckBox;
   PurgeSettingsCheckBox: TNewCheckBox;
   UninstallPurgeAttempted: Boolean;
 
@@ -86,12 +101,12 @@ var
   GuidString: String;
 begin
   if CoCreateGuid(Guid) <> 0 then
-    RaiseException('Windows could not create a migration identifier.');
+    RaiseException(CustomMessage('GuidCreateFailure'));
 
   SetLength(GuidString, 39);
   GuidLength := StringFromGUID2(Guid, GuidString, 39);
   if GuidLength <> 39 then
-    RaiseException('Windows could not format a migration identifier.');
+    RaiseException(CustomMessage('GuidFormatFailure'));
 
   SetLength(GuidString, GuidLength - 1);
   Result := Copy(GuidString, 2, 36);
@@ -101,6 +116,7 @@ function RunLifecycle(
   const HelperPath: String;
   const Action: String;
   const BackupPath: String;
+  const ShellStatePath: String;
   var ErrorText: String): Boolean;
 var
   Parameters: String;
@@ -111,6 +127,9 @@ begin
     AddQuotes(ExpandConstant('{app}'));
   if BackupPath <> '' then
     Parameters := Parameters + ' -LegacyBackupPath ' + AddQuotes(BackupPath);
+  if ShellStatePath <> '' then
+    Parameters := Parameters + ' -LegacyShellStatePath ' +
+      AddQuotes(ShellStatePath);
 
   Result := Exec(
     ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
@@ -121,15 +140,48 @@ begin
     ResultCode);
   if not Result then
   begin
-    ErrorText := CustomMessage('LifecycleFailure') + ' ' +
-      Format('PowerShell could not start (%d).', [ResultCode]);
+    ErrorText := FmtMessage(
+      CustomMessage('PowerShellStartFailure'), [IntToStr(ResultCode)]);
     exit;
   end;
 
   Result := ResultCode = 0;
   if not Result then
-    ErrorText := CustomMessage('LifecycleFailure') + ' ' +
-      Format('The lifecycle helper exited with code %d.', [ResultCode]);
+    ErrorText := FmtMessage(
+      CustomMessage('LifecycleExitFailure'), [IntToStr(ResultCode)]);
+end;
+
+procedure InitializeWizard();
+begin
+  LaunchAfterInstallCheckBox := TNewCheckBox.Create(WizardForm);
+  LaunchAfterInstallCheckBox.Parent := WizardForm.FinishedPage;
+  LaunchAfterInstallCheckBox.Left := WizardForm.RunList.Left;
+  LaunchAfterInstallCheckBox.Top := WizardForm.RunList.Top;
+  LaunchAfterInstallCheckBox.Width := WizardForm.RunList.Width;
+  LaunchAfterInstallCheckBox.Caption :=
+    CustomMessage('LaunchAfterInstall');
+  LaunchAfterInstallCheckBox.Checked := True;
+end;
+
+procedure LaunchInstalledApp();
+var
+  ResultCode: Integer;
+begin
+  if WizardSilent or (not LaunchAfterInstallCheckBox.Checked) then
+    exit;
+
+  if not Exec(
+    ExpandConstant('{app}\CodexQuotaHud.App.exe'),
+    '',
+    '',
+    SW_SHOWNORMAL,
+    ewNoWait,
+    ResultCode) then
+    MsgBox(
+      FmtMessage(
+        CustomMessage('LaunchFailure'), [IntToStr(ResultCode)]),
+      mbError,
+      MB_OK);
 end;
 
 procedure RemoveManagedSelections();
@@ -144,6 +196,7 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ErrorText: String;
   ExactInstalledExecutable: String;
+  MigrationGuid: String;
   IsLegacyInstall: Boolean;
 begin
   Result := '';
@@ -153,7 +206,8 @@ begin
   try
     ExtractTemporaryFile('installer-lifecycle.ps1');
   except
-    Result := CustomMessage('LifecycleFailure') + ' ' + GetExceptionMessage;
+    Result := FmtMessage(
+      CustomMessage('HelperExtractFailure'), [GetExceptionMessage]);
     exit;
   end;
 
@@ -164,15 +218,23 @@ begin
     FileExists(ExactInstalledExecutable);
 
   LegacyBackupPath := '';
+  LegacyShellStatePath := '';
   if IsLegacyInstall then
+  begin
+    MigrationGuid := NewGuidText();
     LegacyBackupPath := ExpandConstant(
       '{localappdata}\Programs\CodexQuotaHud.legacy-backup.') +
-      NewGuidText();
+      MigrationGuid;
+    LegacyShellStatePath := ExpandConstant(
+      '{localappdata}\Programs\CodexQuotaHud.legacy-shell-state.') +
+      MigrationGuid;
+  end;
 
   if not RunLifecycle(
     SetupLifecyclePath,
     'PrepareInstall',
     LegacyBackupPath,
+    '',
     ErrorText) then
   begin
     Result := ErrorText;
@@ -180,6 +242,17 @@ begin
   end;
 
   LegacyPrepared := IsLegacyInstall;
+  if IsLegacyInstall and (not RunLifecycle(
+    SetupLifecyclePath,
+    'SnapshotLegacyState',
+    '',
+    LegacyShellStatePath,
+    ErrorText)) then
+  begin
+    Result := ErrorText;
+    exit;
+  end;
+
   RemoveManagedSelections();
 end;
 
@@ -193,16 +266,26 @@ begin
       SetupLifecyclePath,
       'CommitInstall',
       LegacyBackupPath,
+      '',
       ErrorText) then
       RaiseException(ErrorText);
 
     InstallCompleted := True;
+    if LegacyPrepared and (not RunLifecycle(
+      SetupLifecyclePath,
+      'DiscardLegacyState',
+      '',
+      LegacyShellStatePath,
+      ErrorText)) then
+      Log('Legacy shell state cleanup failed: ' + ErrorText);
   end;
 end;
 
-function MayLaunchInstalledApp(): Boolean;
+function NextButtonClick(CurPageID: Integer): Boolean;
 begin
-  Result := InstallCompleted;
+  Result := True;
+  if CurPageID = wpFinished then
+    LaunchInstalledApp();
 end;
 
 procedure DeinitializeSetup();
@@ -213,8 +296,17 @@ begin
   begin
     if not RunLifecycle(
       SetupLifecyclePath,
+      'CompensateLegacyInstall',
+      '',
+      LegacyShellStatePath,
+      ErrorText) then
+      Log('Legacy shell compensation failed: ' + ErrorText);
+
+    if not RunLifecycle(
+      SetupLifecyclePath,
       'RollbackInstall',
       LegacyBackupPath,
+      '',
       ErrorText) then
       Log('Legacy migration rollback failed: ' + ErrorText);
   end;
@@ -236,7 +328,9 @@ begin
     True) then
   begin
     MsgBox(
-      CustomMessage('LifecycleFailure') + ' The helper could not be extracted.',
+      FmtMessage(
+        CustomMessage('HelperCopyFailure'), [InstalledHelperPath,
+          UninstallLifecyclePath]),
       mbError,
       MB_OK);
     exit;
@@ -245,6 +339,7 @@ begin
   if not RunLifecycle(
     UninstallLifecyclePath,
     'PrepareUninstall',
+    '',
     '',
     ErrorText) then
   begin
@@ -281,6 +376,7 @@ begin
     if not RunLifecycle(
       UninstallLifecyclePath,
       'PurgeSettings',
+      '',
       '',
       ErrorText) then
       MsgBox(ErrorText, mbError, MB_OK);

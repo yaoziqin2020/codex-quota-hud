@@ -9,6 +9,123 @@ public sealed class InstallerLifecycleTests
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     [Fact]
+    public async Task LegacyCompensation_RestoresExactShellStateAndIsRetrySafe()
+    {
+        using var temp = new TemporaryDirectory();
+        var localAppData = Directory.CreateDirectory(
+            Path.Combine(temp.Path, "LocalAppData")).FullName;
+        var programs = Directory.CreateDirectory(
+            Path.Combine(localAppData, "Programs")).FullName;
+        var installPath = Directory.CreateDirectory(
+            Path.Combine(programs, "CodexQuotaHud")).FullName;
+        var shellRoot = Directory.CreateDirectory(
+            Path.Combine(temp.Path, "Shell")).FullName;
+        var desktop = Directory.CreateDirectory(
+            Path.Combine(shellRoot, "Desktop")).FullName;
+        var startMenu = Directory.CreateDirectory(
+            Path.Combine(shellRoot, "StartMenu", "Programs")).FullName;
+        var normalDesktop = Path.Combine(desktop, "Codex Quota HUD.lnk");
+        var previewDesktop = Path.Combine(
+            desktop, "Codex Quota HUD 开发预览.lnk");
+        var startMenuLink = Path.Combine(startMenu, "Codex Quota HUD.lnk");
+        var unrelatedLink = Path.Combine(desktop, "Keep Me.lnk");
+        await File.WriteAllTextAsync(normalDesktop, "legacy normal");
+        await File.WriteAllTextAsync(startMenuLink, "legacy start menu");
+        await File.WriteAllTextAsync(unrelatedLink, "keep shortcut");
+
+        var shellStatePath = Path.Combine(
+            programs,
+            $"CodexQuotaHud.legacy-shell-state.{Guid.NewGuid():N}");
+        const string oldRunValue =
+            "\"C:\\Legacy\\CodexQuotaHud.App.exe\" --background";
+
+        var snapshot = await RunLifecycleAsync(
+            "SnapshotLegacyState",
+            installPath,
+            localAppData,
+            "-LegacyShellStatePath", shellStatePath,
+            "-InternalShellRootPath", shellRoot,
+            "-InternalCurrentRunValueExists",
+            "-InternalCurrentRunValue", oldRunValue);
+
+        Assert.True(snapshot.ExitCode == 0, snapshot.CombinedOutput);
+        Assert.True(Directory.Exists(shellStatePath));
+        var snapshotManifest = JsonDocument.Parse(
+            await File.ReadAllTextAsync(
+                Path.Combine(
+                    shellStatePath,
+                    "CodexQuotaHud.LegacyShellState.json")));
+        Assert.False(
+            snapshotManifest.RootElement
+                .GetProperty("PreviewDesktopExists")
+                .GetBoolean());
+        Assert.False(
+            File.Exists(Path.Combine(shellStatePath, "PreviewDesktop.lnk")));
+
+        await File.WriteAllTextAsync(normalDesktop, "new normal");
+        await File.WriteAllTextAsync(previewDesktop, "new preview");
+        await File.WriteAllTextAsync(startMenuLink, "new start menu");
+        await File.WriteAllTextAsync(
+            Path.Combine(installPath, "unins000.exe"), "new uninstaller");
+        await File.WriteAllTextAsync(
+            Path.Combine(installPath, "unins000.dat"), "new uninstall log");
+        await File.WriteAllTextAsync(
+            Path.Combine(installPath, "unins000.msg"), "new uninstall messages");
+        await File.WriteAllTextAsync(
+            Path.Combine(installPath, "uninsABC.exe"), "keep lookalike");
+        await File.WriteAllTextAsync(
+            Path.Combine(installPath, "CodexQuotaHud.App.exe"), "new app");
+        var actionLog = Path.Combine(temp.Path, "compensation-actions.json");
+
+        var compensate = await RunLifecycleAsync(
+            "CompensateLegacyInstall",
+            installPath,
+            localAppData,
+            "-LegacyShellStatePath", shellStatePath,
+            "-InternalShellRootPath", shellRoot,
+            "-InternalActionLogPath", actionLog);
+
+        Assert.True(compensate.ExitCode == 0, compensate.CombinedOutput);
+        var actions = await ReadActionsAsync(actionLog);
+        Assert.Equal(
+            previewDesktop,
+            SingleAction(actions, "RemoveManagedShortcut").Destination);
+        Assert.Equal("legacy normal", await File.ReadAllTextAsync(normalDesktop));
+        Assert.False(File.Exists(previewDesktop));
+        Assert.Equal(
+            "legacy start menu", await File.ReadAllTextAsync(startMenuLink));
+        Assert.Equal("keep shortcut", await File.ReadAllTextAsync(unrelatedLink));
+        Assert.False(File.Exists(Path.Combine(installPath, "unins000.exe")));
+        Assert.False(File.Exists(Path.Combine(installPath, "unins000.dat")));
+        Assert.False(File.Exists(Path.Combine(installPath, "unins000.msg")));
+        Assert.True(File.Exists(Path.Combine(installPath, "uninsABC.exe")));
+        Assert.Equal(
+            "new app",
+            await File.ReadAllTextAsync(
+                Path.Combine(installPath, "CodexQuotaHud.App.exe")));
+        Assert.False(Directory.Exists(shellStatePath));
+
+        Assert.Equal(oldRunValue, SingleAction(actions, "SetRunValue").Value);
+        Assert.Equal(
+            "CodexQuotaHud",
+            SingleAction(actions, "RemoveRunValue").Name);
+        Assert.Equal(
+            "{7F6E38C7-5928-4A18-9C9B-9B6D9B90D314}_is1",
+            SingleAction(actions, "RemoveUninstallKey").Name);
+
+        var retry = await RunLifecycleAsync(
+            "CompensateLegacyInstall",
+            installPath,
+            localAppData,
+            "-LegacyShellStatePath", shellStatePath,
+            "-InternalShellRootPath", shellRoot);
+        Assert.True(retry.ExitCode == 0, retry.CombinedOutput);
+        Assert.Equal("legacy normal", await File.ReadAllTextAsync(normalDesktop));
+        Assert.Equal(
+            "legacy start menu", await File.ReadAllTextAsync(startMenuLink));
+    }
+
+    [Fact]
     public async Task PrepareInstall_SignalsThenStopsOnlyExactInstalledProcess()
     {
         using var temp = new TemporaryDirectory();
@@ -1169,7 +1286,9 @@ public sealed class InstallerLifecycleTests
         string? Source,
         string? Destination,
         int? ItemCount,
-        string? ProcessIdentity);
+        string? ProcessIdentity,
+        string? Name,
+        string? Value);
 
     private sealed record ProcessResult(
         int ExitCode,

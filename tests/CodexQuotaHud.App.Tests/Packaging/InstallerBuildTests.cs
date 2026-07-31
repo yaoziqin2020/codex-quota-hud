@@ -107,6 +107,89 @@ public sealed class InstallerBuildTests
         Assert.Contains("Version", result.CombinedOutput, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task BuildInstaller_ProductionRejectsInternalHooks()
+    {
+        using var temp = new TemporaryDirectory();
+
+        var result = await RunPowerShellAsync(
+            BuildScript,
+            "-Version", "1.1.0",
+            "-PublishedPath", CreatePublishedDirectory(temp.Path),
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalCompilerExitCode", "17");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(
+            "Internal installer builder hooks require -InternalTestMode",
+            result.CombinedOutput,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BuildInstaller_ProductionRejectsNoncanonicalOutputPath()
+    {
+        using var temp = new TemporaryDirectory();
+
+        var result = await RunPowerShellAsync(
+            BuildScript,
+            "-Version", "1.1.0",
+            "-PublishedPath", CreatePublishedDirectory(temp.Path),
+            "-OutputPath", Path.Combine(temp.Path, "release"));
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(
+            "Production installer output must be exactly",
+            result.CombinedOutput,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InnoDefinition_LaunchesOnlyAfterCommitAndWiresLegacyCompensation()
+    {
+        var definition = File.ReadAllText(InnoDefinition);
+        var normalized = definition.Replace("\r\n", "\n", StringComparison.Ordinal);
+        var code = normalized[normalized.IndexOf("[Code]", StringComparison.Ordinal)..];
+
+        Assert.DoesNotContain("\n[Run]\n", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("postinstall", normalized, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "LaunchAfterInstallCheckBox.Checked := True",
+            code,
+            StringComparison.Ordinal);
+
+        var commit = code.IndexOf("'CommitInstall'", StringComparison.Ordinal);
+        var launch = code.IndexOf("LaunchInstalledApp();", commit,
+            StringComparison.Ordinal);
+        Assert.True(commit >= 0 && launch > commit);
+        Assert.Contains(
+            "function NextButtonClick(CurPageID: Integer): Boolean;",
+            code,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "if CurPageID = wpFinished then\n    LaunchInstalledApp();",
+            code,
+            StringComparison.Ordinal);
+
+        var snapshot = code.IndexOf("'SnapshotLegacyState'", StringComparison.Ordinal);
+        var removeSelections = code.IndexOf(
+            "RemoveManagedSelections();", snapshot, StringComparison.Ordinal);
+        Assert.True(snapshot >= 0 && removeSelections > snapshot);
+
+        var compensate = code.IndexOf(
+            "'CompensateLegacyInstall'", StringComparison.Ordinal);
+        var rollback = code.IndexOf("'RollbackInstall'", compensate,
+            StringComparison.Ordinal);
+        Assert.True(compensate >= 0 && rollback > compensate);
+
+        Assert.Contains("CustomMessage('GuidCreateFailure')", code,
+            StringComparison.Ordinal);
+        Assert.Contains("CustomMessage('PowerShellStartFailure')", code,
+            StringComparison.Ordinal);
+        Assert.Contains("CustomMessage('HelperCopyFailure')", code,
+            StringComparison.Ordinal);
+    }
+
     private static string CreatePublishedDirectory(string tempRoot)
     {
         var path = Directory.CreateDirectory(
@@ -159,6 +242,9 @@ public sealed class InstallerBuildTests
 
     private static string BuildScript =>
         Path.Combine(RepositoryRoot, "scripts", "build-installer.ps1");
+
+    private static string InnoDefinition =>
+        Path.Combine(RepositoryRoot, "installer", "CodexQuotaHud.iss");
 
     private static async Task<ProcessResult> RunPowerShellAsync(
         string script,
