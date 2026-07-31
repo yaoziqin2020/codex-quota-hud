@@ -1,39 +1,40 @@
 # Current Task
 
-## v1.1.0 — released
+## v1.1.1 — released
 
-The installer implementation is published from tag commit `205e7e5`.
-Fresh Release verification passed Core `55/55`, App/UI `332/332`, total
-`387/387`; `dotnet build` reported `0` warnings and `0` errors. Final packaging
+The ordinary-user installer correction is published from tag commit `6515e7c`.
+Fresh Release verification passed Core `55/55`, App/UI `333/333`, total
+`388/388`; `dotnet build` reported `0` warnings and `0` errors. Final packaging
 produced:
 
-- `CodexQuotaHud-Setup-v1.1.0.exe` — 50,884,027 bytes, SHA-256
-  `9704080b7136273ac182bdb9a816553ebda62438e2efe1b7f3e639417c76b1cf`
-- `CodexQuotaHud-v1.1.0-win-x64.zip` — 68,202,697 bytes, SHA-256
-  `9b8e64d7b8d14cd6fdc3d0321b04d3299873e39051bb9aef39a62ce01f2e5594`
+- `CodexQuotaHud-Setup-v1.1.1.exe` — 50,875,857 bytes, SHA-256
+  `714714fdabdeafa9382ee797bd4aa6ef4ac50172ba4211af784b4c600072bfec`
+- `CodexQuotaHud-v1.1.1-win-x64.zip` — 68,202,621 bytes, SHA-256
+  `8210b0e1f1c490ee0f39c4ed9d8c8dd4d68d5cd261ee56d005df733a184a1bb`
 
 The production Setup contains no internal smoke hooks. A separately compiled
 temporary Setup passed clean install, upgrade/task replacement, default
 settings-preserving uninstall, and explicit purge uninstall, then its isolated
 files and registry values were removed with checked postconditions.
 
-Real-machine acceptance is complete for overwrite install and both uninstall
-modes. The final Setup installed with exit code `0`; installed and published
-executable hashes match. Startup runs the formal HUD with `--background`. The
-desktop contains only `Codex Quota HUD 开发预览` with `--preview`; the legacy
-normal desktop link is absent. The normal Start-menu entry remains. Both
-uninstall modes and settings preservation passed real acceptance. The final published
-Setup was installed again with exit code `0`; the installed executable version
-is `1.1.0+205e7e5...` and its hash matches the published binary.
+Real-machine acceptance is complete. The final Setup installed with exit code
+`0`; installed and published executable hashes match. Startup runs the formal
+HUD with `--background`. Setup's default desktop shortcut launches the real HUD
+without arguments, the Start-menu entry remains formal, the `v1.1.0` Developer
+Preview shortcut is removed, and two existing settings files retained their
+hashes. After that acceptance, the maintainer desktop was separately customized
+to keep only `Codex Quota HUD 开发预览` with `--preview`; this is local state and
+is not created by Setup.
 
-GitHub Release `v1.1.0` is public, marked latest, and is neither a draft nor a
+GitHub Release `v1.1.1` is public, marked latest, and is neither a draft nor a
 prerelease. Setup, ZIP, and `SHA256SUMS.txt` are uploaded and their online sizes
-and SHA-256 digests match the local release assets.
+and SHA-256 digests match the local release assets. The retained `v1.1.0`
+Release is labeled developer-oriented and directs ordinary users to `v1.1.1`.
 
 ## Status
 
-Version `1.1.0` is released. The implementation is integrated into `main`, tag
-`v1.1.0` is pushed, the GitHub Release and all three assets are public, and the
+Version `1.1.1` is released. The implementation is integrated into `main`, tag
+`v1.1.1` is pushed, the GitHub Release and all three assets are public, and the
 published Setup is installed locally. No release action remains.
 
 ## Last completed work
@@ -50,7 +51,7 @@ published Setup is installed locally. No release action remains.
   `55/55`, App/UI `266/266`, total `321/321`, and a zero-warning, zero-error
   Release build. GUI/manual preview acceptance was not authorized or performed.
 - That alert-only change did not itself alter installation, release assets, or
-  remote state; the later installer work described above installed `v1.1.0`
+  remote state; the later installer work described above installed `v1.1.1`
   locally.
 
 - Added `--preview` with a real HUD and separate developer control panel.
@@ -91,9 +92,9 @@ settings, or refresh behavior was introduced.
 For optional GUI acceptance, start the installed normal HUD, then launch the
 desktop `Codex Quota HUD 开发预览` shortcut and confirm the normal HUD exits
 before preview opens. Click `退出预览并打开正式版` and confirm preview closes
-before exactly one installed HUD returns. The installed `v1.1.0` release is
+before exactly one installed HUD returns. The installed `v1.1.1` release is
 listener-enabled, so this now exercises graceful signalling rather than the
-legacy fallback. Record tag commit `205e7e5` and the final Setup hash above.
+legacy fallback. Record tag commit `6515e7c` and the final Setup hash above.
 
 Future work should start from user feedback or the optional GUI checks above;
 do not reopen the completed installer release unless a concrete issue appears.

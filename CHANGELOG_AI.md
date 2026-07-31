@@ -19,6 +19,15 @@
   `--background`, and two existing settings files retained their hashes.
 - Fresh verification passed Core `55/55`, App/UI `333/333`, total `388/388`;
   Release build completed with `0` warnings and `0` errors.
+- Published annotated tag `v1.1.1` at `6515e7c` and made its GitHub Release the
+  latest ordinary-user release. Uploaded Setup, ZIP, and `SHA256SUMS.txt`; all
+  online sizes and digests match the final local assets.
+- Updated the retained `v1.1.0` Release with a prominent developer-oriented
+  warning and a link-forward instruction to install `v1.1.1` or later.
+- Installed the final published build locally. Its version is
+  `1.1.1+6515e7c...` and binary hash matches the published payload. After Setup
+  acceptance, restored the maintainer-only Developer Preview desktop shortcut
+  separately while keeping formal startup and the normal Start-menu entry.
 
 ## 2026-08-01 — Public v1.1.0 release
 

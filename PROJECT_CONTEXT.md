@@ -8,34 +8,38 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
-## v1.1.0 release
+## v1.1.1 release
 
 The primary distribution path is the current-user Inno Setup executable
-`CodexQuotaHud-Setup-v1.1.0.exe`; ZIP plus its PowerShell script is fallback
+`CodexQuotaHud-Setup-v1.1.1.exe`; ZIP plus its PowerShell script is fallback
 only, and GitHub Packages is unused. Setup offers English/Simplified Chinese,
-requires no administrator permission, and selects startup plus the Developer
-Preview desktop shortcut by default. It does not create a normal-HUD desktop
-shortcut; the normal HUD starts in the background at sign-in and remains
-available from the Start menu. ZIP users can also run the executable with
-`--preview`.
-It directly upgrades `v1.0.0` while preserving settings by default. Uninstall
-preserves settings unless the user explicitly opts in to purge the exact
-`%LOCALAPPDATA%\\CodexQuotaHud` directory.
+requires no administrator permission, and selects startup plus creation of the
+normal desktop shortcut by default. Desktop and Start-menu shortcuts launch
+the real HUD without `--preview`. Setup contains no Developer Preview entry;
+ZIP and source users retain explicit `--preview` access.
+
+It directly upgrades `v1.0.0` and `v1.1.0`, removes the Developer Preview
+desktop shortcut created by `v1.1.0`, and preserves settings by default.
+Uninstall preserves settings unless the user explicitly opts in to purge the
+exact `%LOCALAPPDATA%\\CodexQuotaHud` directory. The retained `v1.1.0` Release
+is explicitly labeled developer-oriented and directs ordinary users to
+`v1.1.1` or later.
 
 The Setup is unsigned, so SmartScreen may report an unknown publisher; verify
-SHA-256 before running it. Published assets are Setup 50,884,027 bytes /
-`9704080b7136273ac182bdb9a816553ebda62438e2efe1b7f3e639417c76b1cf`
-and ZIP 68,202,697 bytes /
-`9b8e64d7b8d14cd6fdc3d0321b04d3299873e39051bb9aef39a62ce01f2e5594`.
+SHA-256 before running it. Published assets are Setup 50,875,857 bytes /
+`714714fdabdeafa9382ee797bd4aa6ef4ac50172ba4211af784b4c600072bfec`
+and ZIP 68,202,621 bytes /
+`8210b0e1f1c490ee0f39c4ed9d8c8dd4d68d5cd261ee56d005df733a184a1bb`.
 
 Production assets contain no internal smoke hooks. A temporary, separately
 compiled Setup passed all four isolated smoke scenarios and was cleaned up; it
-is not a release asset. Both real uninstall modes passed. The final Setup from
-commit `1f15100` was installed with exit code `0`; the startup value, preview
-shortcut arguments, installed binary hash, preserved settings, and uninstall
-registration were verified on the real machine. The final published Setup was
-then installed with exit code `0`; its installed binary matches the published
-binary from tag commit `205e7e5`.
+is not a release asset. The final Setup from tag commit `6515e7c` installed
+with exit code `0`; its installed binary matches the published binary, startup
+uses `--background`, the normal desktop shortcut has no arguments, the
+Developer Preview shortcut is absent, and two existing settings files retained
+their hashes. After public-behavior acceptance, the maintainer machine was
+separately customized to keep only a local Developer Preview desktop shortcut;
+that local convenience is not Setup behavior.
 
 ## Product behavior
 
@@ -79,12 +83,12 @@ It does not call a private web endpoint directly.
 - Public source: GitHub `main`
 - Installed executable:
   `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`
-- Release: `v1.1.0`
+- Release: `v1.1.1`
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 
-The real machine currently has the published `v1.1.0` build from tag commit
-`205e7e5`. It includes the installed-mode shutdown listener, so future
+The real machine currently has the published `v1.1.1` build from tag commit
+`6515e7c`. It includes the installed-mode shutdown listener, so future
 two-direction preview handoff acceptance exercises graceful signalling.
 
 Do not treat the old conversation worktree under
