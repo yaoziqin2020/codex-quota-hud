@@ -12,6 +12,7 @@ using ShapePath = System.Windows.Shapes.Path;
 
 namespace CodexQuotaHud.App.Tests.UI;
 
+[Collection(WpfUiCollection.Name)]
 public sealed class QuotaOrbWindowStartupTests
 {
     [Theory]

@@ -24,6 +24,9 @@
   temporary link is removed with checked cleanup. Added a regression test;
   the current source baseline is Core `55/55`, App/UI `333/333`, total
   `388/388`.
+- Put the STA-based WPF UI test classes in one non-parallel xUnit collection.
+  This removes a runner-timing race between concurrently constructed WPF
+  controls that could make an otherwise passing skin test fail intermittently.
 
 ## 2026-07-31 — Final installer shortcut and uninstall acceptance
 

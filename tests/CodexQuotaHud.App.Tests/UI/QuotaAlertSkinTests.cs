@@ -9,6 +9,7 @@ using CodexQuotaHud.Core.Models;
 
 namespace CodexQuotaHud.App.Tests.UI;
 
+[Collection(WpfUiCollection.Name)]
 public sealed class QuotaAlertSkinTests
 {
     [Theory]
