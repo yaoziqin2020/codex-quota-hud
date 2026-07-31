@@ -22,6 +22,7 @@ jobs:
         run: dotnet restore CodexQuotaHud.sln
 
       - name: Test
+        shell: powershell
         run: dotnet test CodexQuotaHud.sln -c Release --no-restore
 
       - name: Build

@@ -13,6 +13,10 @@
   executable reports `1.1.0+205e7e5...`, matches the published binary hash,
   retains formal `--background` startup, and keeps the desktop shortcut on
   `--preview`.
+- Made the GitHub Actions Test step explicitly use Windows PowerShell, matching
+  the installer scripts and later workflow steps. This prevents PowerShell 7's
+  module path from being inherited by nested Windows PowerShell test processes
+  and hiding the built-in `Get-FileHash` command.
 
 ## 2026-07-31 — Final installer shortcut and uninstall acceptance
 
