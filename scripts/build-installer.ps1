@@ -74,6 +74,22 @@ if (-not $InternalTestMode -and
     throw "Production installer output must be exactly: $expectedProductionOutput"
 }
 
+if ($InternalTestMode) {
+    $systemTemp = [System.IO.Path]::GetFullPath(
+        [System.IO.Path]::GetTempPath())
+    if (-not $outputFullPath.StartsWith(
+            $systemTemp,
+            [System.StringComparison]::OrdinalIgnoreCase) -or
+        [string]::Equals(
+            $outputFullPath,
+            $systemTemp,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw (
+            'Internal installer output must be a unique directory inside ' +
+            'the system temporary directory.')
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($InnoCompilerPath)) {
     $compilerCandidates = @(
         'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
@@ -103,6 +119,40 @@ $compilerArguments = @(
     "/O$outputFullPath",
     'installer\CodexQuotaHud.iss'
 )
+
+if ($InternalTestMode) {
+    $internalTestId = [Guid]::NewGuid().ToString('D')
+    $internalTestRoot = Join-Path `
+        $outputFullPath `
+        "isolated-$internalTestId"
+    $compilerArguments = @(
+        $compilerArguments[0..3]
+        "/DInternalTestId=$internalTestId"
+        "/DInternalTestRoot=$internalTestRoot"
+        $compilerArguments[4..($compilerArguments.Count - 1)]
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace(
+        $InternalArgumentCapturePath)) {
+        $captureFullPath = [System.IO.Path]::GetFullPath(
+            $InternalArgumentCapturePath)
+        $captureParent = Split-Path -Path $captureFullPath -Parent
+        if (-not $captureFullPath.StartsWith(
+                $systemTemp,
+                [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Internal argument capture must stay inside system temporary.'
+        }
+
+        New-Item -ItemType Directory -Path $captureParent -Force | Out-Null
+        $captureJson = ConvertTo-Json `
+            -InputObject @($compilerArguments) `
+            -Compress
+        [System.IO.File]::WriteAllText(
+            $captureFullPath,
+            $captureJson,
+            [System.Text.UTF8Encoding]::new($false))
+    }
+}
 
 $oldCapture = $env:CODEX_HUD_INSTALLER_CAPTURE_PATH
 $oldExitCode = $env:CODEX_HUD_INSTALLER_FAKE_EXIT_CODE

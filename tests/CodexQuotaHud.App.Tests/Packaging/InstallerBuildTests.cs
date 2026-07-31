@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace CodexQuotaHud.App.Tests.Packaging;
@@ -7,6 +9,172 @@ namespace CodexQuotaHud.App.Tests.Packaging;
 public sealed class InstallerBuildTests
 {
     private static readonly string RepositoryRoot = FindRepositoryRoot();
+
+    [Fact]
+    public async Task PackageRelease_CreatesSetupZipAndExactChecksums()
+    {
+        using var temp = new TemporaryDirectory();
+        var output = Path.Combine(temp.Path, "release");
+
+        var result = await RunPowerShellAsync(
+            PackageScript,
+            "-Version", "1.1.0",
+            "-OutputPath", output,
+            "-DotNetExecutable", CreateFakeDotNet(temp.Path),
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalTestMode");
+
+        Assert.True(result.ExitCode == 0, result.CombinedOutput);
+        var setup = Path.Combine(output, "CodexQuotaHud-Setup-v1.1.0.exe");
+        var zip = Path.Combine(output, "CodexQuotaHud-v1.1.0-win-x64.zip");
+        var checksums = Path.Combine(output, "SHA256SUMS.txt");
+        Assert.True(File.Exists(setup));
+        Assert.True(File.Exists(zip));
+        Assert.True(File.Exists(checksums));
+
+        var lines = (await File.ReadAllLinesAsync(checksums))
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .ToArray();
+        Assert.Equal(
+            new[]
+            {
+                $"{Sha256(setup)}  CodexQuotaHud-Setup-v1.1.0.exe",
+                $"{Sha256(zip)}  CodexQuotaHud-v1.1.0-win-x64.zip",
+            },
+            lines);
+        Assert.All(lines, line => Assert.Matches(
+            "^[0-9a-f]{64}  CodexQuotaHud-(Setup-v1\\.1\\.0\\.exe|v1\\.1\\.0-win-x64\\.zip)$",
+            line));
+
+        using var archive = ZipFile.OpenRead(zip);
+        var entries = archive.Entries
+            .Select(entry => entry.FullName.Replace('\\', '/'))
+            .ToArray();
+        Assert.Contains(
+            "artifacts/CodexQuotaHud-win-x64/CodexQuotaHud.App.exe",
+            entries);
+        Assert.Contains("scripts/install.ps1", entries);
+        Assert.Contains("scripts/uninstall.ps1", entries);
+        Assert.Contains("README.md", entries);
+        Assert.Contains("LICENSE", entries);
+        Assert.DoesNotContain(
+            entries,
+            entry => entry.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
+                entry.Contains("Setup", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task PackageRelease_CompilerFailureLeavesNoChecksumManifest()
+    {
+        using var temp = new TemporaryDirectory();
+        var output = Path.Combine(temp.Path, "release");
+
+        var result = await RunPowerShellAsync(
+            PackageScript,
+            "-Version", "1.1.0",
+            "-OutputPath", output,
+            "-DotNetExecutable", CreateFakeDotNet(temp.Path),
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalTestMode",
+            "-InternalCompilerExitCode", "17");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("ISCC.exe failed with exit code 17", result.CombinedOutput);
+        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
+    }
+
+    [Fact]
+    public async Task PackageRelease_MissingSetupLeavesNoChecksumManifest()
+    {
+        using var temp = new TemporaryDirectory();
+        var output = Path.Combine(temp.Path, "release");
+
+        var result = await RunPowerShellAsync(
+            PackageScript,
+            "-Version", "1.1.0",
+            "-OutputPath", output,
+            "-DotNetExecutable", CreateFakeDotNet(temp.Path),
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalTestMode",
+            "-InternalSkipFakeSetup");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(
+            "Expected installer was not created",
+            result.CombinedOutput,
+            StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
+    }
+
+    [Fact]
+    public async Task PackageRelease_MissingZipAfterSetupLeavesNoChecksumManifest()
+    {
+        using var temp = new TemporaryDirectory();
+        var output = Path.Combine(temp.Path, "release");
+
+        var result = await RunPowerShellAsync(
+            PackageScript,
+            "-Version", "1.1.0",
+            "-OutputPath", output,
+            "-DotNetExecutable", CreateFakeDotNet(temp.Path),
+            "-InnoCompilerPath", CreateFakeIsccThatDeletesZip(temp.Path),
+            "-InternalTestMode");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.True(File.Exists(
+            Path.Combine(output, "CodexQuotaHud-Setup-v1.1.0.exe")));
+        Assert.False(File.Exists(
+            Path.Combine(output, "CodexQuotaHud-v1.1.0-win-x64.zip")));
+        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
+    }
+
+    [Fact]
+    public async Task TestInstaller_RejectsMissingProductionInstallerBeforeBuild()
+    {
+        using var temp = new TemporaryDirectory();
+        var missing = Path.Combine(temp.Path, "CodexQuotaHud-Setup-v1.1.0.exe");
+
+        var result = await RunPowerShellAsync(
+            TestInstallerScript,
+            "-Version", "1.1.0",
+            "-InstallerPath", missing);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(
+            "Production installer does not exist",
+            result.CombinedOutput,
+            StringComparison.Ordinal);
+        Assert.Empty(Directory.GetFileSystemEntries(temp.Path));
+    }
+
+    [Fact]
+    public async Task TestInstaller_RejectsInstallerFilenameForDifferentVersion()
+    {
+        using var temp = new TemporaryDirectory();
+        var wrongVersion = Path.Combine(
+            temp.Path,
+            "CodexQuotaHud-Setup-v9.9.9.exe");
+        await File.WriteAllTextAsync(wrongVersion, "MZ fake setup");
+
+        var result = await RunPowerShellAsync(
+            TestInstallerScript,
+            "-Version", "1.1.0",
+            "-InstallerPath", wrongVersion);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(
+            "Installer filename must be CodexQuotaHud-Setup-v1.1.0.exe",
+            result.CombinedOutput,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TestInstallerScript_IsAsciiSafeForWindowsPowerShellFive()
+    {
+        var script = File.ReadAllText(TestInstallerScript);
+
+        Assert.DoesNotContain(script, character => character > 0x7f);
+    }
 
     [Fact]
     public async Task BuildInstaller_PassesExactDefinesAndOutputToIscc()
@@ -46,6 +214,58 @@ public sealed class InstallerBuildTests
             arguments);
         Assert.Contains($"/O{Path.GetFullPath(output)}", arguments);
         Assert.Contains(Path.Combine("installer", "CodexQuotaHud.iss"), arguments);
+
+        var internalTestId = GetDefine(arguments, "InternalTestId");
+        Assert.True(Guid.TryParse(internalTestId, out _));
+        var internalTestRoot = GetDefine(arguments, "InternalTestRoot");
+        Assert.StartsWith(
+            Path.GetFullPath(Path.GetTempPath()),
+            Path.GetFullPath(internalTestRoot),
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            internalTestId,
+            internalTestRoot,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BuildInstaller_InternalTestDefinesAreUniquePerBuild()
+    {
+        using var temp = new TemporaryDirectory();
+        var firstCapture = Path.Combine(temp.Path, "first.json");
+        var secondCapture = Path.Combine(temp.Path, "second.json");
+        var published = CreatePublishedDirectory(temp.Path);
+        var fakeIscc = CreateFakeIscc(temp.Path);
+
+        var first = await RunPowerShellAsync(
+            BuildScript,
+            "-Version", "1.1.0",
+            "-PublishedPath", published,
+            "-OutputPath", Path.Combine(temp.Path, "first-release"),
+            "-InnoCompilerPath", fakeIscc,
+            "-InternalTestMode",
+            "-InternalArgumentCapturePath", firstCapture);
+        var second = await RunPowerShellAsync(
+            BuildScript,
+            "-Version", "1.1.0",
+            "-PublishedPath", published,
+            "-OutputPath", Path.Combine(temp.Path, "second-release"),
+            "-InnoCompilerPath", fakeIscc,
+            "-InternalTestMode",
+            "-InternalArgumentCapturePath", secondCapture);
+
+        Assert.True(first.ExitCode == 0, first.CombinedOutput);
+        Assert.True(second.ExitCode == 0, second.CombinedOutput);
+        var firstArguments = JsonSerializer.Deserialize<string[]>(
+            await File.ReadAllTextAsync(firstCapture))!;
+        var secondArguments = JsonSerializer.Deserialize<string[]>(
+            await File.ReadAllTextAsync(secondCapture))!;
+        Assert.NotEqual(
+            GetDefine(firstArguments, "InternalTestId"),
+            GetDefine(secondArguments, "InternalTestId"));
+        Assert.NotEqual(
+            GetDefine(firstArguments, "InternalTestRoot"),
+            GetDefine(secondArguments, "InternalTestRoot"));
     }
 
     [Fact]
@@ -215,6 +435,50 @@ public sealed class InstallerBuildTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void InnoDefinition_InternalBuildRedirectsAllMachineArtifacts()
+    {
+        var definition = File.ReadAllText(InnoDefinition)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        Assert.Contains("#ifdef InternalTestRoot", definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "#define EffectiveAppId \"CQH.Test.\" + InternalTestId",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "DefaultDirName={#InternalTestRoot}\\LocalAppData\\Programs\\CodexQuotaHud",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Name: \"{#InternalTestRoot}\\Shell\\StartMenu\\Programs\\Codex Quota HUD\"",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Name: \"{#InternalTestRoot}\\Shell\\Desktop\\Codex Quota HUD\"",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ValueName: \"CodexQuotaHud.InternalTest.{#InternalTestId}\"",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\CQH.Test.{#InternalTestId}_is1'",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "' -InternalTestMode -LocalAppDataRoot ' +",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "if (Action = 'SnapshotLegacyState') or",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains("HasCommandLineParameter('/PURGESETTINGS')", definition,
+            StringComparison.Ordinal);
+    }
+
     private static string CreatePublishedDirectory(string tempRoot)
     {
         var path = Directory.CreateDirectory(
@@ -265,8 +529,91 @@ public sealed class InstallerBuildTests
         return path;
     }
 
+    private static string CreateFakeIsccThatDeletesZip(string directory)
+    {
+        var path = Path.Combine(directory, "fake-iscc-delete-zip.ps1");
+        File.WriteAllText(
+            path,
+            """
+            param(
+                [Parameter(ValueFromRemainingArguments = $true)]
+                [string[]] $RemainingArguments
+            )
+
+            $outputArgument = $RemainingArguments |
+                Where-Object { $_.StartsWith('/O') } |
+                Select-Object -First 1
+            $versionArgument = $RemainingArguments |
+                Where-Object { $_.StartsWith('/DAppVersion=') } |
+                Select-Object -First 1
+            $output = $outputArgument.Substring(2)
+            $version = $versionArgument.Substring('/DAppVersion='.Length)
+            New-Item -ItemType Directory -Path $output -Force | Out-Null
+            Set-Content -LiteralPath (
+                Join-Path $output "CodexQuotaHud-Setup-v$version.exe"
+            ) -Value 'MZ fake setup' -Encoding Ascii
+            Remove-Item -LiteralPath (
+                Join-Path $output "CodexQuotaHud-v$version-win-x64.zip"
+            ) -Force -ErrorAction SilentlyContinue
+            """);
+        return path;
+    }
+
+    private static string CreateFakeDotNet(string directory)
+    {
+        var path = Path.Combine(directory, "fake-dotnet.ps1");
+        File.WriteAllText(
+            path,
+            """
+            param(
+                [Parameter(ValueFromRemainingArguments = $true)]
+                [string[]] $RemainingArguments
+            )
+
+            if ($env:CODEX_HUD_CAPTURE_PATH) {
+                $RemainingArguments |
+                    ConvertTo-Json -Compress |
+                    Set-Content -LiteralPath `
+                        $env:CODEX_HUD_CAPTURE_PATH -Encoding UTF8
+            }
+
+            if ($env:CODEX_HUD_FAKE_EXIT_CODE) {
+                exit [int]$env:CODEX_HUD_FAKE_EXIT_CODE
+            }
+
+            if ($env:CODEX_HUD_SKIP_FAKE_EXE -ne '1') {
+                $outputIndex = [Array]::IndexOf($RemainingArguments, '-o')
+                $output = $RemainingArguments[$outputIndex + 1]
+                New-Item -ItemType Directory -Path $output -Force | Out-Null
+                Set-Content -LiteralPath (
+                    Join-Path $output 'CodexQuotaHud.App.exe'
+                ) -Value 'MZ fake app' -Encoding Ascii
+            }
+            """);
+        return path;
+    }
+
+    private static string Sha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+    }
+
+    private static string GetDefine(IEnumerable<string> arguments, string name)
+    {
+        var prefix = $"/D{name}=";
+        return Assert.Single(arguments, argument =>
+            argument.StartsWith(prefix, StringComparison.Ordinal))[prefix.Length..];
+    }
+
     private static string BuildScript =>
         Path.Combine(RepositoryRoot, "scripts", "build-installer.ps1");
+
+    private static string PackageScript =>
+        Path.Combine(RepositoryRoot, "scripts", "package-release.ps1");
+
+    private static string TestInstallerScript =>
+        Path.Combine(RepositoryRoot, "scripts", "test-installer.ps1");
 
     private static string InnoDefinition =>
         Path.Combine(RepositoryRoot, "installer", "CodexQuotaHud.iss");

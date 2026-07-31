@@ -27,6 +27,14 @@ jobs:
       - name: Build
         run: dotnet build CodexQuotaHud.sln -c Release --no-restore
 
-      - name: Publish Windows package
+      - name: Install Inno Setup
         shell: powershell
-        run: .\scripts\publish.ps1
+        run: choco install innosetup --no-progress -y
+
+      - name: Build release candidates
+        shell: powershell
+        run: .\scripts\package-release.ps1 -Version 1.1.0
+
+      - name: Smoke-test isolated installer
+        shell: powershell
+        run: .\scripts\test-installer.ps1 -Version 1.1.0 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.1.0.exe

@@ -1,11 +1,20 @@
 #define StableAppId "{{7F6E38C7-5928-4A18-9C9B-9B6D9B90D314}"
+#ifdef InternalTestRoot
+#define EffectiveAppId "CQH.Test." + InternalTestId
+#else
+#define EffectiveAppId StableAppId
+#endif
 
 [Setup]
-AppId={#StableAppId}
+AppId={#EffectiveAppId}
 AppName=Codex Quota HUD
 AppVersion={#AppVersion}
 AppPublisher=老姚
+#ifdef InternalTestRoot
+DefaultDirName={#InternalTestRoot}\LocalAppData\Programs\CodexQuotaHud
+#else
 DefaultDirName={localappdata}\Programs\CodexQuotaHud
+#endif
 DisableDirPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
@@ -61,18 +70,35 @@ Source: "{#RepositoryRoot}\scripts\installer-lifecycle.ps1"; DestDir: "{app}\scr
 Source: "{#RepositoryRoot}\scripts\installer-lifecycle.ps1"; Flags: dontcopy
 
 [Icons]
+#ifdef InternalTestRoot
+Name: "{#InternalTestRoot}\Shell\StartMenu\Programs\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"
+Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"; Tasks: desktopicon
+Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD 开发预览"; Filename: "{app}\CodexQuotaHud.App.exe"; Parameters: "--preview"; Tasks: previewdesktopicon
+#else
 Name: "{autoprograms}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"
 Name: "{autodesktop}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"; Tasks: desktopicon
 Name: "{autodesktop}\Codex Quota HUD 开发预览"; Filename: "{app}\CodexQuotaHud.App.exe"; Parameters: "--preview"; Tasks: previewdesktopicon
+#endif
 
 [Registry]
+#ifdef InternalTestRoot
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "CodexQuotaHud.InternalTest.{#InternalTestId}"; ValueData: """{app}\CodexQuotaHud.App.exe"" --background"; Tasks: startup; Flags: uninsdeletevalue
+#else
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "CodexQuotaHud"; ValueData: """{app}\CodexQuotaHud.App.exe"" --background"; Tasks: startup; Flags: uninsdeletevalue
+#endif
 
 [Code]
 const
   RunRegistryKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
+#ifdef InternalTestRoot
+  RunRegistryValueName = 'CodexQuotaHud.InternalTest.{#InternalTestId}';
+  UninstallRegistryKey =
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\CQH.Test.{#InternalTestId}_is1';
+#else
+  RunRegistryValueName = 'CodexQuotaHud';
   UninstallRegistryKey =
     'Software\Microsoft\Windows\CurrentVersion\Uninstall\{7F6E38C7-5928-4A18-9C9B-9B6D9B90D314}_is1';
+#endif
 
 var
   SetupLifecyclePath: String;
@@ -130,6 +156,15 @@ begin
   if ShellStatePath <> '' then
     Parameters := Parameters + ' -LegacyShellStatePath ' +
       AddQuotes(ShellStatePath);
+#ifdef InternalTestRoot
+  Parameters := Parameters + ' -InternalTestMode -LocalAppDataRoot ' +
+    AddQuotes('{#InternalTestRoot}\LocalAppData');
+  if (Action = 'SnapshotLegacyState') or
+    (Action = 'DiscardLegacyState') or
+    (Action = 'CompensateLegacyInstall') then
+    Parameters := Parameters + ' -InternalShellRootPath ' +
+      AddQuotes('{#InternalTestRoot}\Shell');
+#endif
 
   Result := Exec(
     ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
@@ -186,10 +221,16 @@ end;
 
 procedure RemoveManagedSelections();
 begin
+#ifdef InternalTestRoot
+  DeleteFile('{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD.lnk');
+  DeleteFile(
+    '{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD 开发预览.lnk');
+#else
   DeleteFile(ExpandConstant('{autodesktop}\Codex Quota HUD.lnk'));
   DeleteFile(ExpandConstant(
     '{autodesktop}\Codex Quota HUD 开发预览.lnk'));
-  RegDeleteValue(HKCU, RunRegistryKey, 'CodexQuotaHud');
+#endif
+  RegDeleteValue(HKCU, RunRegistryKey, RunRegistryValueName);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -212,7 +253,7 @@ begin
   end;
 
   ExactInstalledExecutable := ExpandConstant(
-    '{localappdata}\Programs\CodexQuotaHud\CodexQuotaHud.App.exe');
+    '{app}\CodexQuotaHud.App.exe');
   IsLegacyInstall :=
     (not RegKeyExists(HKCU, UninstallRegistryKey)) and
     FileExists(ExactInstalledExecutable);
@@ -222,11 +263,11 @@ begin
   if IsLegacyInstall then
   begin
     MigrationGuid := NewGuidText();
-    LegacyBackupPath := ExpandConstant(
-      '{localappdata}\Programs\CodexQuotaHud.legacy-backup.') +
+    LegacyBackupPath := ExtractFileDir(ExpandConstant('{app}')) +
+      '\CodexQuotaHud.legacy-backup.' +
       MigrationGuid;
-    LegacyShellStatePath := ExpandConstant(
-      '{localappdata}\Programs\CodexQuotaHud.legacy-shell-state.') +
+    LegacyShellStatePath := ExtractFileDir(ExpandConstant('{app}')) +
+      '\CodexQuotaHud.legacy-shell-state.' +
       MigrationGuid;
   end;
 
@@ -345,6 +386,21 @@ begin
   Result := True;
 end;
 
+function HasCommandLineParameter(const Expected: String): Boolean;
+var
+  Index: Integer;
+begin
+  Result := False;
+  for Index := 1 to ParamCount do
+  begin
+    if CompareText(ParamStr(Index), Expected) = 0 then
+    begin
+      Result := True;
+      exit;
+    end;
+  end;
+end;
+
 procedure InitializeUninstallProgressForm();
 begin
   PurgeSettingsCheckBox := TNewCheckBox.Create(UninstallProgressForm);
@@ -356,7 +412,8 @@ begin
   PurgeSettingsCheckBox.Width :=
     UninstallProgressForm.InnerPage.ClientWidth;
   PurgeSettingsCheckBox.Caption := CustomMessage('PurgeSettingsTask');
-  PurgeSettingsCheckBox.Checked := False;
+  PurgeSettingsCheckBox.Checked :=
+    HasCommandLineParameter('/PURGESETTINGS');
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
