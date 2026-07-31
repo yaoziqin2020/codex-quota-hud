@@ -34,8 +34,8 @@ Name: "chinesesimp"; MessagesFile: "{#ChineseLanguageFile}"
 [CustomMessages]
 english.StartupTask=Start Codex Quota HUD automatically when I sign in
 chinesesimp.StartupTask=登录 Windows 时自动启动 Codex Quota HUD
-english.PreviewDesktopTask=Create a Developer Preview desktop shortcut
-chinesesimp.PreviewDesktopTask=创建“开发预览”桌面快捷方式
+english.DesktopTask=Create a desktop shortcut
+chinesesimp.DesktopTask=创建桌面快捷方式
 english.PurgeSettingsTask=Also remove personal settings and preview window state
 chinesesimp.PurgeSettingsTask=同时删除个人设置和预览窗口状态
 english.UninstallOptionsTitle=Codex Quota HUD uninstall options
@@ -67,7 +67,7 @@ chinesesimp.LaunchFailure=无法启动 Codex Quota HUD（代码 %1）。
 
 [Tasks]
 Name: "startup"; Description: "{cm:StartupTask}"
-Name: "previewdesktopicon"; Description: "{cm:PreviewDesktopTask}"
+Name: "desktopicon"; Description: "{cm:DesktopTask}"
 
 [Files]
 Source: "{#PublishedDir}\CodexQuotaHud.App.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -82,17 +82,17 @@ Source: "{#RepositoryRoot}\scripts\installer-lifecycle-production.ps1"; DestName
 [Icons]
 #ifdef InternalTestRoot
 Name: "{#InternalTestRoot}\Shell\StartMenu\Programs\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"
-Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD 开发预览"; Filename: "{app}\CodexQuotaHud.App.exe"; Parameters: "--preview"; Tasks: previewdesktopicon
+Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"; Tasks: desktopicon
 #else
 Name: "{autoprograms}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"
-Name: "{autodesktop}\Codex Quota HUD 开发预览"; Filename: "{app}\CodexQuotaHud.App.exe"; Parameters: "--preview"; Tasks: previewdesktopicon
+Name: "{autodesktop}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"; Tasks: desktopicon
 #endif
 
 [InstallDelete]
 #ifdef InternalTestRoot
-Type: files; Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD.lnk"
+Type: files; Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD 开发预览.lnk"
 #else
-Type: files; Name: "{autodesktop}\Codex Quota HUD.lnk"
+Type: files; Name: "{autodesktop}\Codex Quota HUD 开发预览.lnk"
 #endif
 
 [Registry]

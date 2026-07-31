@@ -19,10 +19,10 @@ and a numeric tray icon without scraping web pages or storing credentials.
 > This is an independent open-source project and is not an official OpenAI
 > product.
 
-## v1.1.0 installation / 安装
+## v1.1.1 installation / 安装
 
-Primary path: download `CodexQuotaHud-Setup-v1.1.0.exe` and double-click it.
-主要方式：下载 `CodexQuotaHud-Setup-v1.1.0.exe` 后直接双击运行。
+Primary path: download `CodexQuotaHud-Setup-v1.1.1.exe` and double-click it.
+主要方式：下载 `CodexQuotaHud-Setup-v1.1.1.exe` 后直接双击运行。
 
 Setup automatically offers Simplified Chinese or English, installs only for
 the current Windows user, and needs no administrator permission. It installs
@@ -31,22 +31,22 @@ to `%LOCALAPPDATA%\\Programs\\CodexQuotaHud`.
 安装器会自动提供简体中文和英文；它只为当前 Windows 用户安装，不需要管理员权限，安装路径为
 `%LOCALAPPDATA%\\Programs\\CodexQuotaHud`。
 
-The Setup task page contains startup at sign-in and a Developer Preview desktop
-shortcut, both selected by default. The normal HUD has no desktop shortcut; it
-starts in the background at sign-in and remains available from the Start menu.
-ZIP users can also launch preview explicitly with
+The Setup task page contains startup at sign-in and creation of the normal
+desktop shortcut, both selected by default. The desktop and Start-menu
+shortcuts launch the real HUD without `--preview`. Developer Preview is not
+offered by Setup; source and ZIP users can launch it explicitly with
 `CodexQuotaHud.App.exe --preview`.
 
-Setup 的任务页包含开机启动和“开发预览”桌面快捷方式，两项默认勾选。正式 HUD
-不创建桌面快捷方式：它会在登录时后台启动，也可从开始菜单打开。ZIP 用户也可以明确运行
-`CodexQuotaHud.App.exe --preview` 进入预览模式。
+Setup 的任务页包含开机启动和创建正式版桌面快捷方式，两项默认勾选。桌面和开始菜单
+快捷方式均直接启动真实 HUD，不带 `--preview`。Setup 不提供开发预览入口；源码和 ZIP
+用户可明确运行 `CodexQuotaHud.App.exe --preview` 进入预览模式。
 
-Install `v1.1.0` directly over `v1.0.0`; personal HUD settings and Developer
+Install `v1.1.1` directly over `v1.0.0` or `v1.1.0`; personal HUD settings and Developer
 Preview window state are retained by default. Normal uninstall preserves those
 settings. Select the explicit purge option only to remove the exact
 `%LOCALAPPDATA%\\CodexQuotaHud` settings directory.
 
-可从 `v1.0.0` 直接升级，默认保留 HUD 设置和开发预览窗口状态。普通卸载会保留它们；只有明确选择
+可从 `v1.0.0` 或 `v1.1.0` 直接升级，默认保留 HUD 设置和开发预览窗口状态。普通卸载会保留它们；只有明确选择
 清除选项时，才会删除 `%LOCALAPPDATA%\\CodexQuotaHud` 这一准确的设置目录。
 
 The release Setup is unsigned, so Windows SmartScreen may show an
@@ -54,17 +54,17 @@ unknown-publisher warning. Verify its SHA-256 against `SHA256SUMS.txt` before
 running it:
 
 ```powershell
-Get-FileHash .\\CodexQuotaHud-Setup-v1.1.0.exe -Algorithm SHA256
+Get-FileHash .\\CodexQuotaHud-Setup-v1.1.1.exe -Algorithm SHA256
 ```
 
 当前 Setup 未签名，Windows SmartScreen 可能显示未知发布者提示。运行前请使用
 `SHA256SUMS.txt` 和上述命令核对 SHA-256。
 
-If Setup is unavailable, `CodexQuotaHud-v1.1.0-win-x64.zip` plus its bundled
+If Setup is unavailable, `CodexQuotaHud-v1.1.1-win-x64.zip` plus its bundled
 PowerShell script is the fallback. GitHub Packages is not used for this
 application or its release assets.
 
-若 Setup 不可用，`CodexQuotaHud-v1.1.0-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
+若 Setup 不可用，`CodexQuotaHud-v1.1.1-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
 本应用和发布资产均不使用 GitHub Packages。
 
 ![Codex Quota HUD overview](docs/assets/codex-quota-hud-overview.png)
@@ -85,7 +85,7 @@ application or its release assets.
 ## 下载与安装 / Download
 
 从 [最新 Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
-下载 ZIP 后备包 `CodexQuotaHud-v1.1.0-win-x64.zip`，解压后在该目录运行：
+下载 ZIP 后备包 `CodexQuotaHud-v1.1.1-win-x64.zip`，解压后在该目录运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
@@ -208,9 +208,9 @@ dotnet run --project .\src\CodexQuotaHud.App -- --preview
 再启动 `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`。
 未安装正式版时按钮会禁用。
 
-The desktop **Codex Quota HUD Developer Preview** shortcut performs the
-opposite handoff: it closes installed mode before the preview HUD and control
-window open. The installed `v1.1.0` build exits through its normal cleanup
+On the maintainer's machine, a separately created **Codex Quota HUD Developer
+Preview** shortcut performs the opposite handoff: it closes installed mode
+before the preview HUD and control window open. The installed `v1.1.1` build exits through its normal cleanup
 path. Older builds use a fallback only when the running executable resolves to
 the exact standard installation path above; a same-name process at any other
 path is never force-closed. If replacement cannot be completed, the shortcut
@@ -235,7 +235,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1
 生成可发布 ZIP：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.1.0
+powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.1.1
 ```
 
 ## 项目结构 / Project Structure
@@ -265,8 +265,8 @@ dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
 自包含发布检查。
 
-Release verification for `v1.1.0` passed Core `55/55`, App/UI `332/332`, and
-total `387/387`; the Release build completed with zero warnings and zero
+Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and
+total `388/388`; the Release build completed with zero warnings and zero
 errors. Isolated installer smoke coverage passed clean install, upgrade/task
 replacement, default-uninstall-preserve, and purge-uninstall scenarios. Real
 Windows acceptance passed overwrite install, settings preservation, startup

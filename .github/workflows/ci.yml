@@ -34,8 +34,8 @@ jobs:
 
       - name: Build release candidates
         shell: powershell
-        run: .\scripts\package-release.ps1 -Version 1.1.0
+        run: .\scripts\package-release.ps1 -Version 1.1.1
 
       - name: Smoke-test isolated installer
         shell: powershell
-        run: .\scripts\test-installer.ps1 -Version 1.1.0 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.1.0.exe
+        run: .\scripts\test-installer.ps1 -Version 1.1.1 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.1.1.exe

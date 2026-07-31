@@ -773,39 +773,39 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
-    public void InnoDefinition_ProductionCreatesOnlyDeveloperPreviewDesktopShortcut()
+    public void InnoDefinition_ProductionCreatesOnlyNormalDesktopShortcut()
     {
         var definition = File.ReadAllText(InnoDefinition)
             .Replace("\r\n", "\n", StringComparison.Ordinal);
 
         Assert.Contains(
-            "Name: \"previewdesktopicon\"; Description: \"{cm:PreviewDesktopTask}\"\n",
+            "Name: \"desktopicon\"; Description: \"{cm:DesktopTask}\"\n",
             definition,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
-            "Name: \"desktopicon\";",
+            "Name: \"previewdesktopicon\";",
             definition,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Name: \"{autodesktop}\\Codex Quota HUD 开发预览\"; " +
+            "Name: \"{autodesktop}\\Codex Quota HUD\"; " +
             "Filename: \"{app}\\CodexQuotaHud.App.exe\"; " +
-            "Parameters: \"--preview\"; Tasks: previewdesktopicon",
+            "Tasks: desktopicon",
             definition,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
-            "Name: \"{autodesktop}\\Codex Quota HUD\";",
+            "Name: \"{autodesktop}\\Codex Quota HUD 开发预览\";",
             definition,
             StringComparison.Ordinal);
         Assert.Contains("[InstallDelete]", definition,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Type: files; Name: \"{autodesktop}\\Codex Quota HUD.lnk\"",
+            "Type: files; Name: \"{autodesktop}\\Codex Quota HUD 开发预览.lnk\"",
             definition,
             StringComparison.Ordinal);
     }
 
     [Fact]
-    public void InnoDefinition_DefaultsToStartupAndDeveloperPreviewShortcut()
+    public void InnoDefinition_DefaultsToStartupAndNormalDesktopShortcut()
     {
         var definition = File.ReadAllText(InnoDefinition)
             .Replace("\r\n", "\n", StringComparison.Ordinal);
@@ -815,7 +815,7 @@ public sealed class InstallerBuildTests
             definition,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Name: \"previewdesktopicon\"; Description: \"{cm:PreviewDesktopTask}\"\n",
+            "Name: \"desktopicon\"; Description: \"{cm:DesktopTask}\"\n",
             definition,
             StringComparison.Ordinal);
         Assert.DoesNotContain("Flags: unchecked", definition,
@@ -886,9 +886,9 @@ public sealed class InstallerBuildTests
             definition,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Name: \"{#InternalTestRoot}\\Shell\\Desktop\\Codex Quota HUD 开发预览\"; " +
+            "Name: \"{#InternalTestRoot}\\Shell\\Desktop\\Codex Quota HUD\"; " +
             "Filename: \"{app}\\CodexQuotaHud.App.exe\"; " +
-            "Parameters: \"--preview\"; Tasks: previewdesktopicon",
+            "Tasks: desktopicon",
             definition,
             StringComparison.Ordinal);
         Assert.Contains(

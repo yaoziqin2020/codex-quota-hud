@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string] $Version = '1.1.0',
+    [string] $Version = '1.1.1',
     [Parameter(Mandatory = $true)]
     [string] $InstallerPath
 )
@@ -119,10 +119,11 @@ function Assert-Missing {
     }
 }
 
-function Assert-PreviewShortcut {
+function Assert-DesktopShortcut {
     param(
         [Parameter(Mandatory = $true)][string] $ShortcutPath,
-        [Parameter(Mandatory = $true)][string] $ExpectedTarget)
+        [Parameter(Mandatory = $true)][string] $ExpectedTarget,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string] $ExpectedArguments)
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $null
@@ -146,9 +147,9 @@ function Assert-PreviewShortcut {
         if (-not (Test-PathEquals $target $ExpectedTarget) -or
             -not [string]::Equals(
                 $arguments.Trim(),
-                '--preview',
+                $ExpectedArguments,
                 [System.StringComparison]::Ordinal)) {
-            throw 'Preview desktop link has an unexpected target or arguments.'
+            throw 'Desktop link has an unexpected target or arguments.'
         }
         return
     }
@@ -184,11 +185,11 @@ function Assert-PreviewShortcut {
         -not (Test-PathEquals $target $ExpectedTarget) -or
         -not [string]::Equals(
             $arguments.Trim(),
-            '--preview',
+            $ExpectedArguments,
             [System.StringComparison]::Ordinal)) {
-        throw 'Preview desktop link has an unexpected target or arguments.'
+        throw 'Desktop link has an unexpected target or arguments.'
     }
-    Write-Host 'Preview desktop link verified through an ASCII-path copy.'
+    Write-Host 'Desktop link verified through an ASCII-path copy.'
 }
 
 function Invoke-SetupProcess {
@@ -495,6 +496,9 @@ try {
     $startMenu = Join-Path $internalRoot 'Shell\StartMenu\Programs'
     $installedExecutable = Join-Path $install 'CodexQuotaHud.App.exe'
     $normalDesktop = Join-Path $desktop 'Codex Quota HUD.lnk'
+    $previewShortcutName = 'Codex Quota HUD ' +
+        [char]0x5f00 + [char]0x53d1 + [char]0x9884 + [char]0x89c8 + '.lnk'
+    $previewDesktop = Join-Path $desktop $previewShortcutName
     $normalStartMenu = Join-Path $startMenu 'Codex Quota HUD.lnk'
     $runValueName = "CodexQuotaHud.InternalTest.$internalTestId"
     $uninstallRegistryRelativeKey =
@@ -503,6 +507,7 @@ try {
     $uninstallRegistryPath =
         'Registry::HKEY_CURRENT_USER\' + $uninstallRegistryRelativeKey
     [void]$isolatedShortcutPaths.Add($normalDesktop)
+    [void]$isolatedShortcutPaths.Add($previewDesktop)
     [void]$isolatedShortcutPaths.Add($normalStartMenu)
 
     $productionInstall = Join-Path `
@@ -534,17 +539,17 @@ try {
         -LogPath (Join-Path $smokeRoot 'clean-install.log')
     Assert-Exists -Path $installedExecutable -Description 'Installed executable'
     Assert-Exists -Path $normalStartMenu -Description 'Normal Start Menu link'
-    Assert-Missing -Path $normalDesktop -Description 'Normal desktop link'
+    Assert-Exists -Path $normalDesktop -Description 'Normal desktop link'
+    Assert-Missing -Path $previewDesktop -Description 'Developer Preview desktop link'
     $initialDesktopLinks = @(
         Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' -File)
     if ($initialDesktopLinks.Count -ne 1) {
         throw 'Clean install did not create exactly one desktop link.'
     }
-    $previewDesktop = $initialDesktopLinks[0].FullName
-    [void]$isolatedShortcutPaths.Add($previewDesktop)
-    Assert-PreviewShortcut `
-        -ShortcutPath $previewDesktop `
-        -ExpectedTarget $installedExecutable
+    Assert-DesktopShortcut `
+        -ShortcutPath $normalDesktop `
+        -ExpectedTarget $installedExecutable `
+        -ExpectedArguments ''
     $startupValue = Get-ItemPropertyValue `
         -LiteralPath $runRegistryPath `
         -Name $runValueName `
@@ -569,23 +574,23 @@ try {
     [System.IO.File]::WriteAllText($previewMarker, 'preview marker')
     $legacyPdbMarker = Join-Path $install 'CodexQuotaHud.Core.pdb'
     [System.IO.File]::WriteAllText($legacyPdbMarker, 'legacy pdb marker')
-    [System.IO.File]::WriteAllText($normalDesktop, 'legacy normal shortcut')
+    [System.IO.File]::WriteAllText(
+        $previewDesktop,
+        'legacy v1.1.0 preview shortcut')
 
     Invoke-SetupProcess `
         -Path $isolatedInstaller `
         -Arguments (
             '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART ' +
-            '/TASKS="previewdesktopicon"') `
+            '/TASKS="desktopicon"') `
         -Description 'Isolated upgrade' `
         -LogPath (Join-Path $smokeRoot 'upgrade.log')
     Assert-Exists -Path $normalStartMenu -Description 'Normal Start Menu link'
-    Assert-Missing -Path $normalDesktop -Description 'Normal desktop link'
+    Assert-Exists -Path $normalDesktop -Description 'Normal desktop link'
+    Assert-Missing -Path $previewDesktop -Description 'Legacy Developer Preview link'
     $desktopLinksAfterUpgrade = @(
         Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' -File)
-    $previewLinks = @($desktopLinksAfterUpgrade | Where-Object {
-        -not (Test-PathEquals $_.FullName $normalDesktop)
-    })
-    if ($previewLinks.Count -ne 1) {
+    if ($desktopLinksAfterUpgrade.Count -ne 1) {
         Write-Host 'Desktop contents after isolated upgrade:'
         if (Test-Path -LiteralPath $desktop -PathType Container) {
             Get-ChildItem -LiteralPath $desktop -Force |
@@ -600,13 +605,13 @@ try {
             Get-Content -LiteralPath $upgradeLog -Tail 120
         }
         throw (
-            'Expected exactly one non-normal desktop link after upgrade; ' +
-            "found $($previewLinks.Count).")
+            'Expected exactly one normal desktop link after upgrade; ' +
+            "found $($desktopLinksAfterUpgrade.Count).")
     }
-    $previewDesktop = $previewLinks[0].FullName
-    Assert-PreviewShortcut `
-        -ShortcutPath $previewDesktop `
-        -ExpectedTarget $installedExecutable
+    Assert-DesktopShortcut `
+        -ShortcutPath $normalDesktop `
+        -ExpectedTarget $installedExecutable `
+        -ExpectedArguments ''
     if (Get-RegistryValuePresenceChecked `
         -RelativeKey $productionRunRelativeKey `
         -ValueName $runValueName) {

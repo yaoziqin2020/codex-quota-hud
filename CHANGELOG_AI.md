@@ -1,5 +1,25 @@
 # AI Change Log
 
+## 2026-08-01 — v1.1.1 ordinary-user installer correction
+
+- Restored the approved release boundary: public Setup defaults to current-user
+  startup plus the normal `Codex Quota HUD` desktop shortcut. The desktop and
+  Start-menu shortcuts launch the real HUD without `--preview`.
+- Removed Developer Preview from Setup tasks and icons. Upgrade explicitly
+  removes the Developer Preview desktop shortcut created by `v1.1.0`; source
+  and ZIP users retain explicit `CodexQuotaHud.App.exe --preview` access.
+- Added project `AGENTS.md` rules separating maintainer-machine conveniences
+  from public packaging. A later request that appears to reverse an approved
+  product or release contract must be identified and reconfirmed before work.
+- Updated the installer smoke contract to verify clean install, upgrade from
+  the `v1.1.0` shortcut state, settings-preserving uninstall, and purge
+  uninstall. The four isolated scenarios passed and cleaned up their state.
+- Real candidate upgrade passed with exit code `0`: the normal desktop link had
+  no arguments, the Developer Preview link was absent, startup remained
+  `--background`, and two existing settings files retained their hashes.
+- Fresh verification passed Core `55/55`, App/UI `333/333`, total `388/388`;
+  Release build completed with `0` warnings and `0` errors.
+
 ## 2026-08-01 — Public v1.1.0 release
 
 - Finalized the bilingual README and release notes to match the shipped
