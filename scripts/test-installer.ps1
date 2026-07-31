@@ -462,11 +462,32 @@ try {
         -LogPath (Join-Path $smokeRoot 'clean-install.log')
     Assert-Exists -Path $installedExecutable -Description 'Installed executable'
     Assert-Exists -Path $normalStartMenu -Description 'Normal Start Menu link'
-    Assert-Exists -Path $normalDesktop -Description 'Normal desktop link'
+    Assert-Missing -Path $normalDesktop -Description 'Normal desktop link'
     $initialDesktopLinks = @(
         Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' -File)
     if ($initialDesktopLinks.Count -ne 1) {
-        throw 'Preview desktop link unexpectedly exists after clean install.'
+        throw 'Clean install did not create exactly one desktop link.'
+    }
+    $previewDesktop = $initialDesktopLinks[0].FullName
+    [void]$isolatedShortcutPaths.Add($previewDesktop)
+    $shell = New-Object -ComObject WScript.Shell
+    try {
+        $previewShortcut = $shell.CreateShortcut($previewDesktop)
+        if (-not (Test-PathEquals `
+                $previewShortcut.TargetPath `
+                $installedExecutable) -or
+            -not [string]::Equals(
+                $previewShortcut.Arguments.Trim(),
+                '--preview',
+                [System.StringComparison]::Ordinal)) {
+            throw 'Preview desktop link has an unexpected target or arguments.'
+        }
+    }
+    finally {
+        if ($null -ne $shell) {
+            [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject(
+                $shell)
+        }
     }
     $startupValue = Get-ItemPropertyValue `
         -LiteralPath $runRegistryPath `
@@ -490,6 +511,9 @@ try {
     $previewMarker = Join-Path $settings 'preview-window.json'
     [System.IO.File]::WriteAllText($settingsMarker, 'settings marker')
     [System.IO.File]::WriteAllText($previewMarker, 'preview marker')
+    $legacyPdbMarker = Join-Path $install 'CodexQuotaHud.Core.pdb'
+    [System.IO.File]::WriteAllText($legacyPdbMarker, 'legacy pdb marker')
+    [System.IO.File]::WriteAllText($normalDesktop, 'legacy normal shortcut')
 
     Invoke-SetupProcess `
         -Path $isolatedInstaller `
@@ -524,7 +548,6 @@ try {
             "found $($previewLinks.Count).")
     }
     $previewDesktop = $previewLinks[0].FullName
-    [void]$isolatedShortcutPaths.Add($previewDesktop)
     $shell = New-Object -ComObject WScript.Shell
     try {
         $previewShortcut = $shell.CreateShortcut($previewDesktop)

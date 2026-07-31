@@ -758,39 +758,96 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
-    public void InnoDefinition_ProductionOmitsDeveloperPreviewShortcutTask()
+    public void InnoDefinition_ProductionCreatesOnlyDeveloperPreviewDesktopShortcut()
     {
         var definition = File.ReadAllText(InnoDefinition)
             .Replace("\r\n", "\n", StringComparison.Ordinal);
 
-        Assert.Equal(
-            1,
-            definition.Split("\n", StringSplitOptions.None).Count(
-                line => line.StartsWith(
-                    "Name: \"previewdesktopicon\";",
-                    StringComparison.Ordinal)));
         Assert.Contains(
-            "#ifdef InternalTestRoot\n" +
-            "Name: \"previewdesktopicon\"; Description:",
+            "Name: \"previewdesktopicon\"; Description: \"{cm:PreviewDesktopTask}\"\n",
+            definition,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Name: \"desktopicon\";",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Name: \"{autodesktop}\\Codex Quota HUD 开发预览\"; " +
+            "Filename: \"{app}\\CodexQuotaHud.App.exe\"; " +
+            "Parameters: \"--preview\"; Tasks: previewdesktopicon",
+            definition,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Name: \"{autodesktop}\\Codex Quota HUD\";",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains("[InstallDelete]", definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Type: files; Name: \"{autodesktop}\\Codex Quota HUD.lnk\"",
             definition,
             StringComparison.Ordinal);
     }
 
     [Fact]
-    public void InnoDefinition_DefaultTasksRemainSelectedDuringUpgrade()
+    public void InnoDefinition_DefaultsToStartupAndDeveloperPreviewShortcut()
     {
-        var definition = File.ReadAllText(InnoDefinition);
+        var definition = File.ReadAllText(InnoDefinition)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
 
         Assert.Contains(
             "Name: \"startup\"; Description: \"{cm:StartupTask}\"\n",
-            definition.Replace("\r\n", "\n", StringComparison.Ordinal),
+            definition,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Name: \"desktopicon\"; Description: \"{cm:DesktopTask}\"\n",
-            definition.Replace("\r\n", "\n", StringComparison.Ordinal),
+            "Name: \"previewdesktopicon\"; Description: \"{cm:PreviewDesktopTask}\"\n",
+            definition,
             StringComparison.Ordinal);
-        Assert.DoesNotContain("Flags: checkedonce", definition,
+        Assert.DoesNotContain("Flags: unchecked", definition,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InnoDefinition_CollectsPurgeChoiceBeforeConfirmedUninstall()
+    {
+        var definition = File.ReadAllText(InnoDefinition)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        var code = definition[definition.IndexOf(
+            "[Code]", StringComparison.Ordinal)..];
+
+        Assert.Contains("function ShowUninstallOptions(): Boolean;", code,
+            StringComparison.Ordinal);
+        Assert.Contains("CreateCustomForm", code, StringComparison.Ordinal);
+        Assert.Contains(
+            "PurgeSettingsRequested := PurgeSettingsCheckBox.Checked;",
+            code,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "procedure InitializeUninstallProgressForm();",
+            code,
+            StringComparison.Ordinal);
+
+        var initializeStart = code.IndexOf(
+            "function InitializeUninstall(): Boolean;",
+            StringComparison.Ordinal);
+        var initializeEnd = code.IndexOf(
+            "procedure CurUninstallStepChanged",
+            initializeStart,
+            StringComparison.Ordinal);
+        var initialize = code[initializeStart..initializeEnd];
+        Assert.Contains("ShowUninstallOptions()", initialize,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("'PrepareUninstall'", initialize,
+            StringComparison.Ordinal);
+
+        var uninstallSteps = code[initializeEnd..];
+        var confirmed = uninstallSteps.IndexOf(
+            "CurUninstallStep = usUninstall",
+            StringComparison.Ordinal);
+        var prepare = uninstallSteps.IndexOf(
+            "'PrepareUninstall'",
+            StringComparison.Ordinal);
+        Assert.True(confirmed >= 0 && prepare > confirmed);
     }
 
     [Fact]
@@ -814,7 +871,9 @@ public sealed class InstallerBuildTests
             definition,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Name: \"{#InternalTestRoot}\\Shell\\Desktop\\Codex Quota HUD\"",
+            "Name: \"{#InternalTestRoot}\\Shell\\Desktop\\Codex Quota HUD 开发预览\"; " +
+            "Filename: \"{app}\\CodexQuotaHud.App.exe\"; " +
+            "Parameters: \"--preview\"; Tasks: previewdesktopicon",
             definition,
             StringComparison.Ordinal);
         Assert.Contains(

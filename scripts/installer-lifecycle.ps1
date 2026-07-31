@@ -9,6 +9,7 @@ param(
         'CompensateLegacyInstall',
         'RollbackInstall',
         'PrepareUninstall',
+        'FinalizeUninstall',
         'PurgeSettings')]
     [string] $Action,
     [Parameter(Mandatory = $true)]
@@ -1426,6 +1427,11 @@ try {
         }
         'PrepareUninstall' {
             Stop-ExactInstalledInstance -ExecutablePath $executable
+        }
+        'FinalizeUninstall' {
+            Remove-DirectoryTreeWithoutFollowingReparsePoints `
+                -Path $target `
+                -Boundary $localRoot
         }
         'CommitInstall' {
             if ($null -ne $backup) {

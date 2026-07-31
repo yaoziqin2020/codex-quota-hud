@@ -34,14 +34,18 @@ Name: "chinesesimp"; MessagesFile: "{#ChineseLanguageFile}"
 [CustomMessages]
 english.StartupTask=Start Codex Quota HUD automatically when I sign in
 chinesesimp.StartupTask=登录 Windows 时自动启动 Codex Quota HUD
-english.DesktopTask=Create a desktop shortcut
-chinesesimp.DesktopTask=创建桌面快捷方式
-#ifdef InternalTestRoot
 english.PreviewDesktopTask=Create a Developer Preview desktop shortcut
 chinesesimp.PreviewDesktopTask=创建“开发预览”桌面快捷方式
-#endif
 english.PurgeSettingsTask=Also remove personal settings and preview window state
 chinesesimp.PurgeSettingsTask=同时删除个人设置和预览窗口状态
+english.UninstallOptionsTitle=Codex Quota HUD uninstall options
+chinesesimp.UninstallOptionsTitle=Codex Quota HUD 卸载选项
+english.UninstallOptionsText=Choose what to remove, then continue to the final uninstall confirmation.
+chinesesimp.UninstallOptionsText=选择需要删除的内容，然后继续到最终卸载确认。
+english.ContinueUninstall=Continue
+chinesesimp.ContinueUninstall=继续
+english.CancelUninstall=Cancel
+chinesesimp.CancelUninstall=取消
 english.LifecycleFailure=Codex Quota HUD could not be prepared safely.
 chinesesimp.LifecycleFailure=无法安全准备 Codex Quota HUD。
 english.LaunchAfterInstall=Launch Codex Quota HUD
@@ -63,10 +67,7 @@ chinesesimp.LaunchFailure=无法启动 Codex Quota HUD（代码 %1）。
 
 [Tasks]
 Name: "startup"; Description: "{cm:StartupTask}"
-Name: "desktopicon"; Description: "{cm:DesktopTask}"
-#ifdef InternalTestRoot
-Name: "previewdesktopicon"; Description: "{cm:PreviewDesktopTask}"; Flags: unchecked
-#endif
+Name: "previewdesktopicon"; Description: "{cm:PreviewDesktopTask}"
 
 [Files]
 Source: "{#PublishedDir}\CodexQuotaHud.App.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -81,11 +82,17 @@ Source: "{#RepositoryRoot}\scripts\installer-lifecycle-production.ps1"; DestName
 [Icons]
 #ifdef InternalTestRoot
 Name: "{#InternalTestRoot}\Shell\StartMenu\Programs\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"
-Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"; Tasks: desktopicon
 Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD 开发预览"; Filename: "{app}\CodexQuotaHud.App.exe"; Parameters: "--preview"; Tasks: previewdesktopicon
 #else
 Name: "{autoprograms}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"
-Name: "{autodesktop}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"; Tasks: desktopicon
+Name: "{autodesktop}\Codex Quota HUD 开发预览"; Filename: "{app}\CodexQuotaHud.App.exe"; Parameters: "--preview"; Tasks: previewdesktopicon
+#endif
+
+[InstallDelete]
+#ifdef InternalTestRoot
+Type: files; Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD.lnk"
+#else
+Type: files; Name: "{autodesktop}\Codex Quota HUD.lnk"
 #endif
 
 [Registry]
@@ -116,8 +123,10 @@ var
   LegacyPrepared: Boolean;
   InstallCompleted: Boolean;
   LaunchAfterInstallCheckBox: TNewCheckBox;
-  PurgeSettingsCheckBox: TNewCheckBox;
+  PurgeSettingsRequested: Boolean;
+  UninstallPrepareAttempted: Boolean;
   UninstallPurgeAttempted: Boolean;
+  UninstallFinalizeAttempted: Boolean;
 
 function CoCreateGuid(var Guid: TGuid): LongInt;
   external 'CoCreateGuid@ole32.dll stdcall';
@@ -356,12 +365,97 @@ begin
   end;
 end;
 
+function HasCommandLineParameter(const Expected: String): Boolean;
+var
+  Index: Integer;
+begin
+  Result := False;
+  for Index := 1 to ParamCount do
+  begin
+    if CompareText(ParamStr(Index), Expected) = 0 then
+    begin
+      Result := True;
+      exit;
+    end;
+  end;
+end;
+
+function ShowUninstallOptions(): Boolean;
+var
+  OptionsForm: TSetupForm;
+  InfoLabel: TNewStaticText;
+  PurgeSettingsCheckBox: TNewCheckBox;
+  ContinueButton: TNewButton;
+  CancelButton: TNewButton;
+  ButtonWidth: Integer;
+begin
+  OptionsForm := CreateCustomForm(
+    ScaleX(460), ScaleY(150), False, True);
+  try
+    OptionsForm.Caption := CustomMessage('UninstallOptionsTitle');
+
+    InfoLabel := TNewStaticText.Create(OptionsForm);
+    InfoLabel.Parent := OptionsForm;
+    InfoLabel.Left := ScaleX(12);
+    InfoLabel.Top := ScaleY(12);
+    InfoLabel.Width := OptionsForm.ClientWidth - ScaleX(24);
+    InfoLabel.Height := ScaleY(36);
+    InfoLabel.AutoSize := False;
+    InfoLabel.WordWrap := True;
+    InfoLabel.Caption := CustomMessage('UninstallOptionsText');
+
+    PurgeSettingsCheckBox := TNewCheckBox.Create(OptionsForm);
+    PurgeSettingsCheckBox.Parent := OptionsForm;
+    PurgeSettingsCheckBox.Left := ScaleX(12);
+    PurgeSettingsCheckBox.Top := ScaleY(56);
+    PurgeSettingsCheckBox.Width := OptionsForm.ClientWidth - ScaleX(24);
+    PurgeSettingsCheckBox.Caption := CustomMessage('PurgeSettingsTask');
+    PurgeSettingsCheckBox.Checked := PurgeSettingsRequested;
+
+    ContinueButton := TNewButton.Create(OptionsForm);
+    ContinueButton.Parent := OptionsForm;
+    ContinueButton.Caption := CustomMessage('ContinueUninstall');
+    ContinueButton.Top := OptionsForm.ClientHeight - ScaleY(33);
+    ContinueButton.Height := ScaleY(23);
+    ContinueButton.ModalResult := mrOk;
+    ContinueButton.Default := True;
+
+    CancelButton := TNewButton.Create(OptionsForm);
+    CancelButton.Parent := OptionsForm;
+    CancelButton.Caption := CustomMessage('CancelUninstall');
+    CancelButton.Top := ContinueButton.Top;
+    CancelButton.Height := ContinueButton.Height;
+    CancelButton.ModalResult := mrCancel;
+    CancelButton.Cancel := True;
+
+    ButtonWidth := OptionsForm.CalculateButtonWidth([ContinueButton.Caption,
+      CancelButton.Caption]);
+    ContinueButton.Width := ButtonWidth;
+    CancelButton.Width := ButtonWidth;
+    CancelButton.Left := OptionsForm.ClientWidth - ButtonWidth - ScaleX(10);
+    ContinueButton.Left := CancelButton.Left - ButtonWidth - ScaleX(6);
+    OptionsForm.ActiveControl := ContinueButton;
+
+    Result := OptionsForm.ShowModal() = mrOk;
+    if Result then
+      PurgeSettingsRequested := PurgeSettingsCheckBox.Checked;
+  finally
+    OptionsForm.Free();
+  end;
+end;
+
 function InitializeUninstall(): Boolean;
 var
-  ErrorText: String;
   InstalledHelperPath: String;
 begin
   Result := False;
+  PurgeSettingsRequested :=
+    HasCommandLineParameter('/PURGESETTINGS');
+  if (not HasCommandLineParameter('/SILENT')) and
+    (not HasCommandLineParameter('/VERYSILENT')) and
+    (not ShowUninstallOptions()) then
+    exit;
+
   UninstallLifecyclePath := ExpandConstant(
     '{tmp}\installer-lifecycle.' + NewGuidText() + '.ps1');
   InstalledHelperPath := ExpandConstant(
@@ -380,66 +474,52 @@ begin
     exit;
   end;
 
-  if not RunLifecycle(
-    UninstallLifecyclePath,
-    'PrepareUninstall',
-    '',
-    '',
-    ErrorText) then
-  begin
-    MsgBox(ErrorText, mbError, MB_OK);
-    exit;
-  end;
-
   Result := True;
-end;
-
-function HasCommandLineParameter(const Expected: String): Boolean;
-var
-  Index: Integer;
-begin
-  Result := False;
-  for Index := 1 to ParamCount do
-  begin
-    if CompareText(ParamStr(Index), Expected) = 0 then
-    begin
-      Result := True;
-      exit;
-    end;
-  end;
-end;
-
-procedure InitializeUninstallProgressForm();
-begin
-  PurgeSettingsCheckBox := TNewCheckBox.Create(UninstallProgressForm);
-  PurgeSettingsCheckBox.Parent := UninstallProgressForm.InnerPage;
-  PurgeSettingsCheckBox.Left := 0;
-  PurgeSettingsCheckBox.Top :=
-    UninstallProgressForm.ProgressBar.Top +
-    UninstallProgressForm.ProgressBar.Height + ScaleY(16);
-  PurgeSettingsCheckBox.Width :=
-    UninstallProgressForm.InnerPage.ClientWidth;
-  PurgeSettingsCheckBox.Caption := CustomMessage('PurgeSettingsTask');
-  PurgeSettingsCheckBox.Checked :=
-    HasCommandLineParameter('/PURGESETTINGS');
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ErrorText: String;
 begin
-  if (CurUninstallStep = usPostUninstall) and
-    (not UninstallPurgeAttempted) and
-    PurgeSettingsCheckBox.Checked then
+  if (CurUninstallStep = usUninstall) and
+    (not UninstallPrepareAttempted) then
   begin
-    UninstallPurgeAttempted := True;
+    UninstallPrepareAttempted := True;
     if not RunLifecycle(
       UninstallLifecyclePath,
-      'PurgeSettings',
+      'PrepareUninstall',
       '',
       '',
       ErrorText) then
-      MsgBox(ErrorText, mbError, MB_OK);
+      RaiseException(ErrorText);
+  end;
+
+  if CurUninstallStep = usPostUninstall then
+  begin
+    if (not UninstallPurgeAttempted) and
+      PurgeSettingsRequested then
+    begin
+      UninstallPurgeAttempted := True;
+      if not RunLifecycle(
+        UninstallLifecyclePath,
+        'PurgeSettings',
+        '',
+        '',
+        ErrorText) then
+        MsgBox(ErrorText, mbError, MB_OK);
+    end;
+
+    if not UninstallFinalizeAttempted then
+    begin
+      UninstallFinalizeAttempted := True;
+      if not RunLifecycle(
+        UninstallLifecyclePath,
+        'FinalizeUninstall',
+        '',
+        '',
+        ErrorText) then
+        MsgBox(ErrorText, mbError, MB_OK);
+    end;
   end;
 end;
 

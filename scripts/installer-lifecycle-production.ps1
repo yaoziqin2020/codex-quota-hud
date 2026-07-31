@@ -9,6 +9,7 @@ param(
         'CompensateLegacyInstall',
         'RollbackInstall',
         'PrepareUninstall',
+        'FinalizeUninstall',
         'PurgeSettings')]
     [string] $Action,
     [Parameter(Mandatory = $true)]
@@ -452,6 +453,9 @@ switch ($Action) {
         }
     }
     'PrepareUninstall' { Stop-ExactProcess -Executable $executable }
+    'FinalizeUninstall' {
+        Remove-SafeTree -Path $install -Boundary $localRoot
+    }
     'PurgeSettings' {
         $settings = Get-NormalizedPath (Join-Path $localRoot 'CodexQuotaHud')
         if (-not (Test-StrictDescendant $settings $localRoot)) {
