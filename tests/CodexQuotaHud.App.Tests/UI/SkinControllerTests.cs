@@ -1,5 +1,6 @@
 using System.Windows;
 using CodexQuotaHud.App.UI.Animation;
+using CodexQuotaHud.App.UI;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Models;
 
@@ -86,6 +87,29 @@ public sealed class SkinControllerTests
         };
         Assert.Equal(0, dual.PrimaryPercent);
         Assert.Equal(0, dual.SecondaryPercent);
+    }
+
+    [Fact]
+    public void QuotaSkinState_DerivesIndependentAlertLevels()
+    {
+        var dual = new QuotaSkinState(
+            9,
+            75,
+            "5 灏忔椂",
+            QuotaDisplayMode.Dual,
+            IsRefreshing: false,
+            AnimationsEnabled: true);
+
+        Assert.Equal(QuotaAlertLevel.Critical, dual.PrimaryAlert);
+        Assert.Equal(QuotaAlertLevel.Normal, dual.SecondaryAlert);
+
+        var single = dual with
+        {
+            PrimaryPercent = 20,
+            Mode = QuotaDisplayMode.Single
+        };
+        Assert.Equal(QuotaAlertLevel.Warning, single.PrimaryAlert);
+        Assert.Null(single.SecondaryAlert);
     }
 
     [Fact]

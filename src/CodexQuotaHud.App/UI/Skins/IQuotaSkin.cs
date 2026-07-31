@@ -1,4 +1,5 @@
 using System.Windows;
+using CodexQuotaHud.App.UI;
 using CodexQuotaHud.Core.Models;
 
 namespace CodexQuotaHud.App.UI.Skins;
@@ -48,6 +49,14 @@ public sealed record QuotaSkinState
     public bool IsRefreshing { get; init; }
 
     public bool AnimationsEnabled { get; init; }
+
+    public QuotaAlertLevel PrimaryAlert =>
+        QuotaAlertPolicy.Classify(PrimaryPercent);
+
+    public QuotaAlertLevel? SecondaryAlert =>
+        SecondaryPercent is { } percent
+            ? QuotaAlertPolicy.Classify(percent)
+            : null;
 
     private static double Normalize(double value) =>
         double.IsFinite(value) ? Math.Clamp(value, 0, 100) : 0;
