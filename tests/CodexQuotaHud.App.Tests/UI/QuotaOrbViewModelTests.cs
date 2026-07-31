@@ -53,16 +53,22 @@ public sealed class QuotaOrbViewModelTests : IDisposable
         var source = new FakeRefreshController();
         using var viewModel = CreateViewModel(source);
         var snapshot = new QuotaSnapshot(
-            new QuotaWindow(QuotaWindowKind.FiveHour, 61.5, null),
-            new QuotaWindow(QuotaWindowKind.Weekly, 84.4, null),
+            new QuotaWindow(QuotaWindowKind.FiveHour, 20, null),
+            new QuotaWindow(QuotaWindowKind.Weekly, 10, null),
             DateTimeOffset.Parse("2026-07-29T01:00:00Z"));
 
         source.Publish(State(QuotaDisplayState.FromSnapshot(snapshot)));
 
-        Assert.Equal(62, viewModel.PrimaryPercent);
+        Assert.Equal(20, viewModel.PrimaryPercent);
         Assert.Equal("5 小时", viewModel.PrimaryLabel);
-        Assert.Equal(84, viewModel.SecondaryPercent);
+        Assert.Equal(10, viewModel.SecondaryPercent);
         Assert.True(viewModel.HasSecondary);
+        var rows = viewModel.Details;
+        Assert.Equal(20, rows[0].RemainingPercent);
+        Assert.Equal("20%", rows[0].Remaining);
+        Assert.Equal(QuotaAlertLevel.Warning, rows[0].AlertLevel);
+        Assert.Equal(10, rows[1].RemainingPercent);
+        Assert.Equal(QuotaAlertLevel.Critical, rows[1].AlertLevel);
         Assert.Collection(
             viewModel.Details,
             row => Assert.Equal("5 小时", row.Label),
@@ -70,8 +76,8 @@ public sealed class QuotaOrbViewModelTests : IDisposable
         Assert.Equal(QuotaDisplayMode.Dual, viewModel.DisplayMode);
         Assert.Equal(
             new QuotaSkinState(
-                62,
-                84,
+                20,
+                10,
                 "5 小时",
                 QuotaDisplayMode.Dual,
                 IsRefreshing: false,

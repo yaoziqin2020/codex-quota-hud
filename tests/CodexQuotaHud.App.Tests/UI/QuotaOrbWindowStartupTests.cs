@@ -236,6 +236,112 @@ public sealed class QuotaOrbWindowStartupTests
     }
 
     [Fact]
+    public void EdgeHandle_LowQuotaOverridesOnlyAlertAccents()
+    {
+        RunSta(() =>
+        {
+            var refresh = new MutableRefreshController();
+            using var viewModel = new QuotaOrbViewModel(
+                refresh,
+                new InMemorySettingsStore(),
+                new AppSettings { SelectedSkin = SkinId.Aurora },
+                new InlineDispatcher(),
+                () => { });
+            var window = new QuotaOrbWindow(viewModel);
+            var theme = EdgeProgressThemeProvider.Get(SkinId.Aurora);
+            var handle = Assert.IsType<Border>(window.FindName("EdgeHandle"));
+            var track = Assert.IsType<Border>(window.FindName("EdgeProgressTrack"));
+            var outline = Assert.IsType<Border>(window.FindName("EdgeProgressOutline"));
+            var fill = Assert.IsType<Border>(window.FindName("EdgeProgressFill"));
+            var texture = Assert.IsType<Border>(window.FindName("EdgeProgressTexture"));
+            var glow = Assert.IsType<DropShadowEffect>(handle.Effect);
+
+            refresh.Publish(DisplayState(20));
+            window.ApplyEdgeVisualState(
+                EdgeDockSide.Left,
+                collapsed: true,
+                animate: false);
+
+            Assert.Same(QuotaAlertPalette.WarningBrush, fill.Background);
+            Assert.Same(QuotaAlertPalette.WarningBrush, outline.BorderBrush);
+            Assert.Equal(QuotaAlertPalette.WarningMediaColor, glow.Color);
+            Assert.Equal(theme.Track.ToString(), track.Background.ToString());
+            Assert.Equal(theme.Texture.ToString(), texture.Background.ToString());
+            Assert.Equal(theme.TextureOpacity, texture.Opacity);
+            Assert.Equal(theme.GlowOpacity, glow.Opacity);
+
+            refresh.Publish(DisplayState(10));
+
+            Assert.Same(QuotaAlertPalette.CriticalBrush, fill.Background);
+            Assert.Same(QuotaAlertPalette.CriticalBrush, outline.BorderBrush);
+            Assert.Equal(QuotaAlertPalette.CriticalMediaColor, glow.Color);
+            Assert.Equal(theme.Track.ToString(), track.Background.ToString());
+            Assert.Equal(theme.Texture.ToString(), texture.Background.ToString());
+            Assert.Equal(theme.TextureOpacity, texture.Opacity);
+            Assert.Equal(theme.GlowOpacity, glow.Opacity);
+
+            refresh.Publish(DisplayState(75));
+
+            Assert.Equal(theme.Track.ToString(), track.Background.ToString());
+            Assert.Equal(theme.Border.ToString(), outline.BorderBrush.ToString());
+            Assert.Equal(theme.Fill.ToString(), fill.Background.ToString());
+            Assert.Equal(theme.Texture.ToString(), texture.Background.ToString());
+            Assert.Equal(theme.GlowColor, glow.Color);
+            Assert.Equal(theme.TextureOpacity, texture.Opacity);
+            Assert.Equal(theme.GlowOpacity, glow.Opacity);
+
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void DetailRows_UseSharedAlertBrushesAndRestoreSkinAccent()
+    {
+        RunSta(() =>
+        {
+            var refresh = new MutableRefreshController();
+            using var viewModel = new QuotaOrbViewModel(
+                refresh,
+                new InMemorySettingsStore(),
+                new AppSettings { SelectedSkin = SkinId.LiquidTank },
+                new InlineDispatcher(),
+                () => { });
+            var window = new QuotaOrbWindow(viewModel);
+            window.Show();
+            var details = Assert.IsType<ItemsControl>(
+                window.FindName("DetailsItems"));
+            var popup = Assert.IsType<System.Windows.Controls.Primitives.Popup>(
+                window.FindName("DetailsPopup"));
+            popup.IsOpen = true;
+
+            refresh.Publish(DisplayState(20, 10));
+            details.ApplyTemplate();
+            details.UpdateLayout();
+
+            Assert.Same(
+                QuotaAlertPalette.WarningBrush,
+                RemainingText(details, 0).Foreground);
+            Assert.Same(
+                QuotaAlertPalette.CriticalBrush,
+                RemainingText(details, 1).Foreground);
+
+            refresh.Publish(DisplayState(75, 80));
+            details.ApplyTemplate();
+            details.UpdateLayout();
+
+            var theme = PopupThemeProvider.Get(SkinId.LiquidTank);
+            Assert.Equal(
+                theme.Accent.ToString(),
+                RemainingText(details, 0).Foreground.ToString());
+            Assert.Equal(
+                theme.Accent.ToString(),
+                RemainingText(details, 1).Foreground.ToString());
+
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
     public void EnergyRing_UsesAQuietTextGlowAndEllipticalOrbit()
     {
         RunSta(() =>
@@ -298,6 +404,35 @@ public sealed class QuotaOrbWindowStartupTests
         }
     }
 
+    private static TextBlock RemainingText(ItemsControl details, int index)
+    {
+        var presenter = Assert.IsType<ContentPresenter>(
+            details.ItemContainerGenerator.ContainerFromIndex(index));
+        return Assert.IsType<TextBlock>(
+            details.ItemTemplate.FindName("RemainingText", presenter));
+    }
+
+    private static QuotaRefreshState DisplayState(
+        double primary,
+        double? secondary = null)
+    {
+        var fiveHour = new QuotaWindow(
+            QuotaWindowKind.FiveHour,
+            primary,
+            null);
+        var weekly = secondary is null
+            ? null
+            : new QuotaWindow(QuotaWindowKind.Weekly, secondary.Value, null);
+        return new QuotaRefreshState(
+            IsCodexRunning: true,
+            IsRefreshing: false,
+            Display: QuotaDisplayState.FromSnapshot(new QuotaSnapshot(
+                fiveHour,
+                weekly,
+                DateTimeOffset.Parse("2026-07-31T00:00:00Z"))),
+            LastError: null);
+    }
+
     private sealed class InertRefreshController : IQuotaRefreshController
     {
         public event Action<QuotaRefreshState>? StateChanged
@@ -310,6 +445,18 @@ public sealed class QuotaOrbWindowStartupTests
             bool onlyIfStale,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
+    }
+
+    private sealed class MutableRefreshController : IQuotaRefreshController
+    {
+        public event Action<QuotaRefreshState>? StateChanged;
+
+        public Task RefreshNowAsync(
+            bool onlyIfStale,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public void Publish(QuotaRefreshState state) => StateChanged?.Invoke(state);
     }
 
     private sealed class InMemorySettingsStore : ISettingsStore

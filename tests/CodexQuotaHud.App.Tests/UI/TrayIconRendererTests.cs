@@ -1,3 +1,4 @@
+using System.Drawing;
 using CodexQuotaHud.App.UI;
 using CodexQuotaHud.Core.Models;
 
@@ -54,6 +55,38 @@ public sealed class TrayIconRendererTests
             .ToArray();
 
         Assert.Equal(Enum.GetValues<SkinId>().Length, accents.Length);
+    }
+
+    [Theory]
+    [InlineData(20, 0xFF, 0xB5, 0x47)]
+    [InlineData(10, 0xFF, 0x5A, 0x67)]
+    public void CreateState_LowQuotaOverridesOnlyRingAccent(
+        double percent,
+        byte red,
+        byte green,
+        byte blue)
+    {
+        var state = TrayIconRenderer.CreateState(
+            QuotaDisplayMode.Single,
+            percent,
+            SkinId.Aurora);
+
+        Assert.Equal(Color.FromArgb(red, green, blue), state.Accent);
+        Assert.Equal($"{percent:0}", state.Text);
+    }
+
+    [Fact]
+    public void CreateState_HiddenKeepsNoDataDashAndNormalSkinAccent()
+    {
+        var state = TrayIconRenderer.CreateState(
+            QuotaDisplayMode.Hidden,
+            0,
+            SkinId.Aurora);
+
+        Assert.Equal("\u2014", state.Text);
+        Assert.Null(state.Percent);
+        Assert.Equal(Color.FromArgb(0x79, 0xF3, 0xE2), state.Accent);
+        Assert.NotEqual(QuotaAlertPalette.CriticalDrawingColor, state.Accent);
     }
 
     [Fact]

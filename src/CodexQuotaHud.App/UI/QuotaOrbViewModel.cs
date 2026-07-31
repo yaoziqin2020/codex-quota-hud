@@ -29,8 +29,14 @@ public interface IUiDispatcher
 
 public sealed record QuotaDetailRow(
     string Label,
-    string Remaining,
-    string? ResetsAt);
+    double RemainingPercent,
+    string? ResetsAt)
+{
+    public string Remaining => $"{RemainingPercent:0}%";
+
+    public QuotaAlertLevel AlertLevel =>
+        QuotaAlertPolicy.Classify(RemainingPercent);
+}
 
 internal sealed class QuotaRefreshController(
     QuotaRefreshService service) : IQuotaRefreshController
@@ -359,7 +365,7 @@ public sealed class QuotaOrbViewModel :
 
         _details.Add(new QuotaDetailRow(
             LabelFor(window.Kind),
-            $"{RoundPercent(window.RemainingPercent):0}%",
+            RoundPercent(window.RemainingPercent),
             window.ResetsAt?.ToLocalTime()
                 .ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture)));
     }

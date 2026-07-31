@@ -24,10 +24,15 @@ public static class TrayIconRenderer
                 Math.Clamp(primaryPercent, 0, 100),
                 MidpointRounding.AwayFromZero)
             : (double?)null;
+        var accent = percent is null
+            ? AccentFor(skin)
+            : QuotaAlertPalette.ResolveDrawingColor(
+                QuotaAlertPolicy.Classify(percent.Value),
+                AccentFor(skin));
         return new TrayIconState(
             percent is null ? "—" : $"{percent:0}",
             percent,
-            AccentFor(skin));
+            accent);
     }
 
     public static Icon Render(TrayIconState state, int size = 32)

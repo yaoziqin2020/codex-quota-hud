@@ -58,6 +58,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             () => _viewModel.RefreshCommand.Execute(parameter: null));
         DetailsPopup.CustomPopupPlacementCallback = PlaceDetailsPopup;
         ApplyPopupTheme();
+        ApplyEdgeProgressState(EdgeDockSide.None);
         LocationChanged += (_, _) => RefreshPopupPlacement();
 
         var saved = viewModel.GetSavedPosition();
@@ -195,6 +196,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         _animationController.Attach(skin as IOrbAnimationTarget);
         _skinController.Render(_viewModel.SkinState);
         ApplyPopupTheme();
+        ApplyEdgeProgressState(_edgeAutoHideController.DockSide);
         ApplyAnimationState();
     }
 
@@ -617,6 +619,21 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
 
     private void ApplyEdgeProgressState(EdgeDockSide side)
     {
+        var theme = EdgeProgressThemeProvider.Get(_viewModel.SelectedSkin);
+        var level = _viewModel.DisplayMode == QuotaDisplayMode.Hidden
+            ? QuotaAlertLevel.Normal
+            : QuotaAlertPolicy.Classify(_viewModel.PrimaryPercent);
+        EdgeProgressTrack.Background = theme.Track;
+        EdgeProgressOutline.BorderBrush =
+            QuotaAlertPalette.ResolveBrush(level, theme.Border);
+        EdgeProgressFill.Background =
+            QuotaAlertPalette.ResolveBrush(level, theme.Fill);
+        EdgeProgressTexture.Background = theme.Texture;
+        EdgeProgressTexture.Opacity = theme.TextureOpacity;
+        EdgeHandleGlow.Color =
+            QuotaAlertPalette.ResolveMediaColor(level, theme.GlowColor);
+        EdgeHandleGlow.Opacity = theme.GlowOpacity;
+
         var vertical = side is EdgeDockSide.Left or EdgeDockSide.Right;
         var fillLength = EdgeProgressGeometry.FillLength(
             trackLength: 72,
@@ -785,8 +802,6 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
     private void ApplyPopupTheme()
     {
         var theme = PopupThemeProvider.Get(_viewModel.SelectedSkin);
-        var edgeTheme = EdgeProgressThemeProvider.Get(
-            _viewModel.SelectedSkin);
         PopupCard.Background = theme.Background;
         PopupShadowHost.Background = theme.Background;
         PopupCard.BorderBrush = theme.Border;
@@ -795,13 +810,6 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         PopupCard.Resources["PopupSecondaryTextBrush"] =
             theme.SecondaryText;
         PopupShadow.Color = theme.ShadowColor;
-        EdgeProgressTrack.Background = edgeTheme.Track;
-        EdgeProgressOutline.BorderBrush = edgeTheme.Border;
-        EdgeProgressFill.Background = edgeTheme.Fill;
-        EdgeProgressTexture.Background = edgeTheme.Texture;
-        EdgeProgressTexture.Opacity = edgeTheme.TextureOpacity;
-        EdgeHandleGlow.Color = edgeTheme.GlowColor;
-        EdgeHandleGlow.Opacity = edgeTheme.GlowOpacity;
         HudDialPopupDecoration.Visibility =
             theme.Decoration == PopupDecorationKind.HudDial
                 ? Visibility.Visible : Visibility.Collapsed;
