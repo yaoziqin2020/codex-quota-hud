@@ -158,18 +158,43 @@ public sealed class InstallerBuildTests
             code,
             StringComparison.Ordinal);
 
-        var commit = code.IndexOf("'CommitInstall'", StringComparison.Ordinal);
-        var launch = code.IndexOf("LaunchInstalledApp();", commit,
-            StringComparison.Ordinal);
-        Assert.True(commit >= 0 && launch > commit);
-        Assert.Contains(
+        Assert.DoesNotContain(
             "function NextButtonClick(CurPageID: Integer): Boolean;",
             code,
             StringComparison.Ordinal);
-        Assert.Contains(
-            "if CurPageID = wpFinished then\n    LaunchInstalledApp();",
-            code,
+        Assert.Equal(
+            1,
+            code.Split("\n", StringSplitOptions.None).Count(
+                line => string.Equals(
+                    line,
+                    "    LaunchInstalledApp();",
+                    StringComparison.Ordinal)));
+
+        var curStepStart = code.IndexOf(
+            "procedure CurStepChanged(CurStep: TSetupStep);",
             StringComparison.Ordinal);
+        var curStepEnd = code.IndexOf(
+            "procedure DeinitializeSetup();",
+            curStepStart,
+            StringComparison.Ordinal);
+        Assert.True(curStepStart >= 0 && curStepEnd > curStepStart);
+        var curStep = code[curStepStart..curStepEnd];
+        var commit = curStep.IndexOf("'CommitInstall'", StringComparison.Ordinal);
+        var failureExit = curStep.IndexOf(
+            "RaiseException(ErrorText);",
+            commit,
+            StringComparison.Ordinal);
+        var completed = curStep.IndexOf(
+            "InstallCompleted := True;",
+            commit,
+            StringComparison.Ordinal);
+        var launch = curStep.IndexOf(
+            "LaunchInstalledApp();",
+            commit,
+            StringComparison.Ordinal);
+        Assert.True(
+            commit >= 0 && failureExit > commit && completed > failureExit &&
+            launch > completed);
 
         var snapshot = code.IndexOf("'SnapshotLegacyState'", StringComparison.Ordinal);
         var removeSelections = code.IndexOf(

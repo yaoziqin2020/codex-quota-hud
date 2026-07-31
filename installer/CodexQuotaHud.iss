@@ -278,14 +278,9 @@ begin
       LegacyShellStatePath,
       ErrorText)) then
       Log('Legacy shell state cleanup failed: ' + ErrorText);
-  end;
-end;
 
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  if CurPageID = wpFinished then
     LaunchInstalledApp();
+  end;
 end;
 
 procedure DeinitializeSetup();
