@@ -210,23 +210,17 @@ dotnet run --project .\src\CodexQuotaHud.App -- --preview
 
 The desktop **Codex Quota HUD Developer Preview** shortcut performs the
 opposite handoff: it closes installed mode before the preview HUD and control
-window open. A listener-enabled installed build exits through its normal
-cleanup path. Older installed builds, including the current `v1.0.0`, use a
-fallback only when the running executable resolves to the exact standard
-installation path above; a same-name process at any other path is never
-force-closed. If replacement cannot be completed, the shortcut shows a failure
-message and does not open preview.
+window open. The installed `v1.1.0` build exits through its normal cleanup
+path. Older builds use a fallback only when the running executable resolves to
+the exact standard installation path above; a same-name process at any other
+path is never force-closed. If replacement cannot be completed, the shortcut
+shows a failure message and does not open preview.
 
 The reverse handoff remains **退出预览并打开正式版**: preview cleans up first and
-then starts the executable at the same exact installation path. These source
-changes do not upgrade, deploy, or otherwise change the installed `v1.0.0`
-package. The two-direction desktop handoff is still a manual acceptance check
-and is not marked complete until it is performed on a Windows desktop.
-Before that check, either merge the reviewed feature branch and rebuild the
-existing shortcut target, or temporarily point the shortcut at the feature
-worktree's reviewed Release artifact. Record the exact tested Git commit and
-artifact path or hash with the acceptance result; a shortcut still targeting
-an older canonical-main build does not test this handoff.
+then starts the executable at the same exact installation path. The installed
+binary, startup registration, shortcut arguments, settings preservation, and
+both uninstall modes were accepted on a real Windows desktop. The visual
+two-direction handoff remains an optional manual UI check.
 
 预览控制面板默认完整显示，并将大小和位置单独保存到
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
@@ -257,11 +251,11 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前源码包含 383 项自动化测试：
+当前源码包含 387 项自动化测试：
 
 - Core：55 项
-- App / UI：328 项
-- Total：383 项
+- App / UI：332 项
+- Total：387 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -271,11 +265,12 @@ dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
 自包含发布检查。
 
-Release verification for `v1.1.0` on 2026-07-31 passed Core `55/55`, App/UI
-`328/328`, and total `383/383`; the Release build completed with zero warnings
-and zero errors. Isolated installer smoke coverage passed its clean install,
-upgrade/task replacement, default-uninstall-preserve, and purge-uninstall
-scenarios. A real desktop Setup/upgrade acceptance has not been performed.
+Release verification for `v1.1.0` passed Core `55/55`, App/UI `332/332`, and
+total `387/387`; the Release build completed with zero warnings and zero
+errors. Isolated installer smoke coverage passed clean install, upgrade/task
+replacement, default-uninstall-preserve, and purge-uninstall scenarios. Real
+Windows acceptance passed overwrite install, settings preservation, startup
+and shortcut verification, normal uninstall, and explicit purge uninstall.
 
 ## 许可证 / License
 
