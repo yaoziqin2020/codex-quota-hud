@@ -17,6 +17,11 @@ Repository: https://github.com/yaoziqin2020/codex-quota-hud
 - Left-click toggles details; right-click opens the control menu.
 - Edge docking on the external edges of multi-monitor layouts.
 - Themed edge progress bars and a numeric system-tray icon.
+- Low-quota colors apply independently to each available quota: values above
+  `20%` keep the normal skin color, `>10%..20%` use Warning amber `#FFB547`,
+  and `<=10%` use Critical red `#FF5A67`. They appear on all five floating-HUD
+  skins, collapsed edge bars, tray icon, and detail rows. This is color-only:
+  no flashing, popup, sound, settings, or refresh behavior changes.
 - Single-instance behavior and current-user startup support.
 - No browser-cookie scraping, credential storage, or listening network port.
 - The development-preview shortcut replaces installed mode before preview
@@ -60,8 +65,11 @@ Do not treat the old conversation worktree under
 ## Quality baseline
 
 - Core tests: 55
-- App/UI tests: 231
-- Total: 286
+- App/UI tests: 266
+- Total: 321
+- 2026-07-31 Release verification: focused low-quota alert tests 66/66;
+  full suite Core 55/55, App/UI 266/266, total 321/321; build zero warnings
+  and zero errors. GUI/manual preview acceptance was not performed.
 - GitHub Windows CI covers restore, test, build, and self-contained publish.
 - The asynchronous test wait helper is time-based to remain stable on slower
   GitHub Windows runners.
@@ -83,7 +91,10 @@ Do not treat the old conversation worktree under
   timing as regression-sensitive.
 - The developer preview is entered only with `--preview`; it uses synthetic
   in-memory data and must never replace real app-server acceptance.
-- Run focused tests for changed behavior, then the full 286-test suite.
+- Run focused tests for changed behavior, then the full 321-test suite.
+- Use the Developer Preview sliders as the manual boundary and mixed-state
+  tool for alert colors; inspect normal (`>20%`), Warning (`>10%..20%`), and
+  Critical (`<=10%`) states independently for both quotas.
 - Update the installed build only when the user asks to deploy locally.
 - Do not move the release tag or replace release assets without an explicit
   release reason.

@@ -9,6 +9,20 @@ complete; the two-direction desktop acceptance and branch integration remain.
 
 ## Last completed work
 
+- Added low-quota color alerts across the floating HUD's five skins, collapsed
+  edge bars, tray percentage icon, and detail rows. Values above `20%` retain
+  normal skin colors; `>10%..20%` is Warning amber `#FFB547`; `<=10%` is
+  Critical red `#FF5A67`. Primary and secondary quotas are colored
+  independently in dual mode.
+- The change is color-only: no flashing, popup, sound, setting, or refresh
+  behavior changed. Developer Preview sliders are the manual boundary and
+  mixed-state inspection tool.
+- Automated Release verification passed the focused alert set `66/66`, Core
+  `55/55`, App/UI `266/266`, total `321/321`, and a zero-warning, zero-error
+  Release build. GUI/manual preview acceptance was not authorized or performed.
+- Installed `v1.0.0`, deployment, release assets, and remote/push state remain
+  unchanged.
+
 - Added `--preview` with a real HUD and separate developer control panel.
 - Added dual, five-hour-only, weekly-only, and no-quota synthetic states.
 - Isolated preview mode from app-server, startup registration, and production
@@ -26,7 +40,8 @@ complete; the two-direction desktop acceptance and branch integration remain.
   preview.
 - Retained the reverse handoff: `退出预览并打开正式版` closes preview first and
   then opens the installed executable.
-- Increased the automated baseline to Core 55 + App/UI 242 = 297 tests.
+- At that preview-handoff stage, the automated baseline was Core 55 + App/UI
+  242 = 297 tests.
 - Published the standalone public repository and Windows x64 release.
 - Added MIT license, bilingual README, real five-skin preview, topics, CI, and
   release packaging.
@@ -36,6 +51,12 @@ complete; the two-direction desktop acceptance and branch integration remain.
 - Verified the latest GitHub CI run succeeded.
 
 ## Next continuation point
+
+When GUI launch is authorized, use the Developer Preview sliders to inspect
+the `21`, `20`, `11`, `10`, and `0` boundaries, plus dual mixed states, across
+all five skins, full HUD, details, tray, and each collapsed edge side. Confirm
+that colors return to normal above `20%` and that no flashing, popup, sound,
+settings, or refresh behavior was introduced.
 
 When GUI launch is authorized, perform the two-direction desktop acceptance
 only after the existing preview shortcut targets the reviewed feature

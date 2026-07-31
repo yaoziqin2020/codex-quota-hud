@@ -85,6 +85,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
 剩余百分比来自官方返回的 `usedPercent`，按
 `100 - usedPercent` 计算并限制在 `0%..100%`。
 
+### Low-quota alert colors
+
+- Above `20%` keeps the selected skin's normal color. `>10%..20%` is Warning
+  amber `#FFB547`; `<=10%` is Critical red `#FF5A67`.
+- In dual-quota mode, the primary and secondary quotas are classified and
+  colored independently. The alert color is shown on the floating HUD (all
+  five skins), collapsed edge bar, tray percentage icon, and detail rows.
+- This is color-only feedback: it does not add flashing, popups, sounds,
+  settings, or change refresh behavior. The Developer Preview sliders are the
+  manual boundary and mixed-state inspection tool.
+
 ## 五套皮肤 / Skins
 
 | ID | 名称 | 视觉特点 |
@@ -198,11 +209,11 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前源码包含 297 项自动化测试：
+当前源码包含 321 项自动化测试：
 
 - Core：55 项
-- App / UI：242 项
-- Total：297 项
+- App / UI：266 项
+- Total：321 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -211,6 +222,11 @@ dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 
 GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
 自包含发布检查。
+
+Release verification on 2026-07-31 passed Core `55/55`, App/UI `266/266`, and
+total `321/321`; the focused low-quota alert set passed `66/66`, and the
+Release build completed with zero warnings and zero errors. GUI/manual preview
+acceptance was not performed in that verification.
 
 ## 许可证 / License
 

@@ -1,5 +1,20 @@
 # AI Change Log
 
+## 2026-07-31 — Low-quota alert colors
+
+- Added a shared alert policy across all five floating-HUD skins, collapsed
+  edge bars, tray percentage icon, and detail rows. Above `20%` retains the
+  normal skin color; `>10%..20%` is Warning amber `#FFB547`; `<=10%` is
+  Critical red `#FF5A67`.
+- Dual quotas are classified and colored independently. The change adds no
+  flashing, popup, sound, setting, or refresh behavior. Developer Preview
+  sliders remain the manual boundary and mixed-state inspection tool.
+- Automated Release verification passed focused alert tests 66/66, Core 55/55,
+  App/UI 266/266, total 321/321, and a zero-warning, zero-error Release build.
+  GUI/manual preview acceptance was not authorized or performed.
+- Installed `v1.0.0`, deployment, release assets, and remote/push state were
+  not changed.
+
 ## 2026-07-30 — Symmetric installed/preview handoff
 
 - Launching the desktop `Codex Quota HUD 开发预览` shortcut now replaces the
