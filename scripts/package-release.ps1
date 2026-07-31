@@ -9,7 +9,8 @@ param(
     [string] $InternalArgumentCapturePath,
     [int] $InternalCompilerExitCode,
     [switch] $InternalSkipFakeSetup,
-    [switch] $InternalFailStageCleanup
+    [switch] $InternalFailStageCleanup,
+    [switch] $InternalFailManifestDeleteOnce
 )
 
 Set-StrictMode -Version Latest
@@ -62,7 +63,8 @@ else {
         -not [string]::IsNullOrWhiteSpace($InternalArgumentCapturePath) -or
         $InternalCompilerExitCode -ne 0 -or
         $InternalSkipFakeSetup -or
-        $InternalFailStageCleanup) {
+        $InternalFailStageCleanup -or
+        $InternalFailManifestDeleteOnce) {
         throw 'Internal packaging hooks require -InternalTestMode.'
     }
 
@@ -104,6 +106,38 @@ function Remove-ExactPath {
     else {
         Remove-Item -LiteralPath $Path -Force
     }
+}
+
+$script:ManifestDeleteFailureInjected = $false
+function Remove-ManifestPathChecked {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    if (-not (Test-Path -LiteralPath $Path -ErrorAction Stop)) { return }
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    if ($item.PSIsContainer -or ($item.Attributes -band
+        [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing unsafe manifest cleanup path: $Path"
+    }
+    if ($InternalTestMode -and $InternalFailManifestDeleteOnce -and
+        -not $script:ManifestDeleteFailureInjected) {
+        $script:ManifestDeleteFailureInjected = $true
+        throw "Simulated manifest deletion failure: $Path"
+    }
+    Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+    if (Test-Path -LiteralPath $Path -ErrorAction Stop) {
+        throw "Manifest cleanup postcondition failed: $Path"
+    }
+}
+
+function Invoke-ManifestCleanupChecked {
+    param([Parameter(Mandatory = $true)][string[]] $Paths)
+
+    $errors = [System.Collections.ArrayList]::new()
+    foreach ($path in $Paths) {
+        try { Remove-ManifestPathChecked -Path $path }
+        catch { [void]$errors.Add($_.Exception.Message) }
+    }
+    return @($errors)
 }
 
 $packagingStage = 'initial cleanup'
@@ -231,9 +265,20 @@ try {
 catch {
     $failureMessage =
         "Release packaging failed during $packagingStage. $($_.Exception.Message)"
-    Remove-Item -LiteralPath $manifestTemp,$checksums `
-        -Force `
-        -ErrorAction SilentlyContinue
+    $manifestCleanupErrors = @(
+        Invoke-ManifestCleanupChecked -Paths @($manifestTemp, $checksums))
+    if ($manifestCleanupErrors.Count -gt 0) {
+        $retryErrors = @(
+            Invoke-ManifestCleanupChecked -Paths @($manifestTemp, $checksums))
+        if ($retryErrors.Count -gt 0) {
+            $failureMessage += ' Manifest cleanup failed: ' +
+                ($manifestCleanupErrors + $retryErrors -join ' | ')
+        }
+        else {
+            $failureMessage += ' Manifest cleanup initially failed but retry ' +
+                'succeeded: ' + ($manifestCleanupErrors -join ' | ')
+        }
+    }
     try {
         Remove-ExactPath -Path $stage
         if ($InternalTestMode) {

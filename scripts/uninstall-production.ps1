@@ -21,6 +21,31 @@ function Test-PathEquals {
         [System.StringComparison]::OrdinalIgnoreCase)
 }
 
+function Assert-NoReparsePoint {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $Boundary)
+
+    $current = Get-NormalizedPath $Path
+    $stop = Get-NormalizedPath $Boundary
+    while ($true) {
+        if (Test-Path -LiteralPath $current -ErrorAction Stop) {
+            $item = Get-Item -LiteralPath $current -Force -ErrorAction Stop
+            if (($item.Attributes -band
+                [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Refusing reparse-point path: $current"
+            }
+        }
+        if (Test-PathEquals $current $stop) { break }
+        $parent = Split-Path -Path $current -Parent
+        if ([string]::IsNullOrWhiteSpace($parent) -or
+            (Test-PathEquals $parent $current)) {
+            throw "Path escaped validation boundary: $Path"
+        }
+        $current = $parent
+    }
+}
+
 $localRoot = Get-NormalizedPath ([Environment]::GetFolderPath(
     [Environment+SpecialFolder]::LocalApplicationData))
 $target = Get-NormalizedPath (Join-Path $localRoot 'Programs\CodexQuotaHud')
@@ -28,13 +53,8 @@ $expected = Get-NormalizedPath (Join-Path $localRoot 'Programs\CodexQuotaHud')
 if (-not (Test-PathEquals $target $expected)) {
     throw 'Uninstall target validation failed.'
 }
-$item = if (Test-Path -LiteralPath $target) {
-    Get-Item -LiteralPath $target -Force
-}
-if ($null -ne $item -and ($item.Attributes -band
-    [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-    throw "Refusing reparse-point uninstall target: $target"
-}
+$volumeRoot = Get-NormalizedPath ([System.IO.Path]::GetPathRoot($localRoot))
+Assert-NoReparsePoint -Path $target -Boundary $volumeRoot
 
 $targetExecutable = Join-Path $target 'CodexQuotaHud.App.exe'
 foreach ($process in @(Get-CimInstance -ClassName Win32_Process `

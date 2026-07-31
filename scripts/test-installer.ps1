@@ -210,6 +210,63 @@ function Get-RegistryKeySnapshot {
     }
 }
 
+function Get-RegistryValuePresenceChecked {
+    param(
+        [Parameter(Mandatory = $true)][string] $RelativeKey,
+        [Parameter(Mandatory = $true)][string] $ValueName)
+
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey(
+        $RelativeKey,
+        $false)
+    try {
+        if ($null -eq $key) { return $false }
+        return $ValueName -in $key.GetValueNames()
+    }
+    finally {
+        if ($null -ne $key) { $key.Dispose() }
+    }
+}
+
+function Get-RegistryKeyPresenceChecked {
+    param([Parameter(Mandatory = $true)][string] $RelativeKey)
+
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey(
+        $RelativeKey,
+        $false)
+    try { return $null -ne $key }
+    finally {
+        if ($null -ne $key) { $key.Dispose() }
+    }
+}
+
+function Get-PathPresenceChecked {
+    param([Parameter(Mandatory = $true)][string] $Path)
+    return [bool](Test-Path -LiteralPath $Path -ErrorAction Stop)
+}
+
+function Assert-InternalArtifactsAbsent {
+    param(
+        [Parameter(Mandatory = $true)][string] $RunRelativeKey,
+        [Parameter(Mandatory = $true)][string] $RunValueName,
+        [Parameter(Mandatory = $true)][string] $UninstallRelativeKey,
+        [Parameter(Mandatory = $true)][string[]] $ShortcutPaths,
+        [Parameter(Mandatory = $true)][string] $Description)
+
+    if (Get-RegistryValuePresenceChecked `
+        -RelativeKey $RunRelativeKey `
+        -ValueName $RunValueName) {
+        throw "$Description left the exact internal Run value."
+    }
+    if (Get-RegistryKeyPresenceChecked -RelativeKey $UninstallRelativeKey) {
+        throw "$Description left the exact internal uninstall key."
+    }
+    foreach ($shortcut in $ShortcutPaths) {
+        if (Get-PathPresenceChecked -Path $shortcut) {
+            throw "$Description left managed shortcut: $shortcut"
+        }
+    }
+}
+
 function Assert-InternalUninstallRegistration {
     param(
         [Parameter(Mandatory = $true)][string] $RegistryPath,
@@ -300,6 +357,7 @@ $internalTestId = $null
 $runRegistryPath =
     'Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run'
 $uninstallRegistryPath = $null
+$uninstallRegistryRelativeKey = $null
 $internalRoot = $null
 $normalDesktop = $null
 $previewDesktop = $null
@@ -367,9 +425,11 @@ try {
     $normalDesktop = Join-Path $desktop 'Codex Quota HUD.lnk'
     $normalStartMenu = Join-Path $startMenu 'Codex Quota HUD.lnk'
     $runValueName = "CodexQuotaHud.InternalTest.$internalTestId"
-    $uninstallRegistryPath =
-        'Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
+    $uninstallRegistryRelativeKey =
+        'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
         "CQH.Test.$internalTestId`_is1"
+    $uninstallRegistryPath =
+        'Registry::HKEY_CURRENT_USER\' + $uninstallRegistryRelativeKey
     [void]$isolatedShortcutPaths.Add($normalDesktop)
     [void]$isolatedShortcutPaths.Add($normalStartMenu)
 
@@ -484,11 +544,9 @@ try {
                 $shell)
         }
     }
-    $runValueAfterUpgrade = Get-ItemProperty `
-        -LiteralPath $runRegistryPath `
-        -Name $runValueName `
-        -ErrorAction SilentlyContinue
-    if ($null -ne $runValueAfterUpgrade) {
+    if (Get-RegistryValuePresenceChecked `
+        -RelativeKey $productionRunRelativeKey `
+        -ValueName $runValueName) {
         throw 'Isolated startup value still exists after task deselection.'
     }
     Assert-InternalUninstallRegistration `
@@ -509,6 +567,12 @@ try {
     Assert-Missing -Path $install -Description 'Install directory'
     Assert-Exists -Path $settingsMarker -Description 'Preserved settings marker'
     Assert-Exists -Path $previewMarker -Description 'Preserved preview-state marker'
+    Assert-InternalArtifactsAbsent `
+        -RunRelativeKey $productionRunRelativeKey `
+        -RunValueName $runValueName `
+        -UninstallRelativeKey $uninstallRegistryRelativeKey `
+        -ShortcutPaths @($isolatedShortcutPaths) `
+        -Description 'Default uninstall'
     Write-Host 'Smoke scenario passed: default uninstall preserves settings.'
 
     Invoke-SetupProcess `
@@ -526,6 +590,12 @@ try {
         -Description 'Isolated purge uninstall' `
         -LogPath (Join-Path $smokeRoot 'purge-uninstall.log')
     Assert-Missing -Path $settings -Description 'Purged test settings directory'
+    Assert-InternalArtifactsAbsent `
+        -RunRelativeKey $productionRunRelativeKey `
+        -RunValueName $runValueName `
+        -UninstallRelativeKey $uninstallRegistryRelativeKey `
+        -ShortcutPaths @($isolatedShortcutPaths) `
+        -Description 'Purge uninstall'
     Write-Host 'Smoke scenario passed: purge uninstall removes test settings.'
     Write-Host "Isolated installer root: $internalRoot"
     Write-Host "Isolated test ID: $internalTestId"
@@ -535,10 +605,9 @@ finally {
     if (-not [string]::IsNullOrWhiteSpace($internalTestId)) {
         try {
             $testRunName = "CodexQuotaHud.InternalTest.$internalTestId"
-            if ($null -ne (Get-ItemProperty `
-                -LiteralPath $runRegistryPath `
-                -Name $testRunName `
-                -ErrorAction SilentlyContinue)) {
+            if (Get-RegistryValuePresenceChecked `
+                -RelativeKey $productionRunRelativeKey `
+                -ValueName $testRunName) {
                 Remove-ItemProperty `
                     -LiteralPath $runRegistryPath `
                     -Name $testRunName `
@@ -550,7 +619,8 @@ finally {
     }
     if (-not [string]::IsNullOrWhiteSpace($uninstallRegistryPath)) {
         try {
-            if (Test-Path -LiteralPath $uninstallRegistryPath) {
+            if (Get-RegistryKeyPresenceChecked `
+                -RelativeKey $uninstallRegistryRelativeKey) {
                 Remove-Item `
                     -LiteralPath $uninstallRegistryPath `
                     -Recurse `
@@ -560,42 +630,57 @@ finally {
         }
         catch { [void]$cleanupErrors.Add($_.Exception.Message) }
     }
-    if ($cleanupAuthorized -and (Test-Path -LiteralPath $smokeRoot)) {
+    if ($cleanupAuthorized) {
         try {
-            Assert-NoReparsePoint -Path $smokeRoot -Boundary $systemTemp
-            if (-not (Test-StrictDescendant $smokeRoot $systemTemp)) {
-                throw 'Refusing cleanup outside system temporary.'
+            if (Get-PathPresenceChecked -Path $smokeRoot) {
+                Assert-NoReparsePoint -Path $smokeRoot -Boundary $systemTemp
+                if (-not (Test-StrictDescendant $smokeRoot $systemTemp)) {
+                    throw 'Refusing cleanup outside system temporary.'
+                }
+                Remove-Item -LiteralPath $smokeRoot -Recurse -Force `
+                    -ErrorAction Stop
             }
-            Remove-Item -LiteralPath $smokeRoot -Recurse -Force `
-                -ErrorAction Stop
         }
         catch { [void]$cleanupErrors.Add($_.Exception.Message) }
     }
 
     if ($cleanupAuthorized) {
-        if (Test-Path -LiteralPath $smokeRoot) {
-            [void]$cleanupErrors.Add(
-                "Cleanup postcondition failed: temp root exists: $smokeRoot")
-        }
-        if (-not [string]::IsNullOrWhiteSpace($internalTestId) -and
-            $null -ne (Get-ItemProperty `
-                -LiteralPath $runRegistryPath `
-                -Name "CodexQuotaHud.InternalTest.$internalTestId" `
-                -ErrorAction SilentlyContinue)) {
-            [void]$cleanupErrors.Add(
-                'Cleanup postcondition failed: internal Run value exists.')
-        }
-        if (-not [string]::IsNullOrWhiteSpace($uninstallRegistryPath) -and
-            (Test-Path -LiteralPath $uninstallRegistryPath)) {
-            [void]$cleanupErrors.Add(
-                'Cleanup postcondition failed: internal uninstall key exists.')
-        }
-        foreach ($shortcut in @($isolatedShortcutPaths)) {
-            if (-not [string]::IsNullOrWhiteSpace([string]$shortcut) -and
-                (Test-Path -LiteralPath ([string]$shortcut))) {
+        try {
+            if (Get-PathPresenceChecked -Path $smokeRoot) {
                 [void]$cleanupErrors.Add(
-                    "Cleanup postcondition failed: shortcut exists: $shortcut")
+                    "Cleanup postcondition failed: temp root exists: $smokeRoot")
             }
+        }
+        catch { [void]$cleanupErrors.Add($_.Exception.Message) }
+        try {
+            if (-not [string]::IsNullOrWhiteSpace($internalTestId) -and
+                (Get-RegistryValuePresenceChecked `
+                    -RelativeKey $productionRunRelativeKey `
+                    -ValueName "CodexQuotaHud.InternalTest.$internalTestId")) {
+                [void]$cleanupErrors.Add(
+                    'Cleanup postcondition failed: internal Run value exists.')
+            }
+        }
+        catch { [void]$cleanupErrors.Add($_.Exception.Message) }
+        try {
+            if (-not [string]::IsNullOrWhiteSpace(
+                    $uninstallRegistryRelativeKey) -and
+                (Get-RegistryKeyPresenceChecked `
+                    -RelativeKey $uninstallRegistryRelativeKey)) {
+                [void]$cleanupErrors.Add(
+                    'Cleanup postcondition failed: internal uninstall key exists.')
+            }
+        }
+        catch { [void]$cleanupErrors.Add($_.Exception.Message) }
+        foreach ($shortcut in @($isolatedShortcutPaths)) {
+            try {
+                if (-not [string]::IsNullOrWhiteSpace([string]$shortcut) -and
+                    (Get-PathPresenceChecked -Path ([string]$shortcut))) {
+                    [void]$cleanupErrors.Add(
+                        "Cleanup postcondition failed: shortcut exists: $shortcut")
+                }
+            }
+            catch { [void]$cleanupErrors.Add($_.Exception.Message) }
         }
     }
 

@@ -196,6 +196,35 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
+    public async Task PackageRelease_ManifestDeleteFailureIsReportedAndRetried()
+    {
+        using var temp = new TemporaryDirectory();
+        var output = Path.Combine(temp.Path, "release");
+
+        var result = await RunPowerShellAsync(
+            PackageScript,
+            "-Version", "1.1.0",
+            "-OutputPath", output,
+            "-DotNetExecutable", CreateFakeDotNet(temp.Path),
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalTestMode",
+            "-InternalFailStageCleanup",
+            "-InternalFailManifestDeleteOnce");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("stage cleanup", result.CombinedOutput,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Manifest cleanup initially failed",
+            result.CombinedOutput, StringComparison.Ordinal);
+        Assert.Contains("Simulated manifest deletion failure",
+            result.CombinedOutput, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
+        Assert.Empty(Directory.Exists(output)
+            ? Directory.GetFiles(output, "*SHA256SUMS*.tmp")
+            : Array.Empty<string>());
+    }
+
+    [Fact]
     public async Task TestInstaller_RejectsNoncanonicalInstallerBeforeBuild()
     {
         using var temp = new TemporaryDirectory();
@@ -295,6 +324,163 @@ public sealed class InstallerBuildTests
             StringComparison.Ordinal);
         Assert.Contains("Production registry snapshot changed", script,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TestInstallerScript_AssertsExactAbsenceBeforeBothUninstallPasses()
+    {
+        var script = File.ReadAllText(TestInstallerScript)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        var defaultStart = script.IndexOf(
+            "-Description 'Isolated default uninstall'", StringComparison.Ordinal);
+        var defaultEnd = script.IndexOf(
+            "Smoke scenario passed: default uninstall preserves settings.",
+            defaultStart, StringComparison.Ordinal);
+        var purgeStart = script.IndexOf(
+            "-Description 'Isolated purge uninstall'", StringComparison.Ordinal);
+        var purgeEnd = script.IndexOf(
+            "Smoke scenario passed: purge uninstall removes test settings.",
+            purgeStart, StringComparison.Ordinal);
+
+        Assert.True(defaultStart >= 0 && defaultEnd > defaultStart);
+        Assert.True(purgeStart >= 0 && purgeEnd > purgeStart);
+        Assert.Contains("Assert-InternalArtifactsAbsent",
+            script[defaultStart..defaultEnd], StringComparison.Ordinal);
+        Assert.Contains("Assert-InternalArtifactsAbsent",
+            script[purgeStart..purgeEnd], StringComparison.Ordinal);
+        Assert.Contains("Get-RegistryValuePresenceChecked", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Get-RegistryKeyPresenceChecked", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Get-PathPresenceChecked", script,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("-ErrorAction SilentlyContinue", script,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProductionLifecycle_CompensationFailureRetainsRecoverySnapshot()
+    {
+        using var temp = new TemporaryDirectory();
+        var harness = Path.Combine(temp.Path, "compensation-harness.ps1");
+        var helper = Path.Combine(
+            RepositoryRoot, "scripts", "installer-lifecycle-production.ps1");
+        File.WriteAllText(harness,
+            """
+            param([string] $Helper, [string] $Root)
+            $tokens = $null
+            $errors = $null
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+                $Helper, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) { throw $errors[0] }
+            foreach ($function in $ast.FindAll({
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
+            }, $true)) {
+                Invoke-Expression $function.Extent.Text
+            }
+            $programs = Join-Path $Root 'Programs'
+            $install = Join-Path $programs 'CodexQuotaHud'
+            $state = Join-Path $programs 'CodexQuotaHud.legacy-shell-state.11111111-1111-1111-1111-111111111111'
+            $desktop = Join-Path $Root 'Desktop'
+            $normal = Join-Path $desktop 'Codex Quota HUD.lnk'
+            New-Item -ItemType Directory -Path $install,$state,$normal -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $normal 'blocker.txt') -Value blocker
+            [System.IO.File]::WriteAllText(
+                (Join-Path $state 'state.json'),
+                '{"NormalDesktopExists":false,"PreviewDesktopExists":false,"StartMenuExists":false,"RunValueExists":false,"RunValue":""}')
+            $shell = [pscustomobject]@{
+                NormalDesktop = $normal
+                PreviewDesktop = (Join-Path $desktop 'preview.lnk')
+                StartMenu = (Join-Path $Root 'StartMenu.lnk')
+            }
+            try {
+                Invoke-ProductionCompensation `
+                    -InstallPath $install `
+                    -StatePath $state `
+                    -Programs $programs `
+                    -Shell $shell `
+                    -RunValueName 'CodexQuotaHud.Tests.Missing' `
+                    -UninstallSubKeyName 'CodexQuotaHud.Tests.Missing'
+                throw 'Expected compensation failure.'
+            }
+            catch {
+                if (-not (Test-Path -LiteralPath $state -PathType Container)) {
+                    throw 'Recovery snapshot was deleted after compensation failure.'
+                }
+                Write-Output $_.Exception.Message
+                exit 23
+            }
+            """);
+
+        var result = await RunPowerShellAsync(
+            harness, "-Helper", helper, "-Root", temp.Path);
+
+        Assert.Equal(23, result.ExitCode);
+        Assert.Contains("Legacy compensation failed", result.CombinedOutput,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("not recognized", result.CombinedOutput,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Recovery snapshot was deleted",
+            result.CombinedOutput, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProductionUninstall_RejectsProgramsJunctionAncestor()
+    {
+        using var temp = new TemporaryDirectory();
+        var harness = Path.Combine(temp.Path, "junction-harness.ps1");
+        var helper = Path.Combine(
+            RepositoryRoot, "scripts", "uninstall-production.ps1");
+        File.WriteAllText(harness,
+            """
+            param([string] $Helper, [string] $Root)
+            $tokens = $null
+            $errors = $null
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+                $Helper, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) { throw $errors[0] }
+            $foundValidator = $false
+            foreach ($function in $ast.FindAll({
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
+            }, $true)) {
+                if ($function.Name -eq 'Assert-NoReparsePoint') {
+                    $foundValidator = $true
+                }
+                Invoke-Expression $function.Extent.Text
+            }
+            if (-not $foundValidator) { throw 'Assert-NoReparsePoint is missing.' }
+            $boundary = Join-Path $Root 'LocalAppData'
+            $outside = Join-Path $Root 'OutsidePrograms'
+            $junction = Join-Path $boundary 'Programs'
+            New-Item -ItemType Directory -Path $boundary,$outside -Force | Out-Null
+            New-Item -ItemType Junction -Path $junction -Target $outside | Out-Null
+            $caught = $null
+            try {
+                $target = Join-Path $junction 'CodexQuotaHud'
+                New-Item -ItemType Directory -Path $target -Force | Out-Null
+                Assert-NoReparsePoint -Path $target -Boundary $boundary
+            }
+            catch { $caught = $_ }
+            finally {
+                if (Test-Path -LiteralPath $junction) {
+                    [System.IO.Directory]::Delete($junction, $false)
+                }
+            }
+            if ($null -eq $caught) { throw 'Programs junction was accepted.' }
+            Write-Output $caught.Exception.Message
+            exit 24
+            """);
+
+        var result = await RunPowerShellAsync(
+            harness, "-Helper", helper, "-Root", temp.Path);
+
+        Assert.Equal(24, result.ExitCode);
+        Assert.Contains("reparse-point", result.CombinedOutput,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Programs junction was accepted",
+            result.CombinedOutput, StringComparison.Ordinal);
     }
 
     [Fact]

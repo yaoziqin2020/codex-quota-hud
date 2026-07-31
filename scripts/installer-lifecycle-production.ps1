@@ -217,35 +217,179 @@ function Snapshot-Shell {
     Assert-SafeTree -Path $State -Boundary $Programs
 }
 
-function Restore-Shell {
-    param([string] $State)
-    $markerPath = Join-Path $State 'state.json'
-    if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
-        throw "Legacy shell marker is missing: $markerPath"
+function Remove-ManagedShortcutChecked {
+    param([Parameter(Mandatory = $true)][string] $Path)
+    if (-not (Test-Path -LiteralPath $Path -ErrorAction Stop)) { return }
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    if ($item.PSIsContainer -or ($item.Attributes -band
+        [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing unsafe managed shortcut path: $Path"
     }
-    $marker = ConvertFrom-Json (Get-Content $markerPath -Raw -Encoding UTF8)
-    $shell = Get-ShellPaths
-    foreach ($entry in @(
-        @('NormalDesktop', $shell.NormalDesktop),
-        @('PreviewDesktop', $shell.PreviewDesktop),
-        @('StartMenu', $shell.StartMenu))) {
-        Remove-Item -LiteralPath $entry[1] -Force -ErrorAction SilentlyContinue
-        if ([bool]$marker."$($entry[0])Exists") {
-            $parent = Split-Path $entry[1] -Parent
-            New-Item -ItemType Directory -Path $parent -Force | Out-Null
-            Copy-Item -LiteralPath (Join-Path $State "$($entry[0]).lnk") `
-                -Destination $entry[1] -Force
+    Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+    if (Test-Path -LiteralPath $Path -ErrorAction Stop) {
+        throw "Managed shortcut cleanup postcondition failed: $Path"
+    }
+}
+
+function Remove-StartupValueChecked {
+    param([Parameter(Mandatory = $true)][string] $ValueName)
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey(
+        'Software\Microsoft\Windows\CurrentVersion\Run',
+        $true)
+    if ($null -eq $key) { return }
+    try {
+        if ($ValueName -in $key.GetValueNames()) {
+            $key.DeleteValue($ValueName, $true)
+        }
+        if ($ValueName -in $key.GetValueNames()) {
+            throw "Startup value cleanup postcondition failed: $ValueName"
         }
     }
-    $runPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-    Remove-ItemProperty -Path $runPath -Name 'CodexQuotaHud' `
-        -ErrorAction SilentlyContinue
-    if ([bool]$marker.RunValueExists) {
-        New-Item -Path $runPath -Force | Out-Null
-        New-ItemProperty -Path $runPath -Name 'CodexQuotaHud' `
-            -Value ([string]$marker.RunValue) -PropertyType String -Force |
-            Out-Null
+    finally { $key.Dispose() }
+}
+
+function Set-StartupValueChecked {
+    param(
+        [Parameter(Mandatory = $true)][string] $ValueName,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string] $Value)
+    $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey(
+        'Software\Microsoft\Windows\CurrentVersion\Run')
+    try {
+        $key.SetValue($ValueName, $Value,
+            [Microsoft.Win32.RegistryValueKind]::String)
+        $actual = [string]$key.GetValue(
+            $ValueName,
+            $null,
+            [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        if (-not [string]::Equals(
+            $actual,
+            $Value,
+            [System.StringComparison]::Ordinal)) {
+            throw "Startup value restore postcondition failed: $ValueName"
+        }
     }
+    finally { $key.Dispose() }
+}
+
+function Remove-UninstallKeyChecked {
+    param([Parameter(Mandatory = $true)][string] $SubKeyName)
+    $relative =
+        'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + $SubKeyName
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($relative, $false)
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($relative, $false)
+    try {
+        if ($null -ne $key) {
+            throw "Uninstall key cleanup postcondition failed: $SubKeyName"
+        }
+    }
+    finally { if ($null -ne $key) { $key.Dispose() } }
+}
+
+function Remove-NewUninstallerFilesChecked {
+    param([Parameter(Mandatory = $true)][string] $InstallPath)
+    if (-not (Test-Path -LiteralPath $InstallPath -PathType Container `
+        -ErrorAction Stop)) { return }
+    foreach ($file in @(Get-ChildItem -LiteralPath $InstallPath -File -Force `
+        -ErrorAction Stop)) {
+        if ($file.Name -match '^unins\d{3}\.(exe|dat|msg)$') {
+            Remove-Item -LiteralPath $file.FullName -Force -ErrorAction Stop
+            if (Test-Path -LiteralPath $file.FullName -ErrorAction Stop) {
+                throw "Uninstaller file cleanup postcondition failed: $($file.FullName)"
+            }
+        }
+    }
+}
+
+function Restore-ManagedShortcutChecked {
+    param(
+        [Parameter(Mandatory = $true)][bool] $Existed,
+        [Parameter(Mandatory = $true)][string] $BackupPath,
+        [Parameter(Mandatory = $true)][string] $Destination)
+    if (-not $Existed) {
+        Remove-ManagedShortcutChecked -Path $Destination
+        return
+    }
+    if (-not (Test-Path -LiteralPath $BackupPath -PathType Leaf `
+        -ErrorAction Stop)) {
+        throw "Legacy shortcut backup is missing: $BackupPath"
+    }
+    $backup = Get-Item -LiteralPath $BackupPath -Force -ErrorAction Stop
+    if (($backup.Attributes -band
+        [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing unsafe legacy shortcut backup: $BackupPath"
+    }
+    $parent = Split-Path -Path $Destination -Parent
+    New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop |
+        Out-Null
+    Copy-Item -LiteralPath $BackupPath -Destination $Destination -Force `
+        -ErrorAction Stop
+    if (-not (Test-Path -LiteralPath $Destination -PathType Leaf `
+        -ErrorAction Stop)) {
+        throw "Legacy shortcut restore postcondition failed: $Destination"
+    }
+}
+
+function Invoke-ProductionCompensation {
+    param(
+        [Parameter(Mandatory = $true)][string] $InstallPath,
+        [Parameter(Mandatory = $true)][string] $StatePath,
+        [Parameter(Mandatory = $true)][string] $Programs,
+        [Parameter(Mandatory = $true)][psobject] $Shell,
+        [Parameter(Mandatory = $true)][string] $RunValueName,
+        [Parameter(Mandatory = $true)][string] $UninstallSubKeyName)
+
+    if (-not (Test-Path -LiteralPath $StatePath -PathType Container `
+        -ErrorAction Stop)) { return }
+    Assert-SafeTree -Path $StatePath -Boundary $Programs
+    $markerPath = Join-Path $StatePath 'state.json'
+    if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf `
+        -ErrorAction Stop)) {
+        throw "Legacy shell marker is missing: $markerPath"
+    }
+    $marker = ConvertFrom-Json (Get-Content -LiteralPath $markerPath `
+        -Raw -Encoding UTF8 -ErrorAction Stop)
+    $errors = [System.Collections.ArrayList]::new()
+
+    foreach ($path in @(
+        $Shell.NormalDesktop,
+        $Shell.PreviewDesktop,
+        $Shell.StartMenu)) {
+        try { Remove-ManagedShortcutChecked -Path $path }
+        catch { [void]$errors.Add($_.Exception.Message) }
+    }
+    try { Remove-StartupValueChecked -ValueName $RunValueName }
+    catch { [void]$errors.Add($_.Exception.Message) }
+
+    foreach ($entry in @(
+        @('NormalDesktop', $Shell.NormalDesktop),
+        @('PreviewDesktop', $Shell.PreviewDesktop),
+        @('StartMenu', $Shell.StartMenu))) {
+        try {
+            Restore-ManagedShortcutChecked `
+                -Existed ([bool]$marker."$($entry[0])Exists") `
+                -BackupPath (Join-Path $StatePath "$($entry[0]).lnk") `
+                -Destination $entry[1]
+        }
+        catch { [void]$errors.Add($_.Exception.Message) }
+    }
+    if ([bool]$marker.RunValueExists) {
+        try {
+            Set-StartupValueChecked `
+                -ValueName $RunValueName `
+                -Value ([string]$marker.RunValue)
+        }
+        catch { [void]$errors.Add($_.Exception.Message) }
+    }
+    try { Remove-UninstallKeyChecked -SubKeyName $UninstallSubKeyName }
+    catch { [void]$errors.Add($_.Exception.Message) }
+    try { Remove-NewUninstallerFilesChecked -InstallPath $InstallPath }
+    catch { [void]$errors.Add($_.Exception.Message) }
+
+    if ($errors.Count -gt 0) {
+        throw ('Legacy compensation failed; recovery snapshot retained: ' +
+            ($errors -join ' | '))
+    }
+    Remove-SafeTree -Path $StatePath -Boundary $Programs
 }
 
 $localRoot = Get-NormalizedPath ([Environment]::GetFolderPath(
@@ -292,19 +436,14 @@ switch ($Action) {
     }
     'CompensateLegacyInstall' {
         if ($null -eq $state) { throw 'Shell state path is required.' }
-        $shell = Get-ShellPaths
-        Remove-Item -LiteralPath $shell.NormalDesktop,$shell.PreviewDesktop,
-            $shell.StartMenu -Force -ErrorAction SilentlyContinue
-        Remove-ItemProperty `
-            -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
-            -Name 'CodexQuotaHud' -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath (
-            'Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\' +
-            'CurrentVersion\Uninstall\' +
-            '{7F6E38C7-5928-4A18-9C9B-9B6D9B90D314}_is1') `
-            -Recurse -Force -ErrorAction SilentlyContinue
-        Restore-Shell -State $state
-        Remove-SafeTree -Path $state -Boundary $programs
+        Invoke-ProductionCompensation `
+            -InstallPath $install `
+            -StatePath $state `
+            -Programs $programs `
+            -Shell (Get-ShellPaths) `
+            -RunValueName 'CodexQuotaHud' `
+            -UninstallSubKeyName (
+                '{7F6E38C7-5928-4A18-9C9B-9B6D9B90D314}_is1')
     }
     'RollbackInstall' {
         if ($null -ne $backup -and (Test-Path -LiteralPath $backup)) {
