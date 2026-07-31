@@ -36,8 +36,10 @@ english.StartupTask=Start Codex Quota HUD automatically when I sign in
 chinesesimp.StartupTask=登录 Windows 时自动启动 Codex Quota HUD
 english.DesktopTask=Create a desktop shortcut
 chinesesimp.DesktopTask=创建桌面快捷方式
+#ifdef InternalTestRoot
 english.PreviewDesktopTask=Create a Developer Preview desktop shortcut
 chinesesimp.PreviewDesktopTask=创建“开发预览”桌面快捷方式
+#endif
 english.PurgeSettingsTask=Also remove personal settings and preview window state
 chinesesimp.PurgeSettingsTask=同时删除个人设置和预览窗口状态
 english.LifecycleFailure=Codex Quota HUD could not be prepared safely.
@@ -60,9 +62,11 @@ english.LaunchFailure=Codex Quota HUD could not be launched (code %1).
 chinesesimp.LaunchFailure=无法启动 Codex Quota HUD（代码 %1）。
 
 [Tasks]
-Name: "startup"; Description: "{cm:StartupTask}"; Flags: checkedonce
-Name: "desktopicon"; Description: "{cm:DesktopTask}"; Flags: checkedonce
+Name: "startup"; Description: "{cm:StartupTask}"
+Name: "desktopicon"; Description: "{cm:DesktopTask}"
+#ifdef InternalTestRoot
 Name: "previewdesktopicon"; Description: "{cm:PreviewDesktopTask}"; Flags: unchecked
+#endif
 
 [Files]
 Source: "{#PublishedDir}\CodexQuotaHud.App.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -82,7 +86,6 @@ Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD 开发预览"; Filename
 #else
 Name: "{autoprograms}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"
 Name: "{autodesktop}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"; Tasks: desktopicon
-Name: "{autodesktop}\Codex Quota HUD 开发预览"; Filename: "{app}\CodexQuotaHud.App.exe"; Parameters: "--preview"; Tasks: previewdesktopicon
 #endif
 
 [Registry]
@@ -172,7 +175,7 @@ begin
 #endif
 
   Result := Exec(
-    ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
     Parameters,
     '',
     SW_HIDE,

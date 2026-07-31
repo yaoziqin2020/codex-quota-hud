@@ -19,6 +19,53 @@ and a numeric tray icon without scraping web pages or storing credentials.
 > This is an independent open-source project and is not an official OpenAI
 > product.
 
+## v1.1.0 installation / 安装
+
+Primary path: download `CodexQuotaHud-Setup-v1.1.0.exe` and double-click it.
+主要方式：下载 `CodexQuotaHud-Setup-v1.1.0.exe` 后直接双击运行。
+
+Setup automatically offers Simplified Chinese or English, installs only for
+the current Windows user, and needs no administrator permission. It installs
+to `%LOCALAPPDATA%\\Programs\\CodexQuotaHud`.
+
+安装器会自动提供简体中文和英文；它只为当前 Windows 用户安装，不需要管理员权限，安装路径为
+`%LOCALAPPDATA%\\Programs\\CodexQuotaHud`。
+
+The Setup task page contains only startup at sign-in and the normal desktop
+shortcut, both selected by default. Developer Preview is intentionally absent
+from the release Setup. ZIP users can launch it explicitly with
+`CodexQuotaHud.App.exe --preview` when development testing is needed.
+
+Setup 的任务页只包含开机启动和普通桌面快捷方式，两项默认勾选。正式安装包不会提供
+“开发预览”选项；使用 ZIP 的开发者如需测试，可明确运行
+`CodexQuotaHud.App.exe --preview`。
+
+Install `v1.1.0` directly over `v1.0.0`; personal HUD settings and Developer
+Preview window state are retained by default. Normal uninstall preserves those
+settings. Select the explicit purge option only to remove the exact
+`%LOCALAPPDATA%\\CodexQuotaHud` settings directory.
+
+可从 `v1.0.0` 直接升级，默认保留 HUD 设置和开发预览窗口状态。普通卸载会保留它们；只有明确选择
+清除选项时，才会删除 `%LOCALAPPDATA%\\CodexQuotaHud` 这一准确的设置目录。
+
+The release Setup is unsigned, so Windows SmartScreen may show an
+unknown-publisher warning. Verify its SHA-256 against `SHA256SUMS.txt` before
+running it:
+
+```powershell
+Get-FileHash .\\CodexQuotaHud-Setup-v1.1.0.exe -Algorithm SHA256
+```
+
+当前 Setup 未签名，Windows SmartScreen 可能显示未知发布者提示。运行前请使用
+`SHA256SUMS.txt` 和上述命令核对 SHA-256。
+
+If Setup is unavailable, `CodexQuotaHud-v1.1.0-win-x64.zip` plus its bundled
+PowerShell script is the fallback. GitHub Packages is not used for this
+application or its release assets.
+
+若 Setup 不可用，`CodexQuotaHud-v1.1.0-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
+本应用和发布资产均不使用 GitHub Packages。
+
 ![Codex Quota HUD overview](docs/assets/codex-quota-hud-overview.png)
 
 ## 功能 / Features
@@ -37,7 +84,7 @@ and a numeric tray icon without scraping web pages or storing credentials.
 ## 下载与安装 / Download
 
 从 [最新 Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
-下载 `CodexQuotaHud-v1.0.0-win-x64.zip`，解压后在该目录运行：
+下载 ZIP 后备包 `CodexQuotaHud-v1.1.0-win-x64.zip`，解压后在该目录运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
@@ -193,7 +240,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1
 生成可发布 ZIP：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.0.0
+powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.1.0
 ```
 
 ## 项目结构 / Project Structure
@@ -209,11 +256,11 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前源码包含 321 项自动化测试：
+当前源码包含 383 项自动化测试：
 
 - Core：55 项
-- App / UI：266 项
-- Total：321 项
+- App / UI：328 项
+- Total：383 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -223,10 +270,11 @@ dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
 自包含发布检查。
 
-Release verification on 2026-07-31 passed Core `55/55`, App/UI `266/266`, and
-total `321/321`; the focused low-quota alert set passed `66/66`, and the
-Release build completed with zero warnings and zero errors. GUI/manual preview
-acceptance was not performed in that verification.
+Release verification for `v1.1.0` on 2026-07-31 passed Core `55/55`, App/UI
+`328/328`, and total `383/383`; the Release build completed with zero warnings
+and zero errors. Isolated installer smoke coverage passed its clean install,
+upgrade/task replacement, default-uninstall-preserve, and purge-uninstall
+scenarios. A real desktop Setup/upgrade acceptance has not been performed.
 
 ## 许可证 / License
 

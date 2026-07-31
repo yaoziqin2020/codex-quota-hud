@@ -743,6 +743,57 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
+    public void InnoDefinition_ProductionUsesNativePowerShellForLifecycle()
+    {
+        var definition = File.ReadAllText(InnoDefinition);
+
+        Assert.Contains(
+            "ExpandConstant('{sysnative}\\WindowsPowerShell\\v1.0\\powershell.exe')",
+            definition,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "ExpandConstant('{sys}\\WindowsPowerShell\\v1.0\\powershell.exe')",
+            definition,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InnoDefinition_ProductionOmitsDeveloperPreviewShortcutTask()
+    {
+        var definition = File.ReadAllText(InnoDefinition)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        Assert.Equal(
+            1,
+            definition.Split("\n", StringSplitOptions.None).Count(
+                line => line.StartsWith(
+                    "Name: \"previewdesktopicon\";",
+                    StringComparison.Ordinal)));
+        Assert.Contains(
+            "#ifdef InternalTestRoot\n" +
+            "Name: \"previewdesktopicon\"; Description:",
+            definition,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InnoDefinition_DefaultTasksRemainSelectedDuringUpgrade()
+    {
+        var definition = File.ReadAllText(InnoDefinition);
+
+        Assert.Contains(
+            "Name: \"startup\"; Description: \"{cm:StartupTask}\"\n",
+            definition.Replace("\r\n", "\n", StringComparison.Ordinal),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Name: \"desktopicon\"; Description: \"{cm:DesktopTask}\"\n",
+            definition.Replace("\r\n", "\n", StringComparison.Ordinal),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("Flags: checkedonce", definition,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void InnoDefinition_InternalBuildRedirectsAllMachineArtifacts()
     {
         var definition = File.ReadAllText(InnoDefinition)

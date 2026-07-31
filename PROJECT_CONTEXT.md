@@ -8,6 +8,29 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
+## v1.1.0 installer release candidate
+
+The primary distribution path is the current-user Inno Setup executable
+`CodexQuotaHud-Setup-v1.1.0.exe`; ZIP plus its PowerShell script is fallback
+only, and GitHub Packages is unused. Setup offers English/Simplified Chinese,
+requires no administrator permission, and selects startup and the normal
+desktop shortcut by default. Release Setup contains no Developer Preview
+shortcut option; ZIP users can explicitly run the executable with `--preview`.
+It directly upgrades `v1.0.0` while preserving settings by default. Uninstall
+preserves settings unless the user explicitly opts in to purge the exact
+`%LOCALAPPDATA%\\CodexQuotaHud` directory.
+
+The candidate Setup is unsigned, so SmartScreen may report an unknown
+publisher; verify SHA-256 before running it. Corrected local assets are Setup
+50,880,224 bytes / `628ba0cb457b93e1cd063fe3f954f09b9d1ab5747e0a0cb9f6e5fdae1185514a`
+and ZIP 68,202,773 bytes /
+`5f834e0928b61d6ad96719fe8f0b82dafe832453aee6425123ef7d4c4d6b0f67`.
+
+Production assets contain no internal smoke hooks. A temporary, separately
+compiled Setup passed all four isolated smoke scenarios and was cleaned up; it
+is not a release asset. Corrected-Setup overwrite passed on the real machine;
+both uninstall modes still require real-desktop acceptance.
+
 ## Product behavior
 
 - WPF floating HUD with five animated skins.

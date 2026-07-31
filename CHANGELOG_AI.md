@@ -1,5 +1,44 @@
 # AI Change Log
 
+## 2026-07-31 — Release Setup preview isolation and lifecycle fix
+
+- Removed the Developer Preview shortcut option from the production Setup;
+  development preview remains explicitly available to ZIP/source users through
+  `CodexQuotaHud.App.exe --preview`.
+- Changed Inno lifecycle execution from redirected 32-bit PowerShell to native
+  64-bit PowerShell. This prevents install/uninstall from exiting with code 1
+  while inspecting the exact path of the 64-bit HUD process.
+- Corrected candidate verification passed Core `55/55`, App/UI `331/331`,
+  total `386/386`, Release build with zero warnings/errors, and all four
+  isolated installer smoke scenarios. Corrected Setup SHA-256 is
+  `628ba0cb457b93e1cd063fe3f954f09b9d1ab5747e0a0cb9f6e5fdae1185514a`.
+- Real corrected-Setup overwrite passed: both formal tasks remained selected,
+  settings were preserved, and no Developer Preview shortcut was created.
+
+## 2026-07-31 — v1.1.0 installer release-candidate verification
+
+- Made Setup the documented primary path; ZIP/PowerShell is fallback and
+  GitHub Packages is unused. The documentation covers automatic
+  English/Simplified-Chinese selection, current-user/no-admin install,
+  startup/normal-shortcut defaults, ZIP-only explicit `--preview` launch, direct
+  upgrade, settings preservation, opt-in purge, unsigned SmartScreen notice,
+  and SHA-256 verification.
+- At `04049208e13c579307a421fc96318b82cb6b5da8`, fresh Release verification
+  passed Core 55/55, App/UI 328/328, total 383/383; Release build was 0
+  warnings and 0 errors.
+- Packaged local candidate assets: Setup 50,880,280 bytes / SHA-256
+  `65d7dea7992f1c3ca21cfc75b19b7c7148bd8f25e6fd03f439ad07259705c5aa`; ZIP
+  68,202,715 bytes / SHA-256
+  `572b9d741098ceb055c5601fc7d149547d74e5361f21bc70f48501e673418019`.
+- The four isolated smoke scenarios passed using a temporary smoke-only Setup:
+  clean install, upgrade/task replacement, default preserve uninstall, and
+  explicit purge uninstall. Production assets do not contain internal smoke
+  hooks, and the temporary smoke build was not released.
+- No real Setup has been launched. The installed v1.0.0, its Apps & Features
+  registration, shortcuts, startup, settings, and uninstall behavior remain
+  unaccepted pending explicit GUI/install authorization. No release/tag/upload
+  claim is made.
+
 ## 2026-07-31 — Low-quota alert colors
 
 - Added a shared alert policy across all five floating-HUD skins, collapsed

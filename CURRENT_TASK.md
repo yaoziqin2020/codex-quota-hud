@@ -1,5 +1,36 @@
 # Current Task
 
+## v1.1.0 installer release candidate — manual acceptance pending
+
+The corrected release candidate is in the feature worktree pending commit.
+Fresh Release verification passed Core `55/55`, App/UI `331/331`, total
+`386/386`; `dotnet build` reported `0` warnings and `0` errors. Packaging
+produced:
+
+- `CodexQuotaHud-Setup-v1.1.0.exe` — 50,880,224 bytes, SHA-256
+  `628ba0cb457b93e1cd063fe3f954f09b9d1ab5747e0a0cb9f6e5fdae1185514a`
+- `CodexQuotaHud-v1.1.0-win-x64.zip` — 68,202,773 bytes, SHA-256
+  `5f834e0928b61d6ad96719fe8f0b82dafe832453aee6425123ef7d4c4d6b0f67`
+
+The production Setup contains no internal smoke hooks. Four isolated smoke
+scenarios passed using a separately compiled, temporary Setup that is not a
+release asset: clean install; upgrade with task replacement; default uninstall
+that preserves settings; and explicit purge uninstall.
+
+Manual acceptance is partially complete. The earlier candidate upgraded the
+real `v1.0.0` to `v1.1.0`, preserved settings, and created the expected startup,
+Start-menu, and normal desktop entries. It also exposed a now-rejected preview
+shortcut task. Its first uninstall attempt failed after stopping the HUD because
+redirected 32-bit PowerShell could not inspect the 64-bit executable path.
+
+The corrected Setup removes the production preview task, invokes native 64-bit
+PowerShell, and retains the previous startup/desktop selections during upgrade.
+Regression, full-suite, build, packaging, and four-scenario isolated smoke
+verification pass. Real corrected-Setup overwrite also passed with settings
+preserved and no preview shortcut. Default preserve uninstall, explicit purge
+uninstall, settings restore, and final reinstall remain pending. Do not tag,
+upload, or describe this candidate as manually accepted yet.
+
 ## Status
 
 Version `1.0.0` is released. The isolated developer preview and the symmetric
