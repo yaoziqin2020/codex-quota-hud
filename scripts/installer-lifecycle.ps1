@@ -15,13 +15,18 @@ param(
     [switch] $InternalTestMode,
     [string] $InternalProcessSnapshotPath,
     [string] $InternalActionLogPath,
-    [switch] $InternalSkipShutdownSignal
+    [switch] $InternalSkipShutdownSignal,
+    [int] $InternalRollbackCopyFailureAfterItemCount,
+    [string] $InternalPrepareBackupFailureReparseTargetPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $script:TestActions = [System.Collections.ArrayList]::new()
+$script:ValidatedInternalProcessSnapshotPath = $null
+$script:ValidatedInternalActionLogPath = $null
+$script:ValidatedBackupFailureTarget = $null
 
 function Get-NormalizedPath {
     param([Parameter(Mandatory = $true)][string] $Path)
@@ -55,6 +60,20 @@ function Test-PathEquals {
     return [string]::Equals(
         (Get-NormalizedPath $Left),
         (Get-NormalizedPath $Right),
+        [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-PathIsStrictDescendant {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $Boundary)
+
+    $candidate = Get-NormalizedPath $Path
+    $parent = Get-NormalizedPath $Boundary
+    $prefix = $parent +
+        [System.IO.Path]::DirectorySeparatorChar
+    return $candidate.StartsWith(
+        $prefix,
         [System.StringComparison]::OrdinalIgnoreCase)
 }
 
@@ -114,6 +133,40 @@ function Assert-NoReparsePointTree {
             }
         }
     }
+}
+
+function Remove-DirectoryTreeWithoutFollowingReparsePoints {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $Boundary)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    Assert-NoReparsePoint -Path $Path -Boundary $Boundary
+    foreach ($item in @(
+        Get-ChildItem -LiteralPath $Path -Force)) {
+        if (($item.Attributes -band
+            [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            if ($item.PSIsContainer) {
+                [System.IO.Directory]::Delete($item.FullName)
+            }
+            else {
+                [System.IO.File]::Delete($item.FullName)
+            }
+        }
+        elseif ($item.PSIsContainer) {
+            Remove-DirectoryTreeWithoutFollowingReparsePoints `
+                -Path $item.FullName `
+                -Boundary $Boundary
+        }
+        else {
+            Remove-Item -LiteralPath $item.FullName -Force
+        }
+    }
+
+    Remove-Item -LiteralPath $Path -Force
 }
 
 function Assert-ResolvedPathEqualsExpected {
@@ -273,6 +326,22 @@ function Copy-LegacyInstallToBackup {
 
     try {
         New-Item -ItemType Directory -Path $BackupPath | Out-Null
+        if ($InternalTestMode -and
+            -not [string]::IsNullOrWhiteSpace(
+                $script:ValidatedBackupFailureTarget)) {
+            $injectedPath = Join-Path $BackupPath 'injected-reparse'
+            New-Item `
+                -ItemType Junction `
+                -Path $injectedPath `
+                -Target $script:ValidatedBackupFailureTarget |
+                Out-Null
+            Add-TestAction -Action 'InjectBackupReparse' -Properties @{
+                Source = $script:ValidatedBackupFailureTarget
+                Destination = $injectedPath
+            }
+            throw 'Injected legacy backup copy failure.'
+        }
+
         Get-ChildItem -LiteralPath $InstallPath -Force |
             Copy-Item -Destination $BackupPath -Recurse -Force
 
@@ -288,10 +357,9 @@ function Copy-LegacyInstallToBackup {
     }
     catch {
         if (Test-Path -LiteralPath $BackupPath) {
-            Assert-NoReparsePoint `
+            Remove-DirectoryTreeWithoutFollowingReparsePoints `
                 -Path $BackupPath `
                 -Boundary (Split-Path -Path $BackupPath -Parent)
-            Remove-Item -LiteralPath $BackupPath -Recurse -Force
         }
 
         throw
@@ -301,6 +369,99 @@ function Copy-LegacyInstallToBackup {
         Add-TestAction -Action 'BackupLegacy' -Properties @{
             Source = $InstallPath
             Destination = $BackupPath
+        }
+    }
+}
+
+function Get-ValidatedRollbackSiblingTarget {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $LocalAppDataRoot,
+        [Parameter(Mandatory = $true)][string] $Prefix)
+
+    $localRoot = Get-NormalizedPath $LocalAppDataRoot
+    $programs = Get-NormalizedPath (Join-Path $localRoot 'Programs')
+    $target = Get-NormalizedPath $Path
+    $parent = Get-NormalizedPath (Split-Path -Path $target -Parent)
+    if (-not (Test-PathEquals $parent $programs)) {
+        throw "Rollback path must stay directly under Programs: $programs"
+    }
+
+    $leaf = Split-Path -Path $target -Leaf
+    if (-not $leaf.StartsWith(
+            $Prefix,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Rollback path must use the exact $Prefix prefix."
+    }
+
+    $suffix = $leaf.Substring($Prefix.Length)
+    try {
+        [void][Guid]::Parse($suffix)
+    }
+    catch {
+        throw 'Rollback path suffix must be a GUID.'
+    }
+
+    Assert-NoReparsePointTree -Path $target -Boundary $localRoot
+    Assert-ResolvedPathEqualsExpected -Path $target
+    return $target
+}
+
+function Assert-DirectoryCopiesMatch {
+    param(
+        [Parameter(Mandatory = $true)][string] $Source,
+        [Parameter(Mandatory = $true)][string] $Destination)
+
+    Assert-NoReparsePointTree `
+        -Path $Source `
+        -Boundary (Split-Path -Path $Source -Parent)
+    Assert-NoReparsePointTree `
+        -Path $Destination `
+        -Boundary (Split-Path -Path $Destination -Parent)
+
+    $sourceRoot = Get-NormalizedPath $Source
+    $destinationRoot = Get-NormalizedPath $Destination
+    $sourceItems = @(
+        Get-ChildItem -LiteralPath $sourceRoot -Force -Recurse)
+    $destinationItems = @(
+        Get-ChildItem -LiteralPath $destinationRoot -Force -Recurse)
+    if ($sourceItems.Count -ne $destinationItems.Count) {
+        throw 'Rollback staging copy item count does not match the backup.'
+    }
+
+    foreach ($sourceItem in $sourceItems) {
+        $relativePath = $sourceItem.FullName.Substring(
+            $sourceRoot.Length).TrimStart(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar)
+        $destinationPath = Join-Path $destinationRoot $relativePath
+        if (-not (Test-Path -LiteralPath $destinationPath)) {
+            throw "Rollback staging copy is missing: $relativePath"
+        }
+
+        $destinationItem = Get-Item -LiteralPath $destinationPath -Force
+        if ([bool]$sourceItem.PSIsContainer -ne
+            [bool]$destinationItem.PSIsContainer) {
+            throw "Rollback staging item type differs: $relativePath"
+        }
+
+        if (-not $sourceItem.PSIsContainer) {
+            if ($sourceItem.Length -ne $destinationItem.Length) {
+                throw "Rollback staging file length differs: $relativePath"
+            }
+
+            $sourceHash = (Get-FileHash `
+                -LiteralPath $sourceItem.FullName `
+                -Algorithm SHA256).Hash
+            $destinationHash = (Get-FileHash `
+                -LiteralPath $destinationPath `
+                -Algorithm SHA256).Hash
+            if (-not [string]::Equals(
+                    $sourceHash,
+                    $destinationHash,
+                    [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Rollback staging file content differs: $relativePath"
+            }
         }
     }
 }
@@ -321,19 +482,105 @@ function Restore-LegacyInstallBackup {
     Assert-NoReparsePointTree `
         -Path $BackupPath `
         -Boundary (Split-Path -Path $BackupPath -Parent)
-    if (Test-Path -LiteralPath $InstallPath) {
-        [void](Get-ValidatedInstallTarget `
-            -InstallPath $InstallPath `
-            -LocalAppDataRoot $LocalAppDataRoot)
-        Remove-Item -LiteralPath $InstallPath -Recurse -Force
-    }
+    $programs = Get-NormalizedPath (Split-Path -Path $InstallPath -Parent)
+    $suffix = [Guid]::NewGuid().ToString('N')
+    $staging = Get-ValidatedRollbackSiblingTarget `
+        -Path (Join-Path `
+            $programs `
+            "CodexQuotaHud.rollback-staging.$suffix") `
+        -LocalAppDataRoot $LocalAppDataRoot `
+        -Prefix 'CodexQuotaHud.rollback-staging.'
+    $displaced = Get-ValidatedRollbackSiblingTarget `
+        -Path (Join-Path `
+            $programs `
+            "CodexQuotaHud.rollback-displaced.$suffix") `
+        -LocalAppDataRoot $LocalAppDataRoot `
+        -Prefix 'CodexQuotaHud.rollback-displaced.'
+    $stagingExists = $false
+    $targetDisplaced = $false
+    $stagingActivated = $false
 
-    Copy-Item -LiteralPath $BackupPath -Destination $InstallPath -Recurse
-    $restoredMarker = Join-Path `
-        $InstallPath `
-        'CodexQuotaHud.LegacyBackup.json'
-    Remove-Item -LiteralPath $restoredMarker -Force
-    Remove-Item -LiteralPath $BackupPath -Recurse -Force
+    try {
+        New-Item -ItemType Directory -Path $staging | Out-Null
+        $stagingExists = $true
+        $copiedItemCount = 0
+        foreach ($item in @(
+            Get-ChildItem -LiteralPath $BackupPath -Force |
+                Sort-Object -Property Name)) {
+            Copy-Item `
+                -LiteralPath $item.FullName `
+                -Destination $staging `
+                -Recurse `
+                -Force
+            $copiedItemCount++
+            if ($InternalTestMode) {
+                Add-TestAction -Action 'StageRollbackCopy' -Properties @{
+                    Source = $item.FullName
+                    Destination = $staging
+                    ItemCount = $copiedItemCount
+                }
+            }
+
+            if ($InternalTestMode -and
+                $InternalRollbackCopyFailureAfterItemCount -gt 0 -and
+                $copiedItemCount -ge
+                    $InternalRollbackCopyFailureAfterItemCount) {
+                throw 'Injected rollback copy failure.'
+            }
+        }
+
+        Assert-DirectoryCopiesMatch `
+            -Source $BackupPath `
+            -Destination $staging
+        Remove-Item `
+            -LiteralPath (Join-Path `
+                $staging `
+                'CodexQuotaHud.LegacyBackup.json') `
+            -Force
+
+        if (Test-Path -LiteralPath $InstallPath) {
+            [void](Get-ValidatedInstallTarget `
+                -InstallPath $InstallPath `
+                -LocalAppDataRoot $LocalAppDataRoot)
+            Move-Item -LiteralPath $InstallPath -Destination $displaced
+            $targetDisplaced = $true
+        }
+
+        Move-Item -LiteralPath $staging -Destination $InstallPath
+        $stagingExists = $false
+        $stagingActivated = $true
+
+        if ($targetDisplaced) {
+            Assert-NoReparsePointTree `
+                -Path $displaced `
+                -Boundary $programs
+            Remove-Item -LiteralPath $displaced -Recurse -Force
+            $targetDisplaced = $false
+        }
+
+        Assert-NoReparsePointTree `
+            -Path $BackupPath `
+            -Boundary $programs
+        Remove-Item -LiteralPath $BackupPath -Recurse -Force
+    }
+    catch {
+        if ($targetDisplaced -and
+            -not $stagingActivated -and
+            -not (Test-Path -LiteralPath $InstallPath) -and
+            (Test-Path -LiteralPath $displaced)) {
+            Move-Item -LiteralPath $displaced -Destination $InstallPath
+            $targetDisplaced = $false
+        }
+
+        if ($stagingExists -and (Test-Path -LiteralPath $staging)) {
+            Assert-NoReparsePointTree `
+                -Path $staging `
+                -Boundary $programs
+            Remove-Item -LiteralPath $staging -Recurse -Force
+        }
+
+        throw
+    }
 
     if ($InternalTestMode) {
         Add-TestAction -Action 'RollbackLegacy' -Properties @{
@@ -398,37 +645,87 @@ function Add-TestAction {
     [void]$script:TestActions.Add([pscustomobject]$entry)
 }
 
+function Get-ValidatedInternalHookPath {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $TestRoot,
+        [switch] $MustExist)
+
+    $target = Get-NormalizedPath $Path
+    if (-not (Test-PathIsStrictDescendant `
+            -Path $target `
+            -Boundary $TestRoot)) {
+        throw "Internal hook must stay inside the unique test directory: $TestRoot"
+    }
+
+    Assert-NoReparsePoint -Path $target -Boundary $TestRoot
+    $parent = Split-Path -Path $target -Parent
+    if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+        throw "Internal hook parent directory does not exist: $parent"
+    }
+
+    if ($MustExist -and
+        -not (Test-Path -LiteralPath $target -PathType Leaf)) {
+        throw "Internal hook file does not exist: $target"
+    }
+
+    return $target
+}
+
+function Get-ValidatedInternalDirectoryPath {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $TestRoot)
+
+    $target = Get-NormalizedPath $Path
+    if (-not (Test-PathIsStrictDescendant `
+            -Path $target `
+            -Boundary $TestRoot)) {
+        throw (
+            'Internal directory hook must stay inside the unique test ' +
+            "directory: $TestRoot")
+    }
+
+    Assert-NoReparsePointTree -Path $target -Boundary $TestRoot
+    if (-not (Test-Path -LiteralPath $target -PathType Container)) {
+        throw "Internal directory hook does not exist: $target"
+    }
+
+    return $target
+}
+
 function Write-TestActionLog {
     if (-not $InternalTestMode -or
-        [string]::IsNullOrWhiteSpace($InternalActionLogPath)) {
+        [string]::IsNullOrWhiteSpace(
+            $script:ValidatedInternalActionLogPath)) {
         return
     }
 
     $json = ConvertTo-Json -InputObject @($script:TestActions) -Compress
     [System.IO.File]::WriteAllText(
-        (Get-NormalizedPath $InternalActionLogPath),
+        $script:ValidatedInternalActionLogPath,
         $json,
         [System.Text.UTF8Encoding]::new($false))
 }
 
 function Get-CodexQuotaHudProcesses {
     if ($InternalTestMode) {
-        if ([string]::IsNullOrWhiteSpace($InternalProcessSnapshotPath)) {
+        if ([string]::IsNullOrWhiteSpace(
+            $script:ValidatedInternalProcessSnapshotPath)) {
             return @()
         }
 
         $json = Get-Content `
-            -LiteralPath $InternalProcessSnapshotPath `
+            -LiteralPath $script:ValidatedInternalProcessSnapshotPath `
             -Raw `
             -Encoding UTF8
         $parsed = ConvertFrom-Json -InputObject $json
         return @($parsed | ForEach-Object { $_ })
     }
 
-    return @(Get-CimInstance `
-        -ClassName Win32_Process `
-        -Filter "Name = 'CodexQuotaHud.App.exe'" `
-        -ErrorAction Stop)
+    return @(Get-Process `
+        -Name 'CodexQuotaHud.App' `
+        -ErrorAction SilentlyContinue)
 }
 
 function Get-ExactInstalledProcesses {
@@ -436,35 +733,81 @@ function Get-ExactInstalledProcesses {
 
     $matches = [System.Collections.ArrayList]::new()
     foreach ($process in @(Get-CodexQuotaHudProcesses)) {
-        if ($null -eq $process -or
-            -not [string]::Equals(
-                [string]$process.Name,
-                'CodexQuotaHud.App.exe',
-                [System.StringComparison]::OrdinalIgnoreCase)) {
+        if ($InternalTestMode) {
+            if ($null -eq $process -or
+                -not [string]::Equals(
+                    [string]$process.Name,
+                    'CodexQuotaHud.App.exe',
+                    [System.StringComparison]::OrdinalIgnoreCase)) {
+                continue
+            }
+
+            if ([string]::IsNullOrWhiteSpace(
+                [string]$process.ExecutablePath)) {
+                throw (
+                    "Executable path cannot be inspected for matching " +
+                    "process $([int]$process.ProcessId).")
+            }
+
+            $processPath = try {
+                Get-NormalizedPath ([string]$process.ExecutablePath)
+            }
+            catch {
+                throw (
+                    "Executable path cannot be inspected for matching " +
+                    "process $([int]$process.ProcessId).")
+            }
+
+            if (Test-PathEquals $processPath $ExecutablePath) {
+                if ([string]::IsNullOrWhiteSpace(
+                    [string]$process.ProcessIdentity)) {
+                    throw (
+                        "Stable process identity cannot be inspected for " +
+                        "matching process $([int]$process.ProcessId).")
+                }
+
+                [void]$matches.Add([pscustomobject]@{
+                    ProcessId = [int]$process.ProcessId
+                    ProcessIdentity = [string]$process.ProcessIdentity
+                    ExecutablePath = $processPath
+                    ProcessObject = $null
+                })
+            }
+
             continue
         }
 
-        if ([string]::IsNullOrWhiteSpace(
-            [string]$process.ExecutablePath)) {
-            throw (
-                "Executable path cannot be inspected for matching process " +
-                "$([int]$process.ProcessId).")
-        }
+        $safeHandle = $null
+        $processPath = $null
+        try {
+            $safeHandle = $process.SafeHandle
+            if ($null -eq $safeHandle -or
+                $safeHandle.IsInvalid -or
+                $safeHandle.IsClosed) {
+                throw 'Process handle is unavailable.'
+            }
 
-        $processPath = try {
-            Get-NormalizedPath ([string]$process.ExecutablePath)
+            $processPath = Get-NormalizedPath (
+                [string]$process.MainModule.FileName)
         }
         catch {
+            $process.Dispose()
             throw (
-                "Executable path cannot be inspected for matching process " +
-                "$([int]$process.ProcessId).")
+                "Executable path and stable handle cannot be inspected for " +
+                "matching process $([int]$process.Id).")
         }
 
         if (Test-PathEquals $processPath $ExecutablePath) {
             [void]$matches.Add([pscustomobject]@{
-                ProcessId = [int]$process.ProcessId
+                ProcessId = [int]$process.Id
+                ProcessIdentity = (
+                    $safeHandle.DangerousGetHandle().ToInt64().ToString())
                 ExecutablePath = $processPath
+                ProcessObject = $process
             })
+        }
+        else {
+            $process.Dispose()
         }
     }
 
@@ -473,6 +816,8 @@ function Get-ExactInstalledProcesses {
 
 function Wait-ForExactInstalledInstanceExit {
     param(
+        [AllowEmptyCollection()]
+        [Parameter(Mandatory = $true)][object[]] $Processes,
         [Parameter(Mandatory = $true)][string] $ExecutablePath,
         [Parameter(Mandatory = $true)][int] $TimeoutSeconds)
 
@@ -481,21 +826,31 @@ function Wait-ForExactInstalledInstanceExit {
             ExecutablePath = $ExecutablePath
             TimeoutSeconds = $TimeoutSeconds
         }
-        return @(Get-ExactInstalledProcesses -ExecutablePath $ExecutablePath)
+        return @($Processes)
     }
 
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    do {
-        $remaining = @(
-            Get-ExactInstalledProcesses -ExecutablePath $ExecutablePath)
-        if ($remaining.Count -eq 0) {
-            return @()
+    $remaining = [System.Collections.ArrayList]::new()
+    foreach ($entry in @($Processes)) {
+        $milliseconds = [Math]::Max(
+            0,
+            [int][Math]::Ceiling(
+                ($deadline - [DateTime]::UtcNow).TotalMilliseconds))
+        $exited = try {
+            $entry.ProcessObject.WaitForExit($milliseconds)
+        }
+        catch {
+            throw (
+                "Cannot wait on the validated process handle for " +
+                "$($entry.ProcessId).")
         }
 
-        Start-Sleep -Milliseconds 100
-    } while ([DateTime]::UtcNow -lt $deadline)
+        if (-not $exited) {
+            [void]$remaining.Add($entry)
+        }
+    }
 
-    return $remaining
+    return @($remaining)
 }
 
 function Stop-ExactInstalledInstance {
@@ -524,54 +879,123 @@ function Stop-ExactInstalledInstance {
         }
     }
 
-    $remaining = @(
-        Wait-ForExactInstalledInstanceExit `
-            -ExecutablePath $ExecutablePath `
-            -TimeoutSeconds 2)
-    foreach ($process in $remaining) {
-        if ($InternalTestMode) {
-            Add-TestAction -Action 'StopProcess' -Properties @{
-                ProcessId = $process.ProcessId
-                ExecutablePath = $process.ExecutablePath
+    $validatedProcesses = @(
+        Get-ExactInstalledProcesses -ExecutablePath $ExecutablePath)
+    try {
+        $remaining = @(
+            Wait-ForExactInstalledInstanceExit `
+                -Processes $validatedProcesses `
+                -ExecutablePath $ExecutablePath `
+                -TimeoutSeconds 2)
+        foreach ($process in $remaining) {
+            if ($InternalTestMode) {
+                Add-TestAction -Action 'StopProcess' -Properties @{
+                    ProcessId = $process.ProcessId
+                    ProcessIdentity = $process.ProcessIdentity
+                    ExecutablePath = $process.ExecutablePath
+                }
+            }
+            else {
+                try {
+                    $process.ProcessObject.Kill()
+                }
+                catch [System.InvalidOperationException] {
+                    if (-not $process.ProcessObject.HasExited) {
+                        throw
+                    }
+                }
             }
         }
-        else {
-            Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+
+        $stillRunning = @(
+            Wait-ForExactInstalledInstanceExit `
+                -Processes $remaining `
+                -ExecutablePath $ExecutablePath `
+                -TimeoutSeconds 10)
+        if (-not $InternalTestMode -and $stillRunning.Count -gt 0) {
+            $processIds = $stillRunning.ProcessId -join ', '
+            throw (
+                'Timed out waiting for exact installed process handle to ' +
+                "exit: $processIds")
         }
     }
-
-    $stillRunning = @(
-        Wait-ForExactInstalledInstanceExit `
-            -ExecutablePath $ExecutablePath `
-            -TimeoutSeconds 10)
-    if (-not $InternalTestMode -and $stillRunning.Count -gt 0) {
-        $processIds = $stillRunning.ProcessId -join ', '
-        throw "Timed out waiting for exact installed process to exit: $processIds"
+    finally {
+        if (-not $InternalTestMode) {
+            foreach ($process in $validatedProcesses) {
+                $process.ProcessObject.Dispose()
+            }
+        }
     }
 }
 
 try {
-    if ([string]::IsNullOrWhiteSpace($LocalAppDataRoot)) {
-        $LocalAppDataRoot = [Environment]::GetFolderPath(
-            [Environment+SpecialFolder]::LocalApplicationData)
-    }
-
-    $localRoot = Get-NormalizedPath $LocalAppDataRoot
+    $systemLocalRoot = Get-NormalizedPath (
+        [Environment]::GetFolderPath(
+            [Environment+SpecialFolder]::LocalApplicationData))
     if ($InternalTestMode) {
+        if ([string]::IsNullOrWhiteSpace($LocalAppDataRoot)) {
+            throw 'Internal test mode requires -LocalAppDataRoot.'
+        }
+
+        $localRoot = Get-NormalizedPath $LocalAppDataRoot
         $systemTemp = Get-NormalizedPath ([System.IO.Path]::GetTempPath())
-        if (-not $localRoot.StartsWith(
-            $systemTemp,
-            [System.StringComparison]::OrdinalIgnoreCase)) {
+        $testRoot = Get-NormalizedPath (
+            Split-Path -Path $localRoot -Parent)
+        if (-not [string]::Equals(
+                (Split-Path -Path $localRoot -Leaf),
+                'LocalAppData',
+                [System.StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-PathIsStrictDescendant `
+                -Path $testRoot `
+                -Boundary $systemTemp)) {
             throw (
                 'Internal test LocalAppData must stay inside the system ' +
                 'temporary directory.')
         }
+
+        Assert-NoReparsePoint -Path $localRoot -Boundary $systemTemp
+        if (-not [string]::IsNullOrWhiteSpace(
+            $InternalProcessSnapshotPath)) {
+            $script:ValidatedInternalProcessSnapshotPath =
+                Get-ValidatedInternalHookPath `
+                    -Path $InternalProcessSnapshotPath `
+                    -TestRoot $testRoot `
+                    -MustExist
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($InternalActionLogPath)) {
+            $script:ValidatedInternalActionLogPath =
+                Get-ValidatedInternalHookPath `
+                    -Path $InternalActionLogPath `
+                    -TestRoot $testRoot
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace(
+            $InternalPrepareBackupFailureReparseTargetPath)) {
+            $script:ValidatedBackupFailureTarget =
+                Get-ValidatedInternalDirectoryPath `
+                    -Path $InternalPrepareBackupFailureReparseTargetPath `
+                    -TestRoot $testRoot
+        }
     }
-    elseif (-not [string]::IsNullOrWhiteSpace(
+    else {
+        if (-not [string]::IsNullOrWhiteSpace($LocalAppDataRoot) -and
+            -not (Test-PathEquals $LocalAppDataRoot $systemLocalRoot)) {
+            throw (
+                'Production LocalAppDataRoot must equal the system ' +
+                'LocalApplicationData directory.')
+        }
+
+        $localRoot = $systemLocalRoot
+        if (-not [string]::IsNullOrWhiteSpace(
             $InternalProcessSnapshotPath) -or
-        -not [string]::IsNullOrWhiteSpace($InternalActionLogPath) -or
-        $InternalSkipShutdownSignal) {
-        throw 'Internal lifecycle hooks require -InternalTestMode.'
+            -not [string]::IsNullOrWhiteSpace($InternalActionLogPath) -or
+            $InternalSkipShutdownSignal -or
+            $InternalRollbackCopyFailureAfterItemCount -ne 0 -or
+            -not [string]::IsNullOrWhiteSpace(
+                $InternalPrepareBackupFailureReparseTargetPath)) {
+            throw 'Internal lifecycle hooks require -InternalTestMode.'
+        }
     }
 
     $target = Get-ValidatedInstallTarget `
