@@ -1,42 +1,37 @@
 # Current Task
 
-## v1.1.0 installer release candidate — manual acceptance pending
+## v1.1.0 installer release candidate — locally accepted
 
-The corrected release candidate is in the feature worktree pending commit.
-Fresh Release verification passed Core `55/55`, App/UI `331/331`, total
-`386/386`; `dotnet build` reported `0` warnings and `0` errors. Packaging
+The installer implementation is committed on the feature branch at `1f15100`.
+Fresh Release verification passed Core `55/55`, App/UI `332/332`, total
+`387/387`; `dotnet build` reported `0` warnings and `0` errors. Final packaging
 produced:
 
-- `CodexQuotaHud-Setup-v1.1.0.exe` — 50,880,224 bytes, SHA-256
-  `628ba0cb457b93e1cd063fe3f954f09b9d1ab5747e0a0cb9f6e5fdae1185514a`
-- `CodexQuotaHud-v1.1.0-win-x64.zip` — 68,202,773 bytes, SHA-256
-  `5f834e0928b61d6ad96719fe8f0b82dafe832453aee6425123ef7d4c4d6b0f67`
+- `CodexQuotaHud-Setup-v1.1.0.exe` — 50,882,622 bytes, SHA-256
+  `2fe3877974a3ee24904b0c63f858e4f94eb61d3bbb0768cbbd951963fed3266c`
+- `CodexQuotaHud-v1.1.0-win-x64.zip` — 68,202,656 bytes, SHA-256
+  `c6d563813ffc26a18a4fac1d82637db1cebf60c930aaf240defb93c31617544a`
 
-The production Setup contains no internal smoke hooks. Four isolated smoke
-scenarios passed using a separately compiled, temporary Setup that is not a
-release asset: clean install; upgrade with task replacement; default uninstall
-that preserves settings; and explicit purge uninstall.
+The production Setup contains no internal smoke hooks. A separately compiled
+temporary Setup passed clean install, upgrade/task replacement, default
+settings-preserving uninstall, and explicit purge uninstall, then its isolated
+files and registry values were removed with checked postconditions.
 
-Manual acceptance is partially complete. The earlier candidate upgraded the
-real `v1.0.0` to `v1.1.0`, preserved settings, and created the expected startup,
-Start-menu, and normal desktop entries. It also exposed a now-rejected preview
-shortcut task. Its first uninstall attempt failed after stopping the HUD because
-redirected 32-bit PowerShell could not inspect the 64-bit executable path.
-
-The corrected Setup removes the production preview task, invokes native 64-bit
-PowerShell, and retains the previous startup/desktop selections during upgrade.
-Regression, full-suite, build, packaging, and four-scenario isolated smoke
-verification pass. Real corrected-Setup overwrite also passed with settings
-preserved and no preview shortcut. Default preserve uninstall, explicit purge
-uninstall, settings restore, and final reinstall remain pending. Do not tag,
-upload, or describe this candidate as manually accepted yet.
+Real-machine acceptance is complete for overwrite install and both uninstall
+modes. The final Setup installed with exit code `0`; installed and published
+executable hashes match. Startup runs the formal HUD with `--background`. The
+desktop contains only `Codex Quota HUD 开发预览` with `--preview`; the legacy
+normal desktop link is absent. The normal Start-menu entry remains. Both
+settings files retained their pre-install hashes. No tag, upload, push, or
+GitHub Release update has been performed.
 
 ## Status
 
 Version `1.0.0` is released. The isolated developer preview and the symmetric
-installed/preview handoff are implemented on
-`codex/preview-replaces-installed-app`. Automated regression verification is
-complete; the two-direction desktop acceptance and branch integration remain.
+installed/preview handoff are included in the locally installed `v1.1.0`
+candidate. Installer implementation and local acceptance are complete on
+`feat/inno-setup-installer-20260731`; branch integration, push, tag, asset
+upload, and GitHub Release publication remain.
 
 ## Last completed work
 
@@ -51,8 +46,9 @@ complete; the two-direction desktop acceptance and branch integration remain.
 - Automated Release verification passed the focused alert set `66/66`, Core
   `55/55`, App/UI `266/266`, total `321/321`, and a zero-warning, zero-error
   Release build. GUI/manual preview acceptance was not authorized or performed.
-- Installed `v1.0.0`, deployment, release assets, and remote/push state remain
-  unchanged.
+- That alert-only change did not itself alter installation, release assets, or
+  remote state; the later installer work described above installed `v1.1.0`
+  locally.
 
 - Added `--preview` with a real HUD and separate developer control panel.
 - Added dual, five-hour-only, weekly-only, and no-quota synthetic states.
@@ -89,23 +85,16 @@ all five skins, full HUD, details, tray, and each collapsed edge side. Confirm
 that colors return to normal above `20%` and that no flashing, popup, sound,
 settings, or refresh behavior was introduced.
 
-When GUI launch is authorized, perform the two-direction desktop acceptance
-only after the existing preview shortcut targets the reviewed feature
-artifact. Either merge the reviewed feature branch and rebuild the canonical
-shortcut target, or temporarily retarget the shortcut to the feature
-worktree's reviewed Release artifact. Record the exact tested Git commit and
-artifact path or hash with the acceptance result.
+For optional GUI acceptance, start the installed normal HUD, then launch the
+desktop `Codex Quota HUD 开发预览` shortcut and confirm the normal HUD exits
+before preview opens. Click `退出预览并打开正式版` and confirm preview closes
+before exactly one installed HUD returns. The installed `v1.1.0` candidate is
+listener-enabled, so this now exercises graceful signalling rather than the
+legacy fallback. Record commit `1f15100` and the final Setup hash above.
 
-Start the current installed `v1.0.0`, launch the `Codex Quota HUD 开发预览`
-shortcut, and confirm the installed HUD disappears before preview opens.
-Because `v1.0.0` predates the listener, this first direction should exercise
-the legacy exact-path fallback. Then click `退出预览并打开正式版` and confirm
-preview closes before exactly one installed tray/HUD returns.
-
-The current source change did not upgrade or deploy installed `v1.0.0`.
-Graceful signalling remains unverified until a listener-enabled build is
-installed. No GUI process was launched for this handoff, so both manual
-directions remain unchecked.
+If the user decides to publish `v1.1.0`, review the feature branch and final
+assets, then explicitly authorize push, tag creation, asset upload, and GitHub
+Release publication. Do not infer that authorization from local acceptance.
 
 ## Manual checks for future UI changes
 
@@ -115,8 +104,7 @@ directions remain unchecked.
 - Single-click toggle and double-click refresh separation.
 - Existing instance activation and tray percentage rendering.
 - All five skins in both full HUD and edge-bar states.
-- Installed-to-preview replacement through the legacy exact-path fallback.
+- Installed-to-preview replacement through graceful listener shutdown.
 - Preview-to-installed reverse handoff, including exactly one returned
-  installed tray/HUD. The graceful listener path must be checked separately
-  after a listener-enabled build is installed.
+  installed tray/HUD.
 

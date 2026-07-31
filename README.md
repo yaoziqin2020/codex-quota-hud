@@ -31,14 +31,15 @@ to `%LOCALAPPDATA%\\Programs\\CodexQuotaHud`.
 安装器会自动提供简体中文和英文；它只为当前 Windows 用户安装，不需要管理员权限，安装路径为
 `%LOCALAPPDATA%\\Programs\\CodexQuotaHud`。
 
-The Setup task page contains only startup at sign-in and the normal desktop
-shortcut, both selected by default. Developer Preview is intentionally absent
-from the release Setup. ZIP users can launch it explicitly with
-`CodexQuotaHud.App.exe --preview` when development testing is needed.
+The Setup task page contains startup at sign-in and a Developer Preview desktop
+shortcut, both selected by default. The normal HUD has no desktop shortcut; it
+starts in the background at sign-in and remains available from the Start menu.
+ZIP users can also launch preview explicitly with
+`CodexQuotaHud.App.exe --preview`.
 
-Setup 的任务页只包含开机启动和普通桌面快捷方式，两项默认勾选。正式安装包不会提供
-“开发预览”选项；使用 ZIP 的开发者如需测试，可明确运行
-`CodexQuotaHud.App.exe --preview`。
+Setup 的任务页包含开机启动和“开发预览”桌面快捷方式，两项默认勾选。正式 HUD
+不创建桌面快捷方式：它会在登录时后台启动，也可从开始菜单打开。ZIP 用户也可以明确运行
+`CodexQuotaHud.App.exe --preview` 进入预览模式。
 
 Install `v1.1.0` directly over `v1.0.0`; personal HUD settings and Developer
 Preview window state are retained by default. Normal uninstall preserves those

@@ -1,5 +1,22 @@
 # AI Change Log
 
+## 2026-07-31 — Final installer shortcut and uninstall acceptance
+
+- Changed the release Setup default to current-user startup plus a Developer
+  Preview desktop shortcut. The normal HUD no longer gets a desktop shortcut;
+  upgrades explicitly remove the legacy managed normal desktop link.
+- Moved the purge-settings choice to a usable pre-uninstall form and delayed
+  process shutdown until uninstall is confirmed. Added final removal of exact
+  legacy install residue after Inno cleanup.
+- Verification passed Core `55/55`, App/UI `332/332`, total `387/387`, a
+  zero-warning/zero-error Release build, and all four isolated installer smoke
+  scenarios. Real default-preserve and explicit-purge uninstall acceptance also
+  passed.
+- Installed the final Setup from commit `1f15100` with exit code `0`. The real
+  machine now has formal `--background` startup, one desktop Developer Preview
+  shortcut with `--preview`, no normal desktop shortcut, and unchanged settings
+  hashes. Final asset hashes are recorded in `PROJECT_CONTEXT.md`.
+
 ## 2026-07-31 — Release Setup preview isolation and lifecycle fix
 
 - Removed the Developer Preview shortcut option from the production Setup;

@@ -13,23 +13,27 @@ Repository: https://github.com/yaoziqin2020/codex-quota-hud
 The primary distribution path is the current-user Inno Setup executable
 `CodexQuotaHud-Setup-v1.1.0.exe`; ZIP plus its PowerShell script is fallback
 only, and GitHub Packages is unused. Setup offers English/Simplified Chinese,
-requires no administrator permission, and selects startup and the normal
-desktop shortcut by default. Release Setup contains no Developer Preview
-shortcut option; ZIP users can explicitly run the executable with `--preview`.
+requires no administrator permission, and selects startup plus the Developer
+Preview desktop shortcut by default. It does not create a normal-HUD desktop
+shortcut; the normal HUD starts in the background at sign-in and remains
+available from the Start menu. ZIP users can also run the executable with
+`--preview`.
 It directly upgrades `v1.0.0` while preserving settings by default. Uninstall
 preserves settings unless the user explicitly opts in to purge the exact
 `%LOCALAPPDATA%\\CodexQuotaHud` directory.
 
 The candidate Setup is unsigned, so SmartScreen may report an unknown
-publisher; verify SHA-256 before running it. Corrected local assets are Setup
-50,880,224 bytes / `628ba0cb457b93e1cd063fe3f954f09b9d1ab5747e0a0cb9f6e5fdae1185514a`
-and ZIP 68,202,773 bytes /
-`5f834e0928b61d6ad96719fe8f0b82dafe832453aee6425123ef7d4c4d6b0f67`.
+publisher; verify SHA-256 before running it. Final local assets are Setup
+50,882,622 bytes / `2fe3877974a3ee24904b0c63f858e4f94eb61d3bbb0768cbbd951963fed3266c`
+and ZIP 68,202,656 bytes /
+`c6d563813ffc26a18a4fac1d82637db1cebf60c930aaf240defb93c31617544a`.
 
 Production assets contain no internal smoke hooks. A temporary, separately
 compiled Setup passed all four isolated smoke scenarios and was cleaned up; it
-is not a release asset. Corrected-Setup overwrite passed on the real machine;
-both uninstall modes still require real-desktop acceptance.
+is not a release asset. Both real uninstall modes passed. The final Setup from
+commit `1f15100` was installed with exit code `0`; the startup value, preview
+shortcut arguments, installed binary hash, preserved settings, and uninstall
+registration were verified on the real machine.
 
 ## Product behavior
 
@@ -77,10 +81,11 @@ It does not call a private web endpoint directly.
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 
-The installed `v1.0.0` package has not been upgraded or deployed by the source
-handoff work. It lacks the new listener, so it is the future manual target for
-the legacy exact-path fallback. Graceful signalling can be manually checked
-only after a listener-enabled build is installed.
+The real machine currently has the locally accepted `v1.1.0` candidate from
+commit `1f15100`. It includes the installed-mode shutdown listener, so future
+two-direction preview handoff acceptance exercises graceful signalling. The
+public GitHub release remains `v1.0.0` until push/tag/upload is explicitly
+authorized.
 
 Do not treat the old conversation worktree under
 `Documents\Codex\2026-07-27\new-chat` as the long-term project root.
@@ -88,11 +93,15 @@ Do not treat the old conversation worktree under
 ## Quality baseline
 
 - Core tests: 55
-- App/UI tests: 266
-- Total: 321
+- App/UI tests: 332
+- Total: 387
 - 2026-07-31 Release verification: focused low-quota alert tests 66/66;
   full suite Core 55/55, App/UI 266/266, total 321/321; build zero warnings
   and zero errors. GUI/manual preview acceptance was not performed.
+- 2026-07-31 final installer verification: Core 55/55, App/UI 332/332,
+  total 387/387; build zero warnings and zero errors; four isolated installer
+  scenarios and real-machine install/default-uninstall/purge-uninstall checks
+  passed.
 - GitHub Windows CI covers restore, test, build, and self-contained publish.
 - The asynchronous test wait helper is time-based to remain stable on slower
   GitHub Windows runners.
