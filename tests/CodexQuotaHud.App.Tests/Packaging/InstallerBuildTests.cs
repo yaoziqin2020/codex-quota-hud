@@ -310,6 +310,21 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
+    public void TestInstallerScript_UsesAsciiCopyToReadUnicodeShortcut()
+    {
+        var script = File.ReadAllText(TestInstallerScript);
+
+        Assert.Contains("codex-quota-hud-shortcut-", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Copy-Item -LiteralPath $ShortcutPath", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Remove-Item -LiteralPath $asciiShortcutPath", script,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("ReadAllBytes($ShortcutPath)", script,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TestInstallerScript_RequiresSnapshotsAndCleanupPostconditions()
     {
         var script = File.ReadAllText(TestInstallerScript);

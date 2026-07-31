@@ -251,11 +251,11 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前源码包含 387 项自动化测试：
+当前源码包含 388 项自动化测试：
 
 - Core：55 项
-- App / UI：332 项
-- Total：387 项
+- App / UI：333 项
+- Total：388 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore

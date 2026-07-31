@@ -19,8 +19,11 @@
   and hiding the built-in `Get-FileHash` command.
 - Made shortcut inspection locale-neutral in installer smoke tests. It still
   verifies the exact executable path and `--preview`; when WScript cannot read
-  a Unicode `.lnk` filename on an English runner, it verifies both values from
-  the shortcut binary instead of treating an empty COM result as product data.
+  a Unicode `.lnk` filename on an English runner, it copies the same shortcut
+  to a temporary ASCII-only filename and asks WScript to parse that copy. The
+  temporary link is removed with checked cleanup. Added a regression test;
+  the current source baseline is Core `55/55`, App/UI `333/333`, total
+  `388/388`.
 
 ## 2026-07-31 — Final installer shortcut and uninstall acceptance
 

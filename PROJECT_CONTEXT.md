@@ -93,8 +93,8 @@ Do not treat the old conversation worktree under
 ## Quality baseline
 
 - Core tests: 55
-- App/UI tests: 332
-- Total: 387
+- App/UI tests: 333
+- Total: 388
 - 2026-07-31 Release verification: focused low-quota alert tests 66/66;
   full suite Core 55/55, App/UI 266/266, total 321/321; build zero warnings
   and zero errors. GUI/manual preview acceptance was not performed.
@@ -123,7 +123,7 @@ Do not treat the old conversation worktree under
   timing as regression-sensitive.
 - The developer preview is entered only with `--preview`; it uses synthetic
   in-memory data and must never replace real app-server acceptance.
-- Run focused tests for changed behavior, then the full 387-test suite.
+- Run focused tests for changed behavior, then the full 388-test suite.
 - Use the Developer Preview sliders as the manual boundary and mixed-state
   tool for alert colors; inspect normal (`>20%`), Warning (`>10%..20%`), and
   Critical (`<=10%`) states independently for both quotas.

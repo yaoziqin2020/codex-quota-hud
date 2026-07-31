@@ -125,12 +125,17 @@ function Assert-PreviewShortcut {
         [Parameter(Mandatory = $true)][string] $ExpectedTarget)
 
     $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $null
     try {
         $shortcut = $shell.CreateShortcut($ShortcutPath)
         $target = [string]$shortcut.TargetPath
         $arguments = [string]$shortcut.Arguments
     }
     finally {
+        if ($null -ne $shortcut) {
+            [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject(
+                $shortcut)
+        }
         if ($null -ne $shell) {
             [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject(
                 $shell)
@@ -148,27 +153,42 @@ function Assert-PreviewShortcut {
         return
     }
 
-    $bytes = [System.IO.File]::ReadAllBytes($ShortcutPath)
-    $asciiText = [System.Text.Encoding]::ASCII.GetString($bytes)
-    $unicodeText = [System.Text.Encoding]::Unicode.GetString($bytes)
-    $targetFound =
-        $asciiText.IndexOf(
-            $ExpectedTarget,
-            [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-        $unicodeText.IndexOf(
-            $ExpectedTarget,
-            [System.StringComparison]::OrdinalIgnoreCase) -ge 0
-    $argumentsFound =
-        $asciiText.IndexOf(
-            '--preview',
-            [System.StringComparison]::Ordinal) -ge 0 -or
-        $unicodeText.IndexOf(
-            '--preview',
-            [System.StringComparison]::Ordinal) -ge 0
-    if (-not $targetFound -or -not $argumentsFound) {
-        throw 'Preview desktop link binary has an unexpected target or arguments.'
+    $asciiShortcutPath = Join-Path `
+        ([System.IO.Path]::GetTempPath()) `
+        ('codex-quota-hud-shortcut-' +
+            [System.Guid]::NewGuid().ToString('N') + '.lnk')
+    $fallbackShell = $null
+    $fallbackShortcut = $null
+    try {
+        Copy-Item -LiteralPath $ShortcutPath -Destination $asciiShortcutPath
+        $fallbackShell = New-Object -ComObject WScript.Shell
+        $fallbackShortcut = $fallbackShell.CreateShortcut($asciiShortcutPath)
+        $target = [string]$fallbackShortcut.TargetPath
+        $arguments = [string]$fallbackShortcut.Arguments
     }
-    Write-Host 'Preview desktop link verified with locale-neutral binary fallback.'
+    finally {
+        if ($null -ne $fallbackShortcut) {
+            [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject(
+                $fallbackShortcut)
+        }
+        if ($null -ne $fallbackShell) {
+            [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject(
+                $fallbackShell)
+        }
+        if (Test-Path -LiteralPath $asciiShortcutPath) {
+            Remove-Item -LiteralPath $asciiShortcutPath -Force
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($target) -or
+        -not (Test-PathEquals $target $ExpectedTarget) -or
+        -not [string]::Equals(
+            $arguments.Trim(),
+            '--preview',
+            [System.StringComparison]::Ordinal)) {
+        throw 'Preview desktop link has an unexpected target or arguments.'
+    }
+    Write-Host 'Preview desktop link verified through an ASCII-path copy.'
 }
 
 function Invoke-SetupProcess {
