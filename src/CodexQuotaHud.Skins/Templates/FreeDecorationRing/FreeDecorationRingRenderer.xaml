@@ -1,0 +1,50 @@
+<templates:CustomSkinRenderer x:Class="CodexQuotaHud.Skins.Templates.FreeDecorationRing.FreeDecorationRingRenderer"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CodexQuotaHud.Skins.Templates.FreeDecorationRing"
+        xmlns:templates="clr-namespace:CodexQuotaHud.Skins.Templates"
+        Width="132" Height="132" Background="Transparent">
+    <Grid x:Name="RootGrid" Width="132" Height="132" ClipToBounds="True">
+        <Rectangle x:Name="BackgroundImage" Panel.ZIndex="0"
+                   Width="132" Height="132" IsHitTestVisible="False"
+                   RenderTransformOrigin=".5,.5">
+            <Rectangle.Clip>
+                <EllipseGeometry Center="66,66" RadiusX="64" RadiusY="64" />
+            </Rectangle.Clip>
+        </Rectangle>
+
+        <Ellipse x:Name="BaseFill" Panel.ZIndex="10"
+                 Width="124" Height="124" IsHitTestVisible="False" />
+
+        <Rectangle x:Name="DecorationImage" Panel.ZIndex="20"
+                   Width="132" Height="132" IsHitTestVisible="False"
+                   RenderTransformOrigin=".5,.5" />
+
+        <Rectangle x:Name="CenterImage" Panel.ZIndex="30"
+                   Width="64" Height="64" IsHitTestVisible="False"
+                   RenderTransformOrigin=".5,.5">
+            <Rectangle.Clip>
+                <EllipseGeometry Center="32,32" RadiusX="32" RadiusY="32" />
+            </Rectangle.Clip>
+        </Rectangle>
+
+        <Ellipse x:Name="SecondaryTrack" Panel.ZIndex="40"
+                 Fill="Transparent" IsHitTestVisible="False" />
+        <local:FreeDecorationRingArc x:Name="SecondaryProgress"
+                 Panel.ZIndex="41" IsHitTestVisible="False" />
+        <Ellipse x:Name="PrimaryTrack" Panel.ZIndex="50"
+                 Fill="Transparent" IsHitTestVisible="False" />
+        <local:FreeDecorationRingArc x:Name="PrimaryProgress"
+                 Panel.ZIndex="51" IsHitTestVisible="False" />
+
+        <TextBlock x:Name="QuotaNumber" Panel.ZIndex="60"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="#FFF7FCFF" TextAlignment="Center"
+                   FontFamily="Segoe UI Variable Display"
+                   IsHitTestVisible="False" />
+        <TextBlock x:Name="QuotaLabel" Panel.ZIndex="61"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="#CDE7F4FA" TextAlignment="Center"
+                   IsHitTestVisible="False" />
+    </Grid>
+</templates:CustomSkinRenderer>
