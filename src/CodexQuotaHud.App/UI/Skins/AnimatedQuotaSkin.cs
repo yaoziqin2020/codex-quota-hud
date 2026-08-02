@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Media.Animation;
 using CodexQuotaHud.App.UI.Animation;
 using CodexQuotaHud.Core.Models;
+using CodexQuotaHud.Core.Settings;
 
 namespace CodexQuotaHud.App.UI.Skins;
 
@@ -25,6 +26,8 @@ public abstract class AnimatedQuotaSkin :
     private int? _desiredFrameRate;
 
     public abstract SkinId Id { get; }
+
+    public string SelectionKey => SkinSelectionKey.FromBuiltIn(Id);
 
     public FrameworkElement View => this;
 

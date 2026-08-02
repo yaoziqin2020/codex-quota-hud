@@ -89,7 +89,8 @@ public enum PopupDecorationKind
     EnergyRing,
     LiquidGlass,
     Aurora,
-    LiquidTank
+    LiquidTank,
+    Custom
 }
 
 public static class PopupThemeProvider

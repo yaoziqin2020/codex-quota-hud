@@ -10,6 +10,7 @@ using CodexQuotaHud.App.UI.Animation;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.Core.Models;
+using CodexQuotaHud.Core.Settings;
 using MenuItem = System.Windows.Controls.MenuItem;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
@@ -35,13 +36,43 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
     private bool _contextMenuOpen;
 
     public QuotaOrbWindow(QuotaOrbViewModel viewModel)
+        : this(viewModel, new SkinController(), initializeSelection: true)
+    {
+    }
+
+    internal QuotaOrbWindow(
+        QuotaOrbViewModel viewModel,
+        SkinController skinController)
+        : this(viewModel, skinController, initializeSelection: false)
+    {
+    }
+
+    private QuotaOrbWindow(
+        QuotaOrbViewModel viewModel,
+        SkinController skinController,
+        bool initializeSelection)
     {
         InitializeComponent();
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+        _skinController = skinController ?? throw new ArgumentNullException(
+            nameof(skinController));
         DataContext = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        _skinController = new SkinController();
-        var selected = _skinController.Select(viewModel.SelectedSkin);
+        _viewModel.SetSkinActivationHandler(TryActivateSkinKey);
+        if (initializeSelection &&
+            !string.Equals(
+                _skinController.CurrentDescriptor.SelectionKey,
+                viewModel.SelectedSkinKey,
+                StringComparison.Ordinal) &&
+            _skinController.TryPrepare(
+                viewModel.SelectedSkinKey,
+                out var initial,
+                out _))
+        {
+            _skinController.Activate(initial!);
+        }
+
+        var selected = _skinController.CurrentSkin;
         _animationController = new OrbAnimationController(
             selected as IOrbAnimationTarget);
         SetSkinView(selected.View);
@@ -71,6 +102,31 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         {
             Top = top;
         }
+    }
+
+    internal SkinController SkinController => _skinController;
+
+    bool IPreviewHud.TryActivateSkinKey(string selectionKey) =>
+        TryActivateSkinKey(selectionKey);
+
+    public bool TryActivateSkinKey(string selectionKey)
+    {
+        if (!_skinController.TryPrepare(
+                selectionKey,
+                out var candidate,
+                out _))
+        {
+            return false;
+        }
+
+        if (!_viewModel.TrySelectSkinKey(selectionKey))
+        {
+            return false;
+        }
+
+        _skinController.Activate(candidate!);
+        ApplyActiveSkin();
+        return true;
     }
 
     public void SetSkinView(FrameworkElement view)
@@ -175,10 +231,6 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             ApplyVisibility();
             ApplyAnimationState();
         }
-        else if (e.PropertyName == nameof(QuotaOrbViewModel.SelectedSkin))
-        {
-            ApplySelectedSkin();
-        }
         else if (e.PropertyName == nameof(QuotaOrbViewModel.SkinState))
         {
             _skinController.Render(_viewModel.SkinState);
@@ -189,12 +241,11 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         }
     }
 
-    private void ApplySelectedSkin()
+    private void ApplyActiveSkin()
     {
-        var skin = _skinController.Select(_viewModel.SelectedSkin);
+        var skin = _skinController.CurrentSkin;
         SetSkinView(skin.View);
         _animationController.Attach(skin as IOrbAnimationTarget);
-        _skinController.Render(_viewModel.SkinState);
         ApplyPopupTheme();
         ApplyEdgeProgressState(_edgeAutoHideController.DockSide);
         ApplyAnimationState();
@@ -349,11 +400,11 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         _contextMenuOpen = true;
         CloseDetailsPopup();
         _edgeAutoHideController.Expand();
-        SetSkinCheck(HudDialMenuItem, SkinId.HudDial);
-        SetSkinCheck(EnergyRingMenuItem, SkinId.EnergyRing);
-        SetSkinCheck(LiquidGlassMenuItem, SkinId.LiquidGlass);
-        SetSkinCheck(AuroraMenuItem, SkinId.Aurora);
-        SetSkinCheck(LiquidTankMenuItem, SkinId.LiquidTank);
+        SetSkinCheck(HudDialMenuItem, SkinSelectionKey.HudDial);
+        SetSkinCheck(EnergyRingMenuItem, SkinSelectionKey.EnergyRing);
+        SetSkinCheck(LiquidGlassMenuItem, SkinSelectionKey.LiquidGlass);
+        SetSkinCheck(AuroraMenuItem, SkinSelectionKey.Aurora);
+        SetSkinCheck(LiquidTankMenuItem, SkinSelectionKey.LiquidTank);
     }
 
     private async void OnContextMenuClosed(object sender, RoutedEventArgs e)
@@ -389,8 +440,11 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         await ScheduleEdgeCollapseAsync();
     }
 
-    private void SetSkinCheck(MenuItem item, SkinId skin) =>
-        item.IsChecked = _viewModel.SelectedSkin == skin;
+    private void SetSkinCheck(MenuItem item, string selectionKey) =>
+        item.IsChecked = string.Equals(
+            _skinController.CurrentDescriptor.SelectionKey,
+            selectionKey,
+            StringComparison.Ordinal);
 
     private void ClampToNearestWorkArea(bool save)
     {
@@ -619,7 +673,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
 
     private void ApplyEdgeProgressState(EdgeDockSide side)
     {
-        var theme = EdgeProgressThemeProvider.Get(_viewModel.SelectedSkin);
+        var theme = _skinController.CurrentPresentation.Edge;
         var level = _viewModel.DisplayMode == QuotaDisplayMode.Hidden
             ? QuotaAlertLevel.Normal
             : QuotaAlertPolicy.Classify(_viewModel.PrimaryPercent);
@@ -801,7 +855,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
 
     private void ApplyPopupTheme()
     {
-        var theme = PopupThemeProvider.Get(_viewModel.SelectedSkin);
+        var theme = _skinController.CurrentPresentation.Popup;
         PopupCard.Background = theme.Background;
         PopupShadowHost.Background = theme.Background;
         PopupCard.BorderBrush = theme.Border;

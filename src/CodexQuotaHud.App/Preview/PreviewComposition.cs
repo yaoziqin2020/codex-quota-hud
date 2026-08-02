@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Windows.Threading;
 using CodexQuotaHud.App.UI;
 using CodexQuotaHud.App.Infrastructure;
+using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Settings;
+using CodexQuotaHud.Skins.Templates;
 
 namespace CodexQuotaHud.App.Preview;
 
@@ -27,6 +29,10 @@ internal sealed class PreviewComposition : IDisposable
         _requestExit = requestExit ?? throw new ArgumentNullException(
             nameof(requestExit));
 
+        Catalog = HudSkinCatalog.CreateBuiltInOnly();
+        SkinController = new SkinController(
+            Catalog,
+            SkinTemplateRegistry.CreateDefault());
         SettingsStore = new InMemorySettingsStore(new AppSettings());
         RefreshController = new PreviewQuotaRefreshController();
         ViewModel = new QuotaOrbViewModel(
@@ -34,9 +40,14 @@ internal sealed class PreviewComposition : IDisposable
             SettingsStore,
             SettingsStore.Load(),
             new WpfUiDispatcher(dispatcher),
-            requestExit);
-        HudWindow = new QuotaOrbWindow(ViewModel);
-        Tray = new TrayController(ViewModel);
+            requestExit,
+            key => Catalog.TryGet(key, out _));
+        HudWindow = new QuotaOrbWindow(ViewModel, SkinController);
+        Tray = new TrayController(
+            ViewModel,
+            Catalog,
+            SkinController,
+            HudWindow.TryActivateSkinKey);
         Session = new PreviewSession(
             RefreshController,
             ViewModel,
@@ -54,6 +65,8 @@ internal sealed class PreviewComposition : IDisposable
     }
 
     internal InMemorySettingsStore SettingsStore { get; }
+    internal HudSkinCatalog Catalog { get; }
+    internal SkinController SkinController { get; }
     internal PreviewQuotaRefreshController RefreshController { get; }
     internal QuotaOrbViewModel ViewModel { get; }
     internal QuotaOrbWindow HudWindow { get; }

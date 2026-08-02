@@ -198,7 +198,7 @@ public sealed class SettingsStore : ISettingsStore
 
     private static SkinId? ReadLegacySkin(JsonElement root)
     {
-        if (!root.TryGetProperty(nameof(AppSettings.SelectedSkin), out var value))
+        if (!root.TryGetProperty("SelectedSkin", out var value))
         {
             return null;
         }

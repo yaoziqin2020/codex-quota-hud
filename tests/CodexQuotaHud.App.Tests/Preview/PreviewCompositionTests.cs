@@ -1,5 +1,6 @@
 using System.Windows.Threading;
 using CodexQuotaHud.App.Preview;
+using CodexQuotaHud.Core.Settings;
 using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.Core.Models;
 
@@ -8,6 +9,26 @@ namespace CodexQuotaHud.App.Tests.Preview;
 [Collection(PreviewWpfCollection.Name)]
 public sealed class PreviewCompositionTests
 {
+    [Fact]
+    public void Composition_UsesOnlyBuiltInCatalogAndInMemorySettings() =>
+        RunSta(() =>
+        {
+            using var composition = new PreviewComposition(
+                System.Windows.Threading.Dispatcher.CurrentDispatcher,
+                () => { });
+
+            Assert.Equal(
+                [
+                    SkinSelectionKey.HudDial,
+                    SkinSelectionKey.EnergyRing,
+                    SkinSelectionKey.LiquidGlass,
+                    SkinSelectionKey.Aurora,
+                    SkinSelectionKey.LiquidTank
+                ],
+                composition.HudWindow.SkinController.RegisteredKeys);
+            Assert.IsType<InMemorySettingsStore>(composition.SettingsStore);
+        });
+
     [Fact]
     public void Composition_StartsDualAndDisposesIdempotently()
     {

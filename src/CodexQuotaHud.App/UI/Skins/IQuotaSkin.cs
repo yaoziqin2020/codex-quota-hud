@@ -64,7 +64,7 @@ public sealed record QuotaSkinState
 
 public interface IQuotaSkin
 {
-    SkinId Id { get; }
+    string SelectionKey { get; }
 
     FrameworkElement View { get; }
 

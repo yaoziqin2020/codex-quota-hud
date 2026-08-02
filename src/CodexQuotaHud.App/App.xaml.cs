@@ -5,8 +5,12 @@ using System.Security;
 using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Refresh;
 using CodexQuotaHud.Core.Settings;
+using CodexQuotaHud.Skins.Contracts;
+using CodexQuotaHud.Skins.Storage;
+using CodexQuotaHud.Skins.Templates;
 
 namespace CodexQuotaHud.App;
 
@@ -88,8 +92,21 @@ public partial class App : System.Windows.Application
                 _shutdownListener = new InstalledAppShutdownListener(
                     () => Dispatcher.BeginInvoke(RequestExit));
             }
-            var settingsStore = new SettingsStore();
-            var settings = LoadSettingsForStartup(settingsStore);
+            var storagePaths = new SkinStoragePaths(
+                Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData));
+            var installedCatalog = new InstalledSkinCatalog(
+                storagePaths,
+                CurrentHudVersion());
+            var hudCatalog = new HudSkinCatalog(installedCatalog);
+            var templates = SkinTemplateRegistry.CreateDefault();
+            var startupSettings = LoadNormalSkinSettings(
+                Path.Combine(storagePaths.SettingsRoot, "settings.json"),
+                hudCatalog);
+            var settingsStore = startupSettings.Store;
+            var requestedSelectionKey = startupSettings.RequestedSelectionKey;
+            var settings = startupSettings.Settings;
+
             _processMonitor = new CodexProcessMonitor();
             _quotaClient = new RestartableQuotaClient();
             _refreshService = new QuotaRefreshService(
@@ -103,9 +120,24 @@ public partial class App : System.Windows.Application
                 settingsStore,
                 settings,
                 new WpfUiDispatcher(Dispatcher),
-                RequestExit);
-            _window = new QuotaOrbWindow(_viewModel);
-            _tray = new TrayController(_viewModel);
+                RequestExit,
+                key => hudCatalog.TryGet(key, out _));
+            var skinController = new SkinController(hudCatalog, templates);
+            _ = TryApplyStartupSkinSelection(
+                requestedSelectionKey,
+                _viewModel,
+                skinController,
+                message => System.Windows.MessageBox.Show(
+                    message,
+                    "Codex Quota HUD",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning));
+            _window = new QuotaOrbWindow(_viewModel, skinController);
+            _tray = new TrayController(
+                _viewModel,
+                hudCatalog,
+                skinController,
+                _window.TryActivateSkinKey);
 
             _processMonitor.RunningChanged += OnCodexRunningChanged;
             OnCodexRunningChanged(_processMonitor.IsRunning);
@@ -181,6 +213,87 @@ public partial class App : System.Windows.Application
     internal static bool ShouldRegisterStartup(IReadOnlyList<string> arguments) =>
         IsInteractiveLaunch(arguments) && !IsPreviewLaunch(arguments);
 
+    internal static bool TryApplyStartupSkinSelection(
+        string requestedSelectionKey,
+        QuotaOrbViewModel viewModel,
+        SkinController controller,
+        Action<string> showMessage)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(controller);
+        ArgumentNullException.ThrowIfNull(showMessage);
+
+        controller.Render(viewModel.SkinState);
+
+        if (controller.TryPrepare(
+                requestedSelectionKey,
+                out var requested,
+                out var failure))
+        {
+            controller.Activate(requested!);
+            return true;
+        }
+
+        var safePrepared = controller.TryPrepare(
+            SkinSelectionKey.HudDial,
+            out var safe,
+            out _);
+        var persisted = safePrepared &&
+            viewModel.TrySelectSkinKey(SkinSelectionKey.HudDial);
+        if (persisted)
+        {
+            controller.Activate(safe!);
+        }
+
+        var identity = failure?.DisplayNameOrId ?? requestedSelectionKey;
+        const string customPrefix = "custom:";
+        if (identity.StartsWith(customPrefix, StringComparison.Ordinal))
+        {
+            identity = identity[customPrefix.Length..];
+        }
+
+        showMessage(persisted
+            ? $"自定义皮肤“{identity}”无法加载，已切换到 HUD 科技仪表。请重新导入或删除该皮肤。"
+            : $"自定义皮肤“{identity}”无法加载。当前仅临时使用 HUD 科技仪表，设置未能保存；请检查设置文件权限后重新选择。");
+        return false;
+    }
+
+    internal static NormalSkinStartupSettings LoadNormalSkinSettings(
+        string settingsPath,
+        HudSkinCatalog catalog)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingsPath);
+        ArgumentNullException.ThrowIfNull(catalog);
+
+        string? validatedSelectionKey = null;
+        var store = new SettingsStore(
+            settingsPath,
+            key =>
+            {
+                validatedSelectionKey = key;
+                return catalog.TryGet(key, out _);
+            });
+        var loadResult = store.LoadWithMigration();
+        var requestedSelectionKey = loadResult.SelectionErrorCode is not null &&
+            validatedSelectionKey is not null
+                ? validatedSelectionKey
+                : loadResult.Settings.SelectedSkinKey;
+        var settings = loadResult.Settings with
+        {
+            SelectedSkinKey = requestedSelectionKey
+        };
+        if (loadResult.RequiresWriteBack &&
+            loadResult.SelectionErrorCode is null)
+        {
+            TryPersistStartupMigration(store, loadResult.Settings);
+        }
+
+        return new NormalSkinStartupSettings(
+            store,
+            settings,
+            requestedSelectionKey);
+    }
+
     internal static AppSettings LoadSettingsForStartup(SettingsStore settingsStore)
     {
         ArgumentNullException.ThrowIfNull(settingsStore);
@@ -201,6 +314,38 @@ public partial class App : System.Windows.Application
         }
 
         return loadResult.Settings;
+    }
+
+    private static void TryPersistStartupMigration(
+        SettingsStore settingsStore,
+        AppSettings settings)
+    {
+        try
+        {
+            settingsStore.Save(settings);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or SecurityException)
+        {
+            Trace.TraceWarning(
+                "Could not persist settings migration: {0}",
+                exception);
+        }
+    }
+
+    private static SemanticVersion CurrentHudVersion()
+    {
+        var version = typeof(App).Assembly.GetName().Version;
+        var detected = version is null
+            ? SemanticVersion.Parse("1.1.1")
+            : new SemanticVersion(
+                Math.Max(0, version.Major),
+                Math.Max(0, version.Minor),
+                Math.Max(0, version.Build));
+        var runtimeBaseline = SemanticVersion.Parse("1.1.1");
+        return detected.CompareTo(runtimeBaseline) >= 0
+            ? detected
+            : runtimeBaseline;
     }
 
     internal static bool ShouldStartInstalledShutdownListener(
@@ -470,3 +615,8 @@ public partial class App : System.Windows.Application
         }
     }
 }
+
+internal sealed record NormalSkinStartupSettings(
+    SettingsStore Store,
+    AppSettings Settings,
+    string RequestedSelectionKey);

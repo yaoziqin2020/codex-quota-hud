@@ -1,11 +1,55 @@
 using System.Drawing;
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Models;
 
 namespace CodexQuotaHud.App.Tests.UI;
 
 public sealed class TrayIconRendererTests
 {
+    [Fact]
+    public void TraySkinItem_InvokesInjectedWindowCoordinatorWithExactKey()
+    {
+        var descriptor = new SkinDescriptor(
+            "builtin:Aurora",
+            "Aurora",
+            IsBuiltIn: true,
+            BuiltInId: SkinId.Aurora,
+            Installed: null);
+        var calls = new List<string>();
+        using var item = TrayController.CreateSkinMenuItem(
+            descriptor,
+            key =>
+            {
+                calls.Add(key);
+                return true;
+            });
+
+        item.PerformClick();
+
+        Assert.Equal(["builtin:Aurora"], calls);
+    }
+
+    [Theory]
+    [InlineData(21, 0x12, 0x34, 0x56)]
+    [InlineData(20, 0xFF, 0xB5, 0x47)]
+    [InlineData(11, 0xFF, 0xB5, 0x47)]
+    [InlineData(10, 0xFF, 0x5A, 0x67)]
+    [InlineData(0, 0xFF, 0x5A, 0x67)]
+    public void CustomAccent_UsesPresentationColorUntilProductAlertOverridesIt(
+        double percent,
+        int red,
+        int green,
+        int blue)
+    {
+        var state = TrayIconRenderer.CreateState(
+            QuotaDisplayMode.Single,
+            percent,
+            System.Drawing.Color.FromArgb(0x12, 0x34, 0x56));
+
+        Assert.Equal(System.Drawing.Color.FromArgb(red, green, blue), state.Accent);
+    }
+
     [Theory]
     [InlineData(QuotaDisplayMode.Dual, 84, "84")]
     [InlineData(QuotaDisplayMode.Single, 100, "100")]
@@ -18,7 +62,7 @@ public sealed class TrayIconRendererTests
         var state = TrayIconRenderer.CreateState(
             mode,
             percent,
-            SkinId.EnergyRing);
+            SkinPresentation.ForBuiltIn(SkinId.EnergyRing).TrayAccent);
 
         Assert.Equal(expectedText, state.Text);
         Assert.Equal(
@@ -36,7 +80,7 @@ public sealed class TrayIconRendererTests
             TrayIconRenderer.CreateState(
                 QuotaDisplayMode.Dual,
                 84,
-                SkinId.HudDial),
+                SkinPresentation.ForBuiltIn(SkinId.HudDial).TrayAccent),
             size);
 
         Assert.Equal(size, icon.Width);
@@ -50,7 +94,7 @@ public sealed class TrayIconRendererTests
             .Select(skin => TrayIconRenderer.CreateState(
                 QuotaDisplayMode.Single,
                 50,
-                skin).Accent.ToArgb())
+                SkinPresentation.ForBuiltIn(skin).TrayAccent).Accent.ToArgb())
             .Distinct()
             .ToArray();
 
@@ -69,7 +113,7 @@ public sealed class TrayIconRendererTests
         var state = TrayIconRenderer.CreateState(
             QuotaDisplayMode.Single,
             percent,
-            SkinId.Aurora);
+            SkinPresentation.ForBuiltIn(SkinId.Aurora).TrayAccent);
 
         Assert.Equal(Color.FromArgb(red, green, blue), state.Accent);
         Assert.Equal($"{percent:0}", state.Text);
@@ -81,7 +125,7 @@ public sealed class TrayIconRendererTests
         var state = TrayIconRenderer.CreateState(
             QuotaDisplayMode.Hidden,
             0,
-            SkinId.Aurora);
+            SkinPresentation.ForBuiltIn(SkinId.Aurora).TrayAccent);
 
         Assert.Equal("\u2014", state.Text);
         Assert.Null(state.Percent);
@@ -96,10 +140,14 @@ public sealed class TrayIconRendererTests
         using var lifetime = new TrayIconLifetime(icon => assigned = icon);
         var first = TrayIconRenderer.Render(
             TrayIconRenderer.CreateState(
-                QuotaDisplayMode.Single, 10, SkinId.HudDial));
+                QuotaDisplayMode.Single,
+                10,
+                SkinPresentation.ForBuiltIn(SkinId.HudDial).TrayAccent));
         var second = TrayIconRenderer.Render(
             TrayIconRenderer.CreateState(
-                QuotaDisplayMode.Single, 20, SkinId.Aurora));
+                QuotaDisplayMode.Single,
+                20,
+                SkinPresentation.ForBuiltIn(SkinId.Aurora).TrayAccent));
 
         lifetime.Replace(first);
         lifetime.Replace(second);

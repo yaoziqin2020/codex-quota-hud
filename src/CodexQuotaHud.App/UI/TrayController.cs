@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Models;
 using Forms = System.Windows.Forms;
 
@@ -7,17 +8,28 @@ namespace CodexQuotaHud.App.UI;
 public sealed class TrayController : IDisposable
 {
     private readonly QuotaOrbViewModel _viewModel;
+    private readonly SkinController _skinController;
+    private readonly Func<string, bool> _tryActivateSkinKey;
     private readonly Forms.NotifyIcon _notifyIcon;
     private readonly Forms.ToolStripMenuItem _statusItem;
     private readonly Forms.ToolStripMenuItem _animationsItem;
-    private readonly Dictionary<SkinId, Forms.ToolStripMenuItem> _skinItems = [];
+    private readonly Dictionary<string, Forms.ToolStripMenuItem> _skinItems =
+        new(StringComparer.Ordinal);
     private readonly TrayIconLifetime _iconLifetime;
     private bool _disposed;
 
-    public TrayController(QuotaOrbViewModel viewModel)
+    public TrayController(
+        QuotaOrbViewModel viewModel,
+        HudSkinCatalog catalog,
+        SkinController skinController,
+        Func<string, bool> tryActivateSkinKey)
     {
-        _viewModel =
-            viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+        ArgumentNullException.ThrowIfNull(catalog);
+        _skinController = skinController ?? throw new ArgumentNullException(
+            nameof(skinController));
+        _tryActivateSkinKey = tryActivateSkinKey ?? throw new ArgumentNullException(
+            nameof(tryActivateSkinKey));
 
         var menu = new Forms.ContextMenuStrip();
         var refreshItem = menu.Items.Add("立即刷新");
@@ -25,11 +37,11 @@ public sealed class TrayController : IDisposable
             _viewModel.RefreshCommand.Execute(parameter: null);
 
         var skinItem = new Forms.ToolStripMenuItem("皮肤");
-        AddSkinItem(skinItem, SkinId.HudDial, "HUD 科技仪表");
-        AddSkinItem(skinItem, SkinId.EnergyRing, "双彩能量环");
-        AddSkinItem(skinItem, SkinId.LiquidGlass, "流体玻璃球");
-        AddSkinItem(skinItem, SkinId.Aurora, "克制极光");
-        AddSkinItem(skinItem, SkinId.LiquidTank, "液位储能舱");
+        foreach (var descriptor in catalog.Load().Healthy)
+        {
+            AddSkinItem(skinItem, descriptor);
+        }
+
         menu.Items.Add(skinItem);
 
         _animationsItem = new Forms.ToolStripMenuItem("动画")
@@ -63,6 +75,7 @@ public sealed class TrayController : IDisposable
             _viewModel.RefreshCommand.Execute(parameter: null);
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _skinController.ActiveSkinChanged += OnActiveSkinChanged;
         Synchronize();
         _notifyIcon.Visible = true;
     }
@@ -76,6 +89,7 @@ public sealed class TrayController : IDisposable
 
         _disposed = true;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _skinController.ActiveSkinChanged -= OnActiveSkinChanged;
         _notifyIcon.Visible = false;
         _iconLifetime.Dispose();
         _notifyIcon.Dispose();
@@ -84,26 +98,37 @@ public sealed class TrayController : IDisposable
 
     private void AddSkinItem(
         Forms.ToolStripMenuItem parent,
-        SkinId skin,
-        string text)
+        SkinDescriptor descriptor)
     {
-        var item = new Forms.ToolStripMenuItem(text)
+        var item = CreateSkinMenuItem(descriptor, _tryActivateSkinKey);
+        parent.DropDownItems.Add(item);
+        _skinItems.Add(descriptor.SelectionKey, item);
+    }
+
+    internal static Forms.ToolStripMenuItem CreateSkinMenuItem(
+        SkinDescriptor descriptor,
+        Func<string, bool> tryActivateSkinKey)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        ArgumentNullException.ThrowIfNull(tryActivateSkinKey);
+        var item = new Forms.ToolStripMenuItem(descriptor.DisplayName)
         {
             CheckOnClick = false,
-            Tag = skin
+            Tag = descriptor.SelectionKey
         };
-        item.Click += (_, _) =>
-            _viewModel.SelectSkinCommand.Execute(skin);
-        parent.DropDownItems.Add(item);
-        _skinItems.Add(skin, item);
+        item.Click += (_, _) => _ = tryActivateSkinKey(descriptor.SelectionKey);
+        return item;
     }
+
+    private void OnActiveSkinChanged(object? sender, EventArgs e) =>
+        Synchronize();
 
     private void OnViewModelPropertyChanged(
         object? sender,
         PropertyChangedEventArgs e)
     {
         if (e.PropertyName is
-            nameof(QuotaOrbViewModel.SelectedSkin) or
+            nameof(QuotaOrbViewModel.SelectedSkinKey) or
             nameof(QuotaOrbViewModel.AnimationsEnabled) or
             nameof(QuotaOrbViewModel.DisplayMode) or
             nameof(QuotaOrbViewModel.PrimaryPercent) or
@@ -118,9 +143,12 @@ public sealed class TrayController : IDisposable
 
     private void Synchronize()
     {
-        foreach (var (skin, item) in _skinItems)
+        foreach (var (selectionKey, item) in _skinItems)
         {
-            item.Checked = skin == _viewModel.SelectedSkin;
+            item.Checked = string.Equals(
+                selectionKey,
+                _skinController.CurrentDescriptor.SelectionKey,
+                StringComparison.Ordinal);
         }
 
         _animationsItem.Checked = _viewModel.AnimationsEnabled;
@@ -130,7 +158,7 @@ public sealed class TrayController : IDisposable
                 TrayIconRenderer.CreateState(
                     _viewModel.DisplayMode,
                     _viewModel.PrimaryPercent,
-                    _viewModel.SelectedSkin)));
+                    _skinController.CurrentPresentation.TrayAccent)));
         _notifyIcon.Text = TruncateTooltip(CreateTooltip());
     }
 

@@ -8,6 +8,9 @@ namespace CodexQuotaHud.App.Tests.UI;
 
 public sealed class QuotaOrbViewModelTests : IDisposable
 {
+    private const string CustomKey =
+        "custom:11111111-1111-1111-1111-111111111111";
+
     private readonly string _directory =
         Path.Combine(Path.GetTempPath(), $"CodexQuotaHud-VM-{Guid.NewGuid():N}");
 
@@ -102,20 +105,20 @@ public sealed class QuotaOrbViewModelTests : IDisposable
     }
 
     [Fact]
-    public void SkinSelection_UpdatesImmediatelyAndPersists()
+    public void SkinSelectionKey_UpdatesImmediatelyAndPersists()
     {
         var source = new FakeRefreshController();
         var store = CreateStore();
         using var viewModel = CreateViewModel(source, store);
 
-        viewModel.SelectSkinCommand.Execute(SkinId.LiquidTank);
+        Assert.True(viewModel.TrySelectSkinKey(SkinSelectionKey.LiquidTank));
 
-        Assert.Equal(SkinId.LiquidTank, viewModel.SelectedSkin);
+        Assert.Equal(SkinSelectionKey.LiquidTank, viewModel.SelectedSkinKey);
         Assert.Equal(SkinSelectionKey.LiquidTank, store.Load().SelectedSkinKey);
     }
 
     [Fact]
-    public void SelectedSkin_ProjectsBuiltInKeyAndSetterPersistsExactStringKey()
+    public void SelectedSkinKey_PersistsExactBuiltInStringKey()
     {
         var source = new FakeRefreshController();
         var store = CreateStore();
@@ -127,11 +130,73 @@ public sealed class QuotaOrbViewModelTests : IDisposable
             new QueuedDispatcher(checkAccess: true),
             () => { });
 
-        Assert.Equal(SkinId.EnergyRing, viewModel.SelectedSkin);
+        Assert.Equal(SkinSelectionKey.EnergyRing, viewModel.SelectedSkinKey);
 
-        viewModel.SelectedSkin = SkinId.Aurora;
+        Assert.True(viewModel.TrySelectSkinKey(SkinSelectionKey.Aurora));
 
         Assert.Equal(SkinSelectionKey.Aurora, store.Load().SelectedSkinKey);
+    }
+
+    [Fact]
+    public void TrySelectSkinKey_ValidatesPersistsThenMutatesFormalState()
+    {
+        var source = new FakeRefreshController();
+        var store = new SettingsStore(
+            Path.Combine(_directory, "custom-settings.json"),
+            _ => true);
+        using var viewModel = new QuotaOrbViewModel(
+            source,
+            store,
+            new AppSettings(),
+            new QueuedDispatcher(checkAccess: true),
+            () => { },
+            key => key == SkinSelectionKey.HudDial || key == CustomKey);
+        var changes = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+
+        Assert.True(viewModel.TrySelectSkinKey(CustomKey));
+
+        Assert.Equal(CustomKey, viewModel.SelectedSkinKey);
+        Assert.Equal(CustomKey, store.Load().SelectedSkinKey);
+        Assert.Contains(nameof(QuotaOrbViewModel.SelectedSkinKey), changes);
+    }
+
+    [Fact]
+    public void TrySelectSkinKey_ValidationFailurePreservesMemoryAndDurableState()
+    {
+        var source = new FakeRefreshController();
+        var store = CreateStore();
+        using var viewModel = new QuotaOrbViewModel(
+            source,
+            store,
+            new AppSettings(),
+            new QueuedDispatcher(checkAccess: true),
+            () => { },
+            key => key == SkinSelectionKey.HudDial);
+
+        Assert.False(viewModel.TrySelectSkinKey(CustomKey));
+
+        Assert.Equal(SkinSelectionKey.HudDial, viewModel.SelectedSkinKey);
+        Assert.Equal(SkinSelectionKey.HudDial, store.Load().SelectedSkinKey);
+    }
+
+    [Fact]
+    public void TrySelectSkinKey_SaveFailurePreservesMemoryAndReturnsFalse()
+    {
+        var source = new FakeRefreshController();
+        var store = new ThrowingSettingsStore();
+        using var viewModel = new QuotaOrbViewModel(
+            source,
+            store,
+            new AppSettings(SelectedSkinKey: SkinSelectionKey.Aurora),
+            new QueuedDispatcher(checkAccess: true),
+            () => { },
+            _ => true);
+
+        Assert.False(viewModel.TrySelectSkinKey(CustomKey));
+
+        Assert.Equal(SkinSelectionKey.Aurora, viewModel.SelectedSkinKey);
+        Assert.Equal("璁剧疆鏈繚瀛?", viewModel.LastSettingsError);
     }
 
     [Fact]
@@ -202,14 +267,14 @@ public sealed class QuotaOrbViewModelTests : IDisposable
 
         var exception = Record.Exception(() =>
         {
-            viewModel.SelectSkinCommand.Execute(SkinId.Aurora);
+            Assert.False(viewModel.TrySelectSkinKey(SkinSelectionKey.Aurora));
             viewModel.ToggleAnimationsCommand.Execute(null);
             viewModel.SavePosition(20, 30);
             source.Publish(State(QuotaDisplayState.FromSnapshot(snapshot)));
         });
 
         Assert.Null(exception);
-        Assert.Equal(SkinId.Aurora, viewModel.SelectedSkin);
+        Assert.Equal(SkinSelectionKey.HudDial, viewModel.SelectedSkinKey);
         Assert.False(viewModel.AnimationsEnabled);
         Assert.True(viewModel.IsVisible);
         Assert.Equal(45, viewModel.PrimaryPercent);

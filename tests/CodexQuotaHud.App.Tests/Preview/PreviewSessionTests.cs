@@ -40,7 +40,9 @@ public sealed class PreviewSessionTests
         foreach (var skin in Enum.GetValues<SkinId>())
         {
             session.SetSkin(skin);
-            Assert.Equal(skin, viewModel.SelectedSkin);
+            Assert.Equal(
+                SkinSelectionKey.FromBuiltIn(skin),
+                hud.ActivatedKeys[^1]);
         }
 
         session.SetAnimationsEnabled(false);
@@ -81,7 +83,14 @@ public sealed class PreviewSessionTests
     {
         public bool DetailsOpen { get; private set; }
         public List<EdgeDockSide> Edges { get; } = [];
+        public List<string> ActivatedKeys { get; } = [];
         public int ExpandCount { get; private set; }
+
+        public bool TryActivateSkinKey(string selectionKey)
+        {
+            ActivatedKeys.Add(selectionKey);
+            return true;
+        }
 
         public void SetDetailsOpen(bool isOpen) => DetailsOpen = isOpen;
         public void PreviewEdge(EdgeDockSide side) => Edges.Add(side);

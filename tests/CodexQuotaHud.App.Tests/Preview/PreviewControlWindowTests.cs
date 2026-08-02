@@ -171,6 +171,7 @@ public sealed class PreviewControlWindowTests
     private sealed class RecordingHud : IPreviewHud
     {
         public bool DetailsOpen { get; private set; }
+        public bool TryActivateSkinKey(string selectionKey) => true;
         public void SetDetailsOpen(bool isOpen) => DetailsOpen = isOpen;
         public void PreviewEdge(EdgeDockSide side) { }
         public void ForceExpanded() { }

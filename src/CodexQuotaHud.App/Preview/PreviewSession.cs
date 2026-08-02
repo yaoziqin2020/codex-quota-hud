@@ -1,5 +1,6 @@
 using CodexQuotaHud.App.UI;
 using CodexQuotaHud.Core.Models;
+using CodexQuotaHud.Core.Settings;
 
 namespace CodexQuotaHud.App.Preview;
 
@@ -60,7 +61,7 @@ internal sealed class PreviewSession
             throw new ArgumentOutOfRangeException(nameof(skin));
         }
 
-        _viewModel.SelectedSkin = skin;
+        _ = _hud.TryActivateSkinKey(SkinSelectionKey.FromBuiltIn(skin));
     }
 
     public void SetAnimationsEnabled(bool value) =>

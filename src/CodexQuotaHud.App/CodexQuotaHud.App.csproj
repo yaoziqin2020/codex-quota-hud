@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CodexQuotaHud.Core\CodexQuotaHud.Core.csproj" />
+    <ProjectReference Include="..\CodexQuotaHud.Skins\CodexQuotaHud.Skins.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

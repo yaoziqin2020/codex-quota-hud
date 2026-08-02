@@ -16,7 +16,7 @@ public static class TrayIconRenderer
     public static TrayIconState CreateState(
         QuotaDisplayMode mode,
         double primaryPercent,
-        SkinId skin)
+        Color normalAccent)
     {
         var hasData = mode != QuotaDisplayMode.Hidden;
         var percent = hasData
@@ -25,10 +25,10 @@ public static class TrayIconRenderer
                 MidpointRounding.AwayFromZero)
             : (double?)null;
         var accent = percent is null
-            ? AccentFor(skin)
+            ? normalAccent
             : QuotaAlertPalette.ResolveDrawingColor(
                 QuotaAlertPolicy.Classify(percent.Value),
-                AccentFor(skin));
+                normalAccent);
         return new TrayIconState(
             percent is null ? "—" : $"{percent:0}",
             percent,
@@ -115,16 +115,6 @@ public static class TrayIconRenderer
             _ = DestroyIcon(handle);
         }
     }
-
-    private static Color AccentFor(SkinId skin) =>
-        skin switch
-        {
-            SkinId.EnergyRing => Color.FromArgb(0x53, 0xEC, 0xFF),
-            SkinId.LiquidGlass => Color.FromArgb(0xB9, 0xF1, 0xFF),
-            SkinId.Aurora => Color.FromArgb(0x79, 0xF3, 0xE2),
-            SkinId.LiquidTank => Color.FromArgb(0x8D, 0xE9, 0xF5),
-            _ => Color.FromArgb(0x53, 0xDC, 0xF8)
-        };
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

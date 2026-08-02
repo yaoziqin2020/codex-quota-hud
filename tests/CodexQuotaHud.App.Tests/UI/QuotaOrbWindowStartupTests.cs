@@ -7,6 +7,8 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using CodexQuotaHud.Core.Models;
+using CodexQuotaHud.Skins.Contracts;
+using CodexQuotaHud.Skins.Storage;
 using ShapeEllipse = System.Windows.Shapes.Ellipse;
 using ShapePath = System.Windows.Shapes.Path;
 
@@ -15,6 +17,375 @@ namespace CodexQuotaHud.App.Tests.UI;
 [Collection(WpfUiCollection.Name)]
 public sealed class QuotaOrbWindowStartupTests
 {
+    private const string CustomKey =
+        "custom:11111111-1111-1111-1111-111111111111";
+
+    [Fact]
+    public void NormalSettingsLoad_RejectedCustomSaveFailureCannotShortCircuitAsSuccess()
+    {
+        const string missing =
+            "custom:99999999-9999-9999-9999-999999999999";
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"CodexQuotaHud-CustomFallback-{Guid.NewGuid():N}");
+        var settingsPath = Path.Combine(directory, "settings.json");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            settingsPath,
+            $$"""
+            {
+              "SelectedSkinKey": "{{missing}}"
+            }
+            """);
+
+        try
+        {
+            RunSta(() =>
+            {
+                var catalog = HudSkinCatalog.CreateBuiltInOnly();
+                var startup = global::CodexQuotaHud.App.App
+                    .LoadNormalSkinSettings(settingsPath, catalog);
+                Assert.Equal(missing, startup.Settings.SelectedSkinKey);
+                Assert.Equal(missing, startup.RequestedSelectionKey);
+                using var lockedTarget = new FileStream(
+                    settingsPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read);
+                using var viewModel = new QuotaOrbViewModel(
+                    new InertRefreshController(),
+                    startup.Store,
+                    startup.Settings,
+                    new InlineDispatcher(),
+                    () => { },
+                    key => catalog.TryGet(key, out _));
+                var controller = new SkinController(
+                    catalog,
+                    descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                    SkinSelectionKey.HudDial);
+                var messages = new List<string>();
+
+                Assert.False(global::CodexQuotaHud.App.App.TryApplyStartupSkinSelection(
+                    startup.RequestedSelectionKey,
+                    viewModel,
+                    controller,
+                    messages.Add));
+
+                Assert.Equal(missing, viewModel.SelectedSkinKey);
+                Assert.Contains(missing, File.ReadAllText(settingsPath));
+                var message = Assert.Single(messages);
+                Assert.Contains("设置未能保存", message);
+                Assert.DoesNotContain("已切换", message);
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void StartupFallback_MissingCustomPersistsHudDialAndShowsOneBoundedMessage()
+    {
+        RunSta(() =>
+        {
+            const string missing =
+                "custom:99999999-9999-9999-9999-999999999999";
+            var catalog = HudSkinCatalog.CreateBuiltInOnly();
+            var controller = new SkinController(
+                catalog,
+                descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            var store = new RecordingSettingsStore(
+                [],
+                initial: new AppSettings(SelectedSkinKey: missing));
+            using var viewModel = new QuotaOrbViewModel(
+                new InertRefreshController(),
+                store,
+                store.Load(),
+                new InlineDispatcher(),
+                () => { },
+                key => catalog.TryGet(key, out _));
+            var messages = new List<string>();
+
+            Assert.False(global::CodexQuotaHud.App.App.TryApplyStartupSkinSelection(
+                missing,
+                viewModel,
+                controller,
+                messages.Add));
+
+            Assert.Equal(SkinSelectionKey.HudDial, viewModel.SelectedSkinKey);
+            Assert.Equal(SkinSelectionKey.HudDial, store.Load().SelectedSkinKey);
+            Assert.Equal(SkinSelectionKey.HudDial, controller.CurrentDescriptor.SelectionKey);
+            var message = Assert.Single(messages);
+            Assert.Contains("99999999-9999-9999-9999-999999999999", message);
+            Assert.Contains("重新导入或删除", message);
+            Assert.DoesNotContain(@"C:\", message, StringComparison.OrdinalIgnoreCase);
+
+            controller.Render(new QuotaSkinState(
+                68, 34, "5 hours", QuotaDisplayMode.Dual, false, true));
+            Assert.Single(messages);
+        });
+    }
+
+    [Fact]
+    public void StartupFallback_FactoryFailurePersistsThenActivatesSafeHudDial()
+    {
+        RunSta(() =>
+        {
+            var catalog = CatalogWithCustom();
+            var hud = new RecordingQuotaSkin(SkinSelectionKey.HudDial);
+            var controller = new SkinController(
+                catalog,
+                descriptor => descriptor.SelectionKey == CustomKey
+                    ? throw new InvalidOperationException("renderer failed")
+                    : hud,
+                SkinSelectionKey.HudDial);
+            var store = new RecordingSettingsStore(
+                [],
+                initial: new AppSettings(SelectedSkinKey: CustomKey));
+            using var viewModel = new QuotaOrbViewModel(
+                new InertRefreshController(),
+                store,
+                store.Load(),
+                new InlineDispatcher(),
+                () => { },
+                key => catalog.TryGet(key, out _));
+            var messages = new List<string>();
+
+            Assert.False(global::CodexQuotaHud.App.App.TryApplyStartupSkinSelection(
+                CustomKey,
+                viewModel,
+                controller,
+                messages.Add));
+
+            Assert.Equal(SkinSelectionKey.HudDial, store.Load().SelectedSkinKey);
+            Assert.Same(hud, controller.CurrentSkin);
+            Assert.Contains("Ocean", Assert.Single(messages));
+        });
+    }
+
+    [Fact]
+    public void StartupFallback_ColdCustomFirstRenderFailurePersistsHudDialAndWindowStaysSafe()
+    {
+        RunSta(() =>
+        {
+            var catalog = CatalogWithCustom();
+            var hud = new RecordingQuotaSkin(SkinSelectionKey.HudDial);
+            var controller = new SkinController(
+                catalog,
+                descriptor => descriptor.SelectionKey == CustomKey
+                    ? new RecordingQuotaSkin(
+                        CustomKey,
+                        () => throw new InvalidOperationException("render failed"))
+                    : hud,
+                SkinSelectionKey.HudDial);
+            var store = new RecordingSettingsStore(
+                [],
+                initial: new AppSettings(SelectedSkinKey: CustomKey));
+            using var viewModel = new QuotaOrbViewModel(
+                new InertRefreshController(),
+                store,
+                store.Load(),
+                new InlineDispatcher(),
+                () => { },
+                key => catalog.TryGet(key, out _));
+            var messages = new List<string>();
+
+            var applied = global::CodexQuotaHud.App.App.TryApplyStartupSkinSelection(
+                CustomKey,
+                viewModel,
+                controller,
+                messages.Add);
+            QuotaOrbWindow? window = null;
+            var windowFailure = Record.Exception(
+                () => window = new QuotaOrbWindow(viewModel, controller));
+
+            try
+            {
+                Assert.False(applied);
+                Assert.Equal(SkinSelectionKey.HudDial, viewModel.SelectedSkinKey);
+                Assert.Equal(SkinSelectionKey.HudDial, store.Load().SelectedSkinKey);
+                Assert.Same(hud, controller.CurrentSkin);
+                Assert.Null(windowFailure);
+                Assert.Null(Record.Exception(
+                    () => controller.Render(viewModel.SkinState)));
+                Assert.Contains("Ocean", Assert.Single(messages));
+            }
+            finally
+            {
+                window?.CloseForExit();
+            }
+        });
+    }
+
+    [Fact]
+    public void StartupFallback_SaveFailureKeepsSafeRuntimeWithoutClaimingDurableSuccess()
+    {
+        RunSta(() =>
+        {
+            var catalog = CatalogWithCustom();
+            var controller = new SkinController(
+                catalog,
+                descriptor => descriptor.SelectionKey == CustomKey
+                    ? new RecordingQuotaSkin(
+                        CustomKey,
+                        () => throw new InvalidOperationException("render failed"))
+                    : new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            var safeRuntimeSkin = controller.CurrentSkin;
+            var store = new RecordingSettingsStore(
+                [],
+                throwOnSave: true,
+                initial: new AppSettings(SelectedSkinKey: CustomKey));
+            using var viewModel = new QuotaOrbViewModel(
+                new InertRefreshController(),
+                store,
+                store.Load(),
+                new InlineDispatcher(),
+                () => { },
+                key => catalog.TryGet(key, out _));
+            var messages = new List<string>();
+
+            Assert.False(global::CodexQuotaHud.App.App.TryApplyStartupSkinSelection(
+                CustomKey,
+                viewModel,
+                controller,
+                messages.Add));
+
+            Assert.Same(safeRuntimeSkin, controller.CurrentSkin);
+            Assert.Equal(CustomKey, viewModel.SelectedSkinKey);
+            var message = Assert.Single(messages);
+            Assert.Contains("临时使用", message);
+            Assert.Contains("设置未能保存", message);
+            Assert.DoesNotContain("已切换", message);
+        });
+    }
+
+    [Fact]
+    public void InteractiveSelection_OrdersPrepareSaveActivate()
+    {
+        RunSta(() =>
+        {
+            var events = new List<string>();
+            var store = new RecordingSettingsStore(events);
+            var custom = new RecordingQuotaSkin(CustomKey, () => events.Add("render"));
+            var controller = new SkinController(
+                CatalogWithCustom(),
+                descriptor =>
+                {
+                    if (descriptor.SelectionKey == CustomKey)
+                    {
+                        events.Add("prepare");
+                        return custom;
+                    }
+
+                    return new RecordingQuotaSkin(descriptor.SelectionKey);
+                },
+                SkinSelectionKey.HudDial);
+            controller.ActiveSkinChanged += (_, _) => events.Add("activate");
+            using var viewModel = new QuotaOrbViewModel(
+                new InertRefreshController(),
+                store,
+                new AppSettings(),
+                new InlineDispatcher(),
+                () => { },
+                key => CatalogWithCustom().TryGet(key, out _));
+            var window = new QuotaOrbWindow(viewModel, controller);
+            events.Clear();
+
+            Assert.True(window.TryActivateSkinKey(CustomKey));
+
+            Assert.Equal(["prepare", "render", "save", "activate"], events);
+            Assert.Equal(CustomKey, viewModel.SelectedSkinKey);
+            Assert.Equal(CustomKey, controller.CurrentDescriptor.SelectionKey);
+            Assert.Same(custom.View, Assert.IsType<ContentControl>(
+                window.FindName("SkinHost")).Content);
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void InteractiveSelection_PrepareOrSaveFailurePreservesKeyAndVisualInstance()
+    {
+        RunSta(() =>
+        {
+            var prepareFailure = new SkinController(
+                CatalogWithCustom(),
+                descriptor => descriptor.SelectionKey == CustomKey
+                    ? throw new InvalidOperationException("factory failed")
+                    : new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            var normalStore = new RecordingSettingsStore([]);
+            using var firstViewModel = ViewModel(normalStore);
+            var firstWindow = new QuotaOrbWindow(firstViewModel, prepareFailure);
+            var firstVisual = Assert.IsType<ContentControl>(
+                firstWindow.FindName("SkinHost")).Content;
+
+            Assert.False(firstWindow.TryActivateSkinKey(CustomKey));
+            Assert.Equal(SkinSelectionKey.HudDial, firstViewModel.SelectedSkinKey);
+            Assert.Same(firstVisual, Assert.IsType<ContentControl>(
+                firstWindow.FindName("SkinHost")).Content);
+            Assert.Equal(0, normalStore.SaveCount);
+            firstWindow.CloseForExit();
+
+            var saveFailure = new SkinController(
+                CatalogWithCustom(),
+                descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            var throwingStore = new RecordingSettingsStore([], throwOnSave: true);
+            using var secondViewModel = ViewModel(throwingStore);
+            var secondWindow = new QuotaOrbWindow(secondViewModel, saveFailure);
+            var secondVisual = Assert.IsType<ContentControl>(
+                secondWindow.FindName("SkinHost")).Content;
+
+            Assert.False(secondWindow.TryActivateSkinKey(CustomKey));
+            Assert.Equal(SkinSelectionKey.HudDial, secondViewModel.SelectedSkinKey);
+            Assert.Equal(SkinSelectionKey.HudDial, saveFailure.CurrentDescriptor.SelectionKey);
+            Assert.Same(secondVisual, Assert.IsType<ContentControl>(
+                secondWindow.FindName("SkinHost")).Content);
+            secondWindow.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void InteractiveSelection_FirstRenderFailureOccursBeforeSaveAndPreservesEverything()
+    {
+        RunSta(() =>
+        {
+            var catalog = CatalogWithCustom();
+            var store = new RecordingSettingsStore([]);
+            var controller = new SkinController(
+                catalog,
+                descriptor => descriptor.SelectionKey == CustomKey
+                    ? new RecordingQuotaSkin(
+                        CustomKey,
+                        () => throw new InvalidOperationException("render failed"))
+                    : new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            using var viewModel = new QuotaOrbViewModel(
+                new InertRefreshController(),
+                store,
+                new AppSettings(),
+                new InlineDispatcher(),
+                () => { },
+                key => catalog.TryGet(key, out _));
+            var window = new QuotaOrbWindow(viewModel, controller);
+            var previousSkin = controller.CurrentSkin;
+            var previousVisual = Assert.IsType<ContentControl>(
+                window.FindName("SkinHost")).Content;
+
+            Assert.False(window.TryActivateSkinKey(CustomKey));
+
+            Assert.Equal(0, store.SaveCount);
+            Assert.Equal(SkinSelectionKey.HudDial, viewModel.SelectedSkinKey);
+            Assert.Same(previousSkin, controller.CurrentSkin);
+            Assert.Same(previousVisual, Assert.IsType<ContentControl>(
+                window.FindName("SkinHost")).Content);
+            window.CloseForExit();
+        });
+    }
+
     [Fact]
     public void StartupMigration_WhenSaveFails_ContinuesWithMigratedSettings()
     {
@@ -164,7 +535,7 @@ public sealed class QuotaOrbWindowStartupTests
                 Assert.IsAssignableFrom<FrameworkElement>(
                     window.FindName("HudDialPopupDecoration")).Visibility);
 
-            viewModel.SelectedSkin = SkinId.LiquidTank;
+            Assert.True(window.TryActivateSkinKey(SkinSelectionKey.LiquidTank));
             Assert.Equal(
                 Visibility.Collapsed,
                 Assert.IsAssignableFrom<FrameworkElement>(
@@ -249,7 +620,7 @@ public sealed class QuotaOrbWindowStartupTests
                     handle.Margin);
             }
 
-            viewModel.SelectedSkin = SkinId.Aurora;
+            Assert.True(window.TryActivateSkinKey(SkinSelectionKey.Aurora));
             var theme = EdgeProgressThemeProvider.Get(SkinId.Aurora);
             Assert.Equal(
                 theme.Track.ToString(),
@@ -456,6 +827,28 @@ public sealed class QuotaOrbWindowStartupTests
         }
     }
 
+    private static QuotaOrbViewModel ViewModel(ISettingsStore store) =>
+        new(
+            new InertRefreshController(),
+            store,
+            new AppSettings(),
+            new InlineDispatcher(),
+            () => { },
+            key => CatalogWithCustom().TryGet(key, out _));
+
+    private static HudSkinCatalog CatalogWithCustom()
+    {
+        var package = HudSkinCatalogTests.Document();
+        var record = new InstalledSkinRecord(
+            CustomKey,
+            package.Manifest.SkinId,
+            package.Manifest.DisplayName,
+            package.Manifest.PackageVersion,
+            @"C:\Catalog\11111111-1111-1111-1111-111111111111",
+            package);
+        return new HudSkinCatalog(new InstalledSkinCatalogResult([record], []));
+    }
+
     private static TextBlock RemainingText(ItemsControl details, int index)
     {
         var presenter = Assert.IsType<ContentPresenter>(
@@ -518,6 +911,41 @@ public sealed class QuotaOrbWindowStartupTests
         public AppSettings Load() => _settings;
 
         public void Save(AppSettings settings) => _settings = settings;
+    }
+
+    private sealed class RecordingSettingsStore(
+        List<string> events,
+        bool throwOnSave = false,
+        AppSettings? initial = null) : ISettingsStore
+    {
+        private AppSettings _settings = initial ?? new();
+
+        public int SaveCount { get; private set; }
+
+        public AppSettings Load() => _settings;
+
+        public void Save(AppSettings settings)
+        {
+            SaveCount++;
+            events.Add("save");
+            if (throwOnSave)
+            {
+                throw new UnauthorizedAccessException("read only");
+            }
+
+            _settings = settings;
+        }
+    }
+
+    private sealed class RecordingQuotaSkin(
+        string selectionKey,
+        Action? onRender = null) : IQuotaSkin
+    {
+        public string SelectionKey { get; } = selectionKey;
+
+        public FrameworkElement View { get; } = new Border();
+
+        public void Render(QuotaSkinState state) => onRender?.Invoke();
     }
 
     private sealed class InlineDispatcher : IUiDispatcher

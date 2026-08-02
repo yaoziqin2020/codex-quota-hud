@@ -70,6 +70,8 @@ public sealed class QuotaOrbViewModel :
     private readonly ISettingsStore _settingsStore;
     private readonly IUiDispatcher _dispatcher;
     private readonly Action _requestExit;
+    private readonly Func<string, bool> _selectionExists;
+    private Func<string, bool>? _tryActivateSkinKey;
     private readonly object _settingsSync = new();
     private readonly ObservableCollection<QuotaDetailRow> _details = [];
     private AppSettings _settings;
@@ -90,7 +92,8 @@ public sealed class QuotaOrbViewModel :
         ISettingsStore settingsStore,
         AppSettings settings,
         IUiDispatcher dispatcher,
-        Action requestExit)
+        Action requestExit,
+        Func<string, bool>? selectionExists = null)
     {
         _refreshController =
             refreshController ?? throw new ArgumentNullException(nameof(refreshController));
@@ -99,6 +102,8 @@ public sealed class QuotaOrbViewModel :
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _requestExit = requestExit ?? throw new ArgumentNullException(nameof(requestExit));
+        _selectionExists = selectionExists ??
+            (key => SkinSelectionKey.TryGetBuiltIn(key, out _));
 
         RefreshCommand = new AsyncRelayCommand(
             () => _refreshController.RefreshNowAsync(
@@ -107,9 +112,9 @@ public sealed class QuotaOrbViewModel :
         SelectSkinCommand = new RelayCommand(
             parameter =>
             {
-                if (parameter is SkinId skin && Enum.IsDefined(skin))
+                if (parameter is string selectionKey)
                 {
-                    SelectedSkin = skin;
+                    _ = _tryActivateSkinKey?.Invoke(selectionKey);
                 }
             });
         ToggleAnimationsCommand = new RelayCommand(
@@ -225,29 +230,57 @@ public sealed class QuotaOrbViewModel :
                 ? "尚未读取额度"
                 : $"上次更新：{LastUpdated.Value.ToLocalTime():HH:mm}";
 
-    public SkinId SelectedSkin
+    public string SelectedSkinKey => _settings.SelectedSkinKey;
+
+    internal void SetSkinActivationHandler(Func<string, bool>? handler) =>
+        _tryActivateSkinKey = handler;
+
+    public bool TrySelectSkinKey(string selectionKey)
     {
-        get => SkinSelectionKey.TryGetBuiltIn(
-            _settings.SelectedSkinKey,
-            out var skin)
-            ? skin
-            : SkinId.HudDial;
-        set
+        bool exists;
+        try
         {
-            if (!Enum.IsDefined(value))
-            {
-                return;
-            }
-
-            var selectionKey = SkinSelectionKey.FromBuiltIn(value);
-            if (_settings.SelectedSkinKey == selectionKey)
-            {
-                return;
-            }
-
-            SaveSettings(_settings with { SelectedSkinKey = selectionKey });
-            OnPropertyChanged();
+            exists = !string.IsNullOrWhiteSpace(selectionKey) &&
+                _selectionExists(selectionKey);
         }
+        catch
+        {
+            exists = false;
+        }
+
+        if (!exists)
+        {
+            return false;
+        }
+
+        lock (_settingsSync)
+        {
+            if (string.Equals(
+                    _settings.SelectedSkinKey,
+                    selectionKey,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            var next = _settings with { SelectedSkinKey = selectionKey };
+            try
+            {
+                _settingsStore.Save(next);
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException or SecurityException)
+            {
+                LastSettingsError = "璁剧疆鏈繚瀛?";
+                return false;
+            }
+
+            _settings = next;
+            LastSettingsError = null;
+        }
+
+        OnPropertyChanged(nameof(SelectedSkinKey));
+        return true;
     }
 
     public bool AnimationsEnabled
