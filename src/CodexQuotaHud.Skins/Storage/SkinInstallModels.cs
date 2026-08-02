@@ -17,11 +17,30 @@ public enum SkinInstallDisposition
     Cancelled
 }
 
-public sealed record SkinInstallPreview(
-    SkinPackageDocument Package,
-    InstalledSkinRecord? Existing,
-    bool IsDowngrade,
-    IReadOnlyList<SkinCollisionDecision> AllowedDecisions);
+public sealed class SkinInstallPreview
+{
+    internal SkinInstallPreview(
+        SkinPackageDocument package,
+        InstalledSkinRecord? existing,
+        bool isDowngrade,
+        IReadOnlyList<SkinCollisionDecision> allowedDecisions)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentNullException.ThrowIfNull(allowedDecisions);
+        Package = package;
+        Existing = existing;
+        IsDowngrade = isDowngrade;
+        AllowedDecisions = allowedDecisions;
+    }
+
+    public SkinPackageDocument Package { get; }
+
+    public InstalledSkinRecord? Existing { get; }
+
+    public bool IsDowngrade { get; }
+
+    public IReadOnlyList<SkinCollisionDecision> AllowedDecisions { get; }
+}
 
 public sealed record SkinInstallResult(
     SkinInstallDisposition Disposition,

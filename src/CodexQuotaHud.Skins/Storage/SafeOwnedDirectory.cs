@@ -54,14 +54,7 @@ internal sealed class PhysicalSkinFileSystem : ISkinFileSystem
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
-        if (source.Length > maximumBytes)
-        {
-            throw new InvalidDataException("The installed skin file exceeds its size limit.");
-        }
-
-        using var destination = new MemoryStream(checked((int)source.Length));
-        source.CopyTo(destination);
-        return destination.ToArray();
+        return BoundedSkinFileReader.Read(source, maximumBytes);
     }
 
     public void CreateDirectory(string path) => Directory.CreateDirectory(path);
@@ -82,6 +75,47 @@ internal sealed class PhysicalSkinFileSystem : ISkinFileSystem
 
     public void DeleteDirectory(string path, bool recursive) =>
         Directory.Delete(path, recursive);
+}
+
+internal static class BoundedSkinFileReader
+{
+    private const int BufferSize = 64 * 1024;
+
+    public static byte[] Read(Stream source, long maximumBytes)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentOutOfRangeException.ThrowIfNegative(maximumBytes);
+        if (!source.CanRead)
+        {
+            throw new ArgumentException(
+                "The source stream must be readable.",
+                nameof(source));
+        }
+
+        using var destination = new MemoryStream();
+        var buffer = new byte[BufferSize];
+        long totalBytes = 0;
+        while (true)
+        {
+            var allowedRead = (int)Math.Min(
+                buffer.Length,
+                maximumBytes - totalBytes + 1);
+            var read = source.Read(buffer, 0, allowedRead);
+            if (read == 0)
+            {
+                return destination.ToArray();
+            }
+
+            totalBytes = checked(totalBytes + read);
+            if (totalBytes > maximumBytes)
+            {
+                throw new InvalidDataException(
+                    "The installed skin file exceeds its size limit.");
+            }
+
+            destination.Write(buffer, 0, read);
+        }
+    }
 }
 
 internal sealed class SafeOwnedDirectory

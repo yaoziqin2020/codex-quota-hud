@@ -1,15 +1,14 @@
 using System.IO;
+using System.Security.Cryptography;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Packaging;
 using CodexQuotaHud.Skins.Serialization;
+using CodexQuotaHud.Skins.Validation;
 
 namespace CodexQuotaHud.Skins.Storage;
 
 public sealed class SkinPackageInstaller
 {
-    private static readonly SemanticVersion CatalogValidationVersion =
-        new(int.MaxValue, int.MaxValue, int.MaxValue);
-
     private static readonly HashSet<Guid> ReservedBuiltInIds =
     [
         Guid.Parse("10000000-0000-0000-0000-000000000001"),
@@ -27,21 +26,48 @@ public sealed class SkinPackageInstaller
     ];
 
     private readonly SkinStoragePaths _paths;
+    private readonly SemanticVersion _currentHudVersion;
     private readonly ISkinFileSystem _fileSystem;
+    private readonly ISkinInstallLockProvider _lockProvider;
+    private readonly IDirectoryIdentityProvider _identityProvider;
+    private readonly IDirectoryLeaseProvider _directoryLeaseProvider;
+    private readonly IDirectoryMoveProvider _directoryMoveProvider;
+    private readonly ISafeDirectoryDeleteProvider _directoryDeleteProvider;
 
-    public SkinPackageInstaller(SkinStoragePaths paths)
-        : this(paths, PhysicalSkinFileSystem.Instance)
+    public SkinPackageInstaller(
+        SkinStoragePaths paths,
+        SemanticVersion currentHudVersion)
+        : this(paths, currentHudVersion, PhysicalSkinFileSystem.Instance)
     {
     }
 
     internal SkinPackageInstaller(
         SkinStoragePaths paths,
-        ISkinFileSystem fileSystem)
+        SemanticVersion currentHudVersion,
+        ISkinFileSystem fileSystem,
+        ISkinInstallLockProvider? lockProvider = null,
+        IDirectoryIdentityProvider? identityProvider = null,
+        IDirectoryLeaseProvider? directoryLeaseProvider = null,
+        IDirectoryMoveProvider? directoryMoveProvider = null,
+        ISafeDirectoryDeleteProvider? directoryDeleteProvider = null)
     {
         ArgumentNullException.ThrowIfNull(paths);
         ArgumentNullException.ThrowIfNull(fileSystem);
         _paths = paths;
+        _currentHudVersion = currentHudVersion;
         _fileSystem = fileSystem;
+        _lockProvider = lockProvider ?? NamedSkinInstallLockProvider.Instance;
+        _identityProvider = identityProvider ?? PhysicalDirectoryIdentityProvider.Instance;
+        _directoryLeaseProvider = directoryLeaseProvider ??
+            PhysicalDirectoryLeaseProvider.Instance;
+        _directoryMoveProvider = directoryMoveProvider ??
+            (ReferenceEquals(fileSystem, PhysicalSkinFileSystem.Instance)
+                ? PhysicalDirectoryLeaseProvider.Instance
+                : new FileSystemDirectoryMoveProvider(fileSystem));
+        _directoryDeleteProvider = directoryDeleteProvider ??
+            (ReferenceEquals(fileSystem, PhysicalSkinFileSystem.Instance)
+                ? PhysicalDirectoryDeleteProvider.Instance
+                : new FileSystemDirectoryDeleteProvider(fileSystem));
     }
 
     public SkinValidationResult<SkinInstallPreview> Inspect(
@@ -49,9 +75,19 @@ public sealed class SkinPackageInstaller
         SemanticVersion hudVersion,
         CancellationToken cancellationToken)
     {
+        if (hudVersion != _currentHudVersion)
+        {
+            return new SkinValidationResult<SkinInstallPreview>(
+                null,
+                [new SkinValidationError(
+                    "inspect.hud-version-mismatch",
+                    "$hudVersion",
+                    "The inspection HUD version does not match the installer.")]);
+        }
+
         var package = new SkinPackageReader().ValidateFile(
             packagePath,
-            hudVersion,
+            _currentHudVersion,
             cancellationToken);
         if (!package.IsValid)
         {
@@ -62,7 +98,7 @@ public sealed class SkinPackageInstaller
 
         var existing = new InstalledSkinCatalog(
             _paths,
-            hudVersion,
+            _currentHudVersion,
             _fileSystem).Find(package.Value!.Manifest.SkinId);
         var isDowngrade = existing is not null &&
             package.Value.Manifest.PackageVersion.CompareTo(existing.PackageVersion) < 0;
@@ -83,12 +119,59 @@ public sealed class SkinPackageInstaller
         ArgumentNullException.ThrowIfNull(preview);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (preview.IsDowngrade)
+        var validatedPackage = ValidateExternalPackage(
+            preview.Package,
+            cancellationToken);
+        if (!validatedPackage.IsValid)
         {
-            return Error("install.downgrade", "The installed skin is newer than this package.");
+            return new SkinInstallResult(
+                SkinInstallDisposition.Cancelled,
+                null,
+                validatedPackage.Errors);
         }
 
-        if (preview.Existing is not null && decision == SkinCollisionDecision.Cancel)
+        var package = validatedPackage.Value!;
+        if (preview.Existing is not null &&
+            !IsValidExistingRecord(preview.Existing, package.Manifest.SkinId))
+        {
+            return Error(
+                "install.preview.invalid",
+                "The collision preview does not reference an owned installed skin.");
+        }
+
+        using var transactionLock = _lockProvider.Acquire(
+            _paths.InstalledSkinsRoot,
+            package.Manifest.SkinId,
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var existing = new InstalledSkinCatalog(
+            _paths,
+            _currentHudVersion,
+            _fileSystem).Find(package.Manifest.SkinId);
+        if (!MatchesPreviewState(preview.Existing, existing))
+        {
+            return Error(
+                "install.state-changed",
+                "The installed skin state changed. Inspect the package again.");
+        }
+
+        if (existing is not null &&
+            package.Manifest.PackageVersion.CompareTo(existing.PackageVersion) < 0)
+        {
+            return Error(
+                "install.downgrade",
+                "The installed skin is newer than this package.");
+        }
+
+        if (!Enum.IsDefined(decision) ||
+            (existing is null && decision != SkinCollisionDecision.Replace))
+        {
+            return Error(
+                "install.decision.invalid",
+                "The collision decision is not allowed.");
+        }
+
+        if (existing is not null && decision == SkinCollisionDecision.Cancel)
         {
             return new SkinInstallResult(
                 SkinInstallDisposition.Cancelled,
@@ -96,50 +179,6 @@ public sealed class SkinPackageInstaller
                 []);
         }
 
-        if (preview.Existing is not null &&
-            !preview.AllowedDecisions.Contains(decision))
-        {
-            return Error("install.decision.invalid", "The collision decision is not allowed.");
-        }
-
-        if (preview.Existing is not null &&
-            !IsValidExistingRecord(preview.Existing, preview.Package.Manifest.SkinId))
-        {
-            return Error(
-                "install.preview.invalid",
-                "The collision preview does not reference an owned installed skin.");
-        }
-
-        var existing = preview.Existing;
-        if (existing is not null)
-        {
-            var current = new InstalledSkinCatalog(
-                _paths,
-                CatalogValidationVersion,
-                _fileSystem).Find(preview.Package.Manifest.SkinId);
-            if (current is null ||
-                !string.Equals(
-                    Path.GetFullPath(current.DirectoryPath),
-                    Path.GetFullPath(existing.DirectoryPath),
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return Error(
-                    "install.preview.invalid",
-                    "The installed skin changed after the collision preview was created.");
-            }
-
-            if (preview.Package.Manifest.PackageVersion.CompareTo(
-                    current.PackageVersion) < 0)
-            {
-                return Error(
-                    "install.downgrade",
-                    "The installed skin is newer than this package.");
-            }
-
-            existing = current;
-        }
-
-        var package = preview.Package;
         var disposition = SkinInstallDisposition.Installed;
         if (existing is not null && decision == SkinCollisionDecision.KeepCopy)
         {
@@ -188,45 +227,142 @@ public sealed class SkinPackageInstaller
         var retainOperation = false;
         var backupMoved = false;
         var candidatePromoted = false;
+        IDirectoryLease? candidateLease = null;
+        IDirectoryLease? candidateParentLease = null;
+        IDirectoryLease? existingLease = null;
+        IDirectoryLease? backupParentLease = null;
+        IDirectoryLease? installedRootLease = null;
         SkinInstallResult result;
+
+        void DisposeTransactionLeases()
+        {
+            existingLease?.Dispose();
+            existingLease = null;
+            candidateLease?.Dispose();
+            candidateLease = null;
+            installedRootLease?.Dispose();
+            installedRootLease = null;
+            backupParentLease?.Dispose();
+            backupParentLease = null;
+            candidateParentLease?.Dispose();
+            candidateParentLease = null;
+        }
+
+        SkinInstallResult FinishTransaction(
+            SkinInstallResult transactionResult,
+            bool retain)
+        {
+            DisposeTransactionLeases();
+            return FinishOperation(
+                transactionResult,
+                operationPath,
+                operationId,
+                retain);
+        }
+
+        bool TryRollbackExactHandles()
+        {
+            if (candidatePromoted)
+            {
+                if (candidateLease is null || candidateParentLease is null)
+                {
+                    return false;
+                }
+
+                _directoryMoveProvider.Move(
+                    candidateLease,
+                    finalPath,
+                    candidateParentLease,
+                    candidateRoot,
+                    skinDirectoryName,
+                    candidatePath);
+                candidatePromoted = false;
+            }
+
+            if (backupMoved)
+            {
+                if (existingLease is null || installedRootLease is null)
+                {
+                    return false;
+                }
+
+                _directoryMoveProvider.Move(
+                    existingLease,
+                    backupPath,
+                    installedRootLease,
+                    _paths.InstalledSkinsRoot,
+                    skinDirectoryName,
+                    finalPath);
+                backupMoved = false;
+            }
+
+            return true;
+        }
 
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             _fileSystem.CreateDirectory(candidatePath);
+            candidateParentLease = _directoryLeaseProvider.Lease(candidateRoot);
+            candidateLease = _directoryLeaseProvider.Lease(candidatePath);
             WriteCandidate(candidatePath, package, cancellationToken);
-
             var staged = new InstalledSkinReader(
                 candidateRoot,
-                package.Manifest.MinimumHudVersion,
-                _fileSystem).Read(candidatePath);
+                _currentHudVersion,
+                _fileSystem,
+                allowLocalProvenance:
+                    disposition == SkinInstallDisposition.KeptCopy).Read(candidatePath);
             if (!staged.IsValid)
             {
                 result = new SkinInstallResult(
                     SkinInstallDisposition.Cancelled,
                     null,
                     staged.Errors);
-                return FinishOperation(
-                    result,
-                    operationPath,
-                    operationId,
-                    retainOperation);
+                return FinishTransaction(result, retainOperation);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
             _fileSystem.CreateDirectory(_paths.InstalledSkinsRoot);
+            installedRootLease = _directoryLeaseProvider.Lease(
+                _paths.InstalledSkinsRoot);
             if (existing is not null && decision == SkinCollisionDecision.Replace)
             {
                 _fileSystem.CreateDirectory(backupRoot);
-                _fileSystem.MoveDirectory(existing.DirectoryPath, backupPath);
+                existingLease = _directoryLeaseProvider.Lease(
+                    existing.DirectoryPath);
+                backupParentLease = _directoryLeaseProvider.Lease(backupRoot);
+                _directoryMoveProvider.Move(
+                    existingLease,
+                    existing.DirectoryPath,
+                    backupParentLease,
+                    backupRoot,
+                    skinDirectoryName,
+                    backupPath);
                 backupMoved = true;
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
             try
             {
-                _fileSystem.MoveDirectory(candidatePath, finalPath);
+                _directoryMoveProvider.Move(
+                    candidateLease,
+                    candidatePath,
+                    installedRootLease,
+                    _paths.InstalledSkinsRoot,
+                    skinDirectoryName,
+                    finalPath);
                 candidatePromoted = true;
+                if (candidateLease is null ||
+                    !_identityProvider.TryGetIdentity(
+                        finalPath,
+                        out var candidateIdentity) ||
+                    candidateIdentity != candidateLease.Identity)
+                {
+                    retainOperation = true;
+                    result = RollbackFailed(operationId);
+                    return FinishTransaction(result, retainOperation);
+                }
+
                 cancellationToken.ThrowIfCancellationRequested();
             }
             catch (Exception exception) when (
@@ -236,84 +372,61 @@ public sealed class SkinPackageInstaller
                 {
                     try
                     {
-                        RestoreBackup(finalPath, backupPath);
-                        backupMoved = false;
-                        candidatePromoted = false;
+                        if (!TryRollbackExactHandles())
+                        {
+                            retainOperation = true;
+                            result = RollbackFailed(operationId);
+                            return FinishTransaction(result, retainOperation);
+                        }
                     }
                     catch (Exception rollbackException) when (
                         rollbackException is IOException or UnauthorizedAccessException)
                     {
                         retainOperation = true;
-                        result = Error(
-                            "install.rollback-failed",
-                            $"Promotion and rollback failed. Recovery operation: {operationId:D}.");
-                        return FinishOperation(
-                            result,
-                            operationPath,
-                            operationId,
-                            retainOperation);
+                        result = RollbackFailed(operationId);
+                        return FinishTransaction(result, retainOperation);
                     }
                 }
 
                 result = Error("install.io", "The skin could not be installed safely.");
-                return FinishOperation(
-                    result,
-                    operationPath,
-                    operationId,
-                    retainOperation);
+                return FinishTransaction(result, retainOperation);
             }
 
             var installed = new InstalledSkinReader(
                 _paths.InstalledSkinsRoot,
-                package.Manifest.MinimumHudVersion,
-                _fileSystem).Read(finalPath);
+                _currentHudVersion,
+                _fileSystem,
+                allowLocalProvenance:
+                    disposition == SkinInstallDisposition.KeptCopy).Read(finalPath);
             if (!installed.IsValid)
             {
-                if (backupMoved)
+                try
                 {
-                    RestoreBackup(finalPath, backupPath);
-                    backupMoved = false;
-                    candidatePromoted = false;
+                    if (!TryRollbackExactHandles())
+                    {
+                        retainOperation = true;
+                        result = RollbackFailed(operationId);
+                        return FinishTransaction(result, retainOperation);
+                    }
                 }
-                else if (_fileSystem.DirectoryExists(finalPath))
+                catch (Exception exception) when (
+                    exception is IOException or UnauthorizedAccessException)
                 {
-                    _fileSystem.DeleteDirectory(finalPath, recursive: true);
-                    candidatePromoted = false;
+                    retainOperation = true;
+                    result = RollbackFailed(operationId);
+                    return FinishTransaction(result, retainOperation);
                 }
 
                 result = new SkinInstallResult(
                     SkinInstallDisposition.Cancelled,
                     null,
                     installed.Errors);
-                return FinishOperation(
-                    result,
-                    operationPath,
-                    operationId,
-                    retainOperation);
+                return FinishTransaction(result, retainOperation);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
             if (backupMoved)
             {
-                try
-                {
-                    _fileSystem.DeleteDirectory(backupPath, recursive: true);
-                }
-                catch (Exception exception) when (
-                    exception is IOException or UnauthorizedAccessException)
-                {
-                    retainOperation = true;
-                    result = new SkinInstallResult(
-                        disposition,
-                        installed.Value,
-                        [CleanupFailed(operationId)]);
-                    return FinishOperation(
-                        result,
-                        operationPath,
-                        operationId,
-                        retainOperation);
-                }
-
                 backupMoved = false;
             }
 
@@ -321,57 +434,59 @@ public sealed class SkinPackageInstaller
         }
         catch (OperationCanceledException)
         {
+            var rollbackSucceeded = true;
             try
             {
-                if (backupMoved || _fileSystem.DirectoryExists(backupPath))
-                {
-                    RestoreBackup(finalPath, backupPath);
-                    backupMoved = false;
-                    candidatePromoted = false;
-                }
-                else if (candidatePromoted && _fileSystem.DirectoryExists(finalPath))
-                {
-                    _fileSystem.DeleteDirectory(finalPath, recursive: true);
-                    candidatePromoted = false;
-                }
+                rollbackSucceeded = TryRollbackExactHandles();
             }
             catch (Exception exception) when (
                 exception is IOException or UnauthorizedAccessException)
             {
                 retainOperation = true;
+                rollbackSucceeded = false;
             }
 
-            _ = FinishOperation(
+            if (!rollbackSucceeded)
+            {
+                retainOperation = true;
+                return FinishTransaction(
+                    RollbackFailed(operationId),
+                    retainOperation);
+            }
+
+            _ = FinishTransaction(
                 Error("install.cancelled", "The skin installation was cancelled."),
-                operationPath,
-                operationId,
                 retainOperation);
             throw;
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException)
         {
+            var rollbackSucceeded = true;
             try
             {
-                if (backupMoved || _fileSystem.DirectoryExists(backupPath))
-                {
-                    RestoreBackup(finalPath, backupPath);
-                    backupMoved = false;
-                    candidatePromoted = false;
-                }
-                else if (candidatePromoted && _fileSystem.DirectoryExists(finalPath))
-                {
-                    _fileSystem.DeleteDirectory(finalPath, recursive: true);
-                    candidatePromoted = false;
-                }
+                rollbackSucceeded = TryRollbackExactHandles();
             }
             catch (Exception rollbackException) when (
                 rollbackException is IOException or UnauthorizedAccessException)
             {
                 retainOperation = true;
+                rollbackSucceeded = false;
             }
 
-            result = Error("install.io", "The skin could not be installed safely.");
+            if (!rollbackSucceeded)
+            {
+                retainOperation = true;
+                result = RollbackFailed(operationId);
+            }
+            else
+            {
+                result = Error("install.io", "The skin could not be installed safely.");
+            }
+        }
+        finally
+        {
+            DisposeTransactionLeases();
         }
 
         return FinishOperation(
@@ -396,6 +511,11 @@ public sealed class SkinPackageInstaller
                 "remove.reserved-id",
                 "Built-in skins cannot be removed from custom storage.");
         }
+
+        using var installLock = _lockProvider.Acquire(
+            _paths.InstalledSkinsRoot,
+            skinId,
+            CancellationToken.None);
 
         if (!_fileSystem.DirectoryExists(_paths.InstalledSkinsRoot))
         {
@@ -445,7 +565,54 @@ public sealed class SkinPackageInstaller
                     "The custom skin directory is not an owned lowercase GUID directory.");
             }
 
-            _fileSystem.DeleteDirectory(directoryPath, recursive: true);
+            var operationId = Guid.NewGuid();
+            var operationPath = Path.Combine(
+                _paths.ImportsRoot,
+                operationId.ToString("D").ToLowerInvariant());
+            var removeRoot = Path.Combine(operationPath, "remove");
+            var directoryName = skinId.ToString("D").ToLowerInvariant();
+            var quarantinePath = Path.Combine(removeRoot, directoryName);
+            if (!SafeOwnedDirectory.IsSafeStoragePath(
+                    _paths,
+                    quarantinePath,
+                    _fileSystem))
+            {
+                return RemoveError(
+                    "remove.path.invalid",
+                    "The removal quarantine path is unsafe.");
+            }
+
+            _fileSystem.CreateDirectory(removeRoot);
+            using (var installedRootLease = _directoryLeaseProvider.Lease(
+                       _paths.InstalledSkinsRoot))
+            using (var targetLease = _directoryLeaseProvider.Lease(directoryPath))
+            using (var removeParentLease = _directoryLeaseProvider.Lease(removeRoot))
+            {
+                _directoryMoveProvider.Move(
+                    targetLease,
+                    directoryPath,
+                    removeParentLease,
+                    removeRoot,
+                    directoryName,
+                    quarantinePath);
+            }
+
+            // C4 first quarantines the exact leased object. The operation tree is
+            // cleaned only after every lease that prevents deletion is released.
+            try
+            {
+                _directoryDeleteProvider.DeleteOwnedTree(
+                    operationPath,
+                    SkinPackageLimits.MaximumEntries + 3);
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException)
+            {
+                return RemoveError(
+                    "remove.cleanup-failed",
+                    $"The skin was removed, but cleanup failed. Recovery operation: {operationId:D}.");
+            }
+
             return new SkinValidationResult<Guid>(skinId, []);
         }
         catch (Exception exception) when (
@@ -456,6 +623,158 @@ public sealed class SkinPackageInstaller
                 "The custom skin could not be removed safely.");
         }
     }
+
+    private SkinValidationResult<SkinPackageDocument> ValidateExternalPackage(
+        SkinPackageDocument? package,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (package?.Manifest is null ||
+                package.Theme is null ||
+                package.Assets is null ||
+                package.Manifest.Assets is null)
+            {
+                return InvalidPreview(
+                    "The collision preview does not contain a complete package.");
+            }
+
+            var manifest = package.Manifest with
+            {
+                Assets = package.Manifest.Assets.ToArray()
+            };
+            var contract = SkinContractValidator.Validate(
+                manifest,
+                package.Theme,
+                _currentHudVersion,
+                allowLocalProvenance: false);
+            if (!contract.IsValid)
+            {
+                return new SkinValidationResult<SkinPackageDocument>(
+                    null,
+                    contract.Errors);
+            }
+
+            var assetSnapshot = new Dictionary<SkinAssetSlot, SkinAsset>();
+            foreach (var pair in package.Assets)
+            {
+                assetSnapshot.Add(pair.Key, pair.Value);
+            }
+
+            if (assetSnapshot.Count != manifest.Assets.Count)
+            {
+                return InvalidPreview(
+                    "The collision preview asset dictionary does not match its manifest.");
+            }
+
+            long totalBytes = checked(
+                SkinJsonCodec.WriteManifest(manifest).LongLength +
+                SkinJsonCodec.WriteTheme(contract.Value!.Theme).LongLength);
+            if (totalBytes > SkinPackageLimits.MaximumExtractedBytes)
+            {
+                return InvalidPreview(
+                    "The collision preview exceeds the extracted size limit.");
+            }
+
+            var validatedAssets = new Dictionary<SkinAssetSlot, SkinAsset>();
+            long decodedPixels = 0;
+            foreach (var reference in manifest.Assets)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (reference is null ||
+                    !assetSnapshot.TryGetValue(reference.Slot, out var asset) ||
+                    asset is null ||
+                    asset.Slot != reference.Slot ||
+                    !string.Equals(
+                        asset.RelativePath,
+                        reference.Path,
+                        StringComparison.Ordinal) ||
+                    asset.Content is null)
+                {
+                    return InvalidPreview(
+                        "The collision preview asset dictionary does not match its manifest.");
+                }
+
+                if (asset.Content.LongLength > SkinPackageLimits.MaximumImageBytes ||
+                    asset.Content.LongLength >
+                        SkinPackageLimits.MaximumExtractedBytes - totalBytes)
+                {
+                    return InvalidPreview(
+                        "The collision preview exceeds an asset size limit.");
+                }
+
+                var content = asset.Content.ToArray();
+                totalBytes = checked(totalBytes + content.LongLength);
+                var hash = Convert.ToHexString(SHA256.HashData(content))
+                    .ToLowerInvariant();
+                if (!string.Equals(hash, reference.Sha256, StringComparison.Ordinal))
+                {
+                    return InvalidPreview(
+                        "The collision preview asset hash does not match its manifest.");
+                }
+
+                var decoded = SkinImageDecoder.Decode(
+                    reference.Slot,
+                    reference.Path,
+                    content,
+                    SkinPackageLimits.MaximumDecodedPixels - decodedPixels);
+                var pixels = checked(
+                    (long)decoded.PixelWidth * decoded.PixelHeight);
+                decodedPixels = checked(decodedPixels + pixels);
+                if (asset.PixelWidth != decoded.PixelWidth ||
+                    asset.PixelHeight != decoded.PixelHeight ||
+                    asset.HasAlpha != decoded.HasAlpha)
+                {
+                    return InvalidPreview(
+                        "The collision preview asset metadata does not match its content.");
+                }
+
+                validatedAssets.Add(
+                    reference.Slot,
+                    new SkinAsset(
+                        reference.Slot,
+                        reference.Path,
+                        content,
+                        decoded.PixelWidth,
+                        decoded.PixelHeight,
+                        decoded.HasAlpha));
+            }
+
+            return new SkinValidationResult<SkinPackageDocument>(
+                new SkinPackageDocument(
+                    manifest,
+                    contract.Value.Theme,
+                    validatedAssets),
+                []);
+        }
+        catch (SkinImageValidationException exception)
+        {
+            return new SkinValidationResult<SkinPackageDocument>(
+                null,
+                [new SkinValidationError(
+                    exception.Code,
+                    "$image",
+                    exception.Message)]);
+        }
+        catch (Exception exception) when (
+            exception is IOException or OverflowException or
+                ArgumentException or KeyNotFoundException or
+                InvalidOperationException)
+        {
+            return InvalidPreview(
+                "The collision preview package is malformed.");
+        }
+    }
+
+    private static SkinValidationResult<SkinPackageDocument> InvalidPreview(
+        string message) =>
+        new(
+            null,
+            [new SkinValidationError(
+                "install.preview.invalid",
+                "$install.preview",
+                message)]);
 
     private SkinInstallResult FinishOperation(
         SkinInstallResult result,
@@ -470,14 +789,19 @@ public sealed class SkinPackageInstaller
 
         try
         {
-            _fileSystem.DeleteDirectory(operationPath, recursive: true);
+            _directoryDeleteProvider.DeleteOwnedTree(
+                operationPath,
+                SkinPackageLimits.MaximumEntries + 3);
             return result;
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException)
         {
+            var cleanupError = result.Installed is null
+                ? OperationCleanupFailed(operationId)
+                : CleanupFailed(operationId);
             var errors = result.Errors
-                .Concat([CleanupFailed(operationId)])
+                .Concat([cleanupError])
                 .ToArray();
             return result with { Errors = errors };
         }
@@ -506,30 +830,44 @@ public sealed class SkinPackageInstaller
             _fileSystem);
         return ownedSkins.TryResolveSkinDirectory(
                 existing.DirectoryPath,
-                out var resolvedPath,
+                out _,
                 out var directorySkinId) &&
-            directorySkinId == existing.SkinId &&
-            _fileSystem.DirectoryExists(resolvedPath);
+            directorySkinId == existing.SkinId;
     }
 
-    private void RestoreBackup(string finalPath, string backupPath)
+    private static bool MatchesPreviewState(
+        InstalledSkinRecord? previewExisting,
+        InstalledSkinRecord? currentExisting)
     {
-        if (_fileSystem.DirectoryExists(finalPath))
+        if (previewExisting is null || currentExisting is null)
         {
-            _fileSystem.DeleteDirectory(finalPath, recursive: true);
+            return previewExisting is null && currentExisting is null;
         }
 
-        if (_fileSystem.DirectoryExists(backupPath))
-        {
-            _fileSystem.MoveDirectory(backupPath, finalPath);
-        }
+        return previewExisting.SkinId == currentExisting.SkinId &&
+            previewExisting.PackageVersion == currentExisting.PackageVersion &&
+            string.Equals(
+                Path.GetFullPath(previewExisting.DirectoryPath),
+                Path.GetFullPath(currentExisting.DirectoryPath),
+                StringComparison.OrdinalIgnoreCase);
     }
+
+    private static SkinInstallResult RollbackFailed(Guid operationId) =>
+        Error(
+            "install.rollback-failed",
+            $"Rollback could not safely identify the promoted skin. Recovery operation: {operationId:D}.");
 
     private static SkinValidationError CleanupFailed(Guid operationId) =>
         new(
             "install.cleanup-failed",
             "$operation",
             $"The new skin was installed, but cleanup failed. Recovery operation: {operationId:D}.");
+
+    private static SkinValidationError OperationCleanupFailed(Guid operationId) =>
+        new(
+            "install.operation-cleanup-failed",
+            "$operation",
+            $"The skin was not installed, and temporary cleanup failed. Recovery operation: {operationId:D}.");
 
     private void WriteCandidate(
         string candidatePath,

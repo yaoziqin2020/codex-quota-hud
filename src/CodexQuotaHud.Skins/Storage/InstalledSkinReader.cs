@@ -12,15 +12,18 @@ internal sealed class InstalledSkinReader
     private readonly SafeOwnedDirectory _ownedRoot;
     private readonly ISkinFileSystem _fileSystem;
     private readonly SemanticVersion _hudVersion;
+    private readonly bool _allowLocalProvenance;
 
     public InstalledSkinReader(
         string installedRoot,
         SemanticVersion hudVersion,
-        ISkinFileSystem fileSystem)
+        ISkinFileSystem fileSystem,
+        bool allowLocalProvenance = true)
     {
         _ownedRoot = new SafeOwnedDirectory(installedRoot, fileSystem);
         _fileSystem = fileSystem;
         _hudVersion = hudVersion;
+        _allowLocalProvenance = allowLocalProvenance;
     }
 
     public SkinValidationResult<InstalledSkinRecord> Read(string directoryPath)
@@ -54,8 +57,15 @@ internal sealed class InstalledSkinReader
                     "The installed skin is missing a required file.");
             }
 
-            var manifestBytes = ReadFile(manifestPath, SkinPackageLimits.MaximumExtractedBytes);
-            var themeBytes = ReadFile(themePath, SkinPackageLimits.MaximumExtractedBytes);
+            long totalBytes = 0;
+            var manifestBytes = ReadFile(
+                manifestPath,
+                SkinPackageLimits.MaximumExtractedBytes - totalBytes);
+            totalBytes = checked(totalBytes + manifestBytes.LongLength);
+            var themeBytes = ReadFile(
+                themePath,
+                SkinPackageLimits.MaximumExtractedBytes - totalBytes);
+            totalBytes = checked(totalBytes + themeBytes.LongLength);
             var manifestResult = SkinJsonCodec.ParseManifest(manifestBytes);
             if (!manifestResult.IsValid)
             {
@@ -72,7 +82,7 @@ internal sealed class InstalledSkinReader
                 manifestResult.Value!,
                 themeResult.Value!,
                 _hudVersion,
-                allowLocalProvenance: true);
+                allowLocalProvenance: _allowLocalProvenance);
             if (!contract.IsValid)
             {
                 return Invalid(contract.Errors);
@@ -114,7 +124,6 @@ internal sealed class InstalledSkinReader
 
             var assets = new Dictionary<SkinAssetSlot, SkinAsset>();
             long decodedPixels = 0;
-            long totalBytes = checked(manifestBytes.LongLength + themeBytes.LongLength);
             foreach (var reference in manifest.Assets)
             {
                 var assetPath = Path.GetFullPath(Path.Combine(
@@ -129,7 +138,10 @@ internal sealed class InstalledSkinReader
                         "An installed asset is missing or leaves owned storage.");
                 }
 
-                var content = ReadFile(assetPath, SkinPackageLimits.MaximumImageBytes);
+                var remainingBytes = SkinPackageLimits.MaximumExtractedBytes - totalBytes;
+                var content = ReadFile(
+                    assetPath,
+                    Math.Min(SkinPackageLimits.MaximumImageBytes, remainingBytes));
                 totalBytes = checked(totalBytes + content.LongLength);
                 if (totalBytes > SkinPackageLimits.MaximumExtractedBytes)
                 {
@@ -182,8 +194,15 @@ internal sealed class InstalledSkinReader
         {
             return Invalid(exception.Code, "$image", exception.Message);
         }
+        catch (InvalidDataException)
+        {
+            return Invalid(
+                "installed.extracted-size",
+                "$directory",
+                "The installed skin exceeds its extracted size limit.");
+        }
         catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException or InvalidDataException or OverflowException)
+            exception is IOException or UnauthorizedAccessException or OverflowException)
         {
             return Invalid(
                 "installed.io",

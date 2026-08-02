@@ -139,6 +139,38 @@ public sealed class InstalledSkinCatalogTests
             out _));
     }
 
+    [Fact]
+    public void LoadAll_RejectsZeroAssetRecordWhoseManifestAndThemeExceedAggregateLimit()
+    {
+        using var fixture = new SkinPackageInstallerTests.InstallerFixture();
+        var installed = Install(fixture, fixture.CreatePackage("1.2.3"));
+        var targetLength = SkinPackageLimits.MaximumExtractedBytes / 2 + 1;
+        PadJsonWithSpaces(
+            Path.Combine(installed.DirectoryPath, SkinPackageLimits.ManifestFileName),
+            targetLength);
+        PadJsonWithSpaces(
+            Path.Combine(installed.DirectoryPath, SkinPackageLimits.ThemeFileName),
+            targetLength);
+
+        var loaded = new InstalledSkinCatalog(
+            fixture.Paths,
+            SemanticVersion.Parse("1.1.1")).LoadAll();
+
+        Assert.Empty(loaded.Installed);
+        Assert.Contains(
+            Assert.Single(loaded.Corrupt).Errors,
+            error => error.Code == "installed.extracted-size");
+    }
+
+    [Fact]
+    public void BoundedReader_RejectsStreamThatGrowsPastObservedLengthAndLimit()
+    {
+        using var stream = new GrowingAfterLengthStream([0x01, 0x02], observedLength: 1);
+
+        Assert.Throws<InvalidDataException>(() =>
+            BoundedSkinFileReader.Read(stream, maximumBytes: 1));
+    }
+
     private static InstalledSkinRecord Install(
         SkinPackageInstallerTests.InstallerFixture fixture,
         string packagePath)
@@ -149,6 +181,38 @@ public sealed class InstalledSkinCatalogTests
             CancellationToken.None);
         Assert.Empty(result.Errors);
         return Assert.IsType<InstalledSkinRecord>(result.Installed);
+    }
+
+    private static void PadJsonWithSpaces(string path, long targetLength)
+    {
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Write,
+            FileShare.None);
+        stream.Position = stream.Length;
+        var remaining = targetLength - stream.Length;
+        var padding = new byte[64 * 1024];
+        Array.Fill(padding, (byte)' ');
+        while (remaining > 0)
+        {
+            var count = (int)Math.Min(padding.Length, remaining);
+            stream.Write(padding, 0, count);
+            remaining -= count;
+        }
+
+        stream.Flush(flushToDisk: true);
+    }
+
+    private sealed class GrowingAfterLengthStream : MemoryStream
+    {
+        private readonly long _observedLength;
+
+        public GrowingAfterLengthStream(byte[] content, long observedLength)
+            : base(content, writable: false) =>
+            _observedLength = observedLength;
+
+        public override long Length => _observedLength;
     }
 
     internal sealed class ReparseMarkingFileSystem : ISkinFileSystem
