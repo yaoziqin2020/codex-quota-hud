@@ -24,6 +24,30 @@ public sealed class SkinContractValidatorTests
         Assert.Equal(theme, result.Value.Theme);
     }
 
+    [Fact]
+    public void ValidateTheme_AcceptsTheSameThemeWithoutManifestRepair()
+    {
+        var theme = ValidTheme();
+
+        var result = SkinContractValidator.ValidateTheme(theme);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Errors));
+        Assert.Equal(theme, result.Value);
+    }
+
+    [Fact]
+    public void ValidateTheme_ReturnsTheExistingBoundedThemeError()
+    {
+        var result = SkinContractValidator.ValidateTheme(
+            ValidTheme() with { RingThickness = 16.001 });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            error => error.Code == "number.out-of-range" &&
+                error.Location == "$.ringThickness");
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(2)]

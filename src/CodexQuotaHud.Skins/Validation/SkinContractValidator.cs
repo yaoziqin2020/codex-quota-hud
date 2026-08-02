@@ -43,6 +43,18 @@ public static class SkinContractValidator
                 errors);
     }
 
+    public static SkinValidationResult<SkinTheme> ValidateTheme(
+        SkinTheme theme)
+    {
+        ArgumentNullException.ThrowIfNull(theme);
+
+        var errors = new List<SkinValidationError>();
+        ValidateTheme(theme, errors);
+        return errors.Count == 0
+            ? new SkinValidationResult<SkinTheme>(theme, [])
+            : new SkinValidationResult<SkinTheme>(default, errors);
+    }
+
     private static void ValidateManifest(
         SkinManifest manifest,
         SemanticVersion installedHudVersion,

@@ -1,0 +1,16 @@
+<Window x:Class="CodexQuotaHud.SkinDesigner.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Codex Quota HUD 皮肤设计器"
+        Width="960"
+        Height="640"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <TextBlock HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   FontSize="20"
+                   Text="皮肤设计器" />
+    </Grid>
+</Window>
