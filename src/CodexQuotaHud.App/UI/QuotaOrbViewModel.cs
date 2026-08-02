@@ -235,8 +235,20 @@ public sealed class QuotaOrbViewModel :
     internal void SetSkinActivationHandler(Func<string, bool>? handler) =>
         _tryActivateSkinKey = handler;
 
-    public bool TrySelectSkinKey(string selectionKey)
+    internal void ClearSkinSelectionError() => LastSettingsError = null;
+
+    public bool TrySelectSkinKey(string selectionKey) =>
+        TrySelectSkinKey(selectionKey, CancellationToken.None);
+
+    public bool TrySelectSkinKey(
+        string selectionKey,
+        CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
         bool exists;
         try
         {
@@ -255,6 +267,11 @@ public sealed class QuotaOrbViewModel :
 
         lock (_settingsSync)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+
             if (string.Equals(
                     _settings.SelectedSkinKey,
                     selectionKey,
@@ -266,12 +283,24 @@ public sealed class QuotaOrbViewModel :
             var next = _settings with { SelectedSkinKey = selectionKey };
             try
             {
-                _settingsStore.Save(next);
+                _settingsStore.Save(next, cancellationToken);
+            }
+            catch (OperationCanceledException) when (
+                cancellationToken.IsCancellationRequested)
+            {
+                TryRestoreSettings(_settings);
+                return false;
             }
             catch (Exception exception) when (
                 exception is IOException or UnauthorizedAccessException or SecurityException)
             {
                 LastSettingsError = "璁剧疆鏈繚瀛?";
+                return false;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                TryRestoreSettings(_settings);
                 return false;
             }
 
@@ -281,6 +310,19 @@ public sealed class QuotaOrbViewModel :
 
         OnPropertyChanged(nameof(SelectedSkinKey));
         return true;
+    }
+
+    private void TryRestoreSettings(AppSettings settings)
+    {
+        try
+        {
+            _settingsStore.Save(settings);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or SecurityException)
+        {
+            LastSettingsError = "设置未保存";
+        }
     }
 
     public bool AnimationsEnabled

@@ -140,7 +140,17 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         TryActivateSkinKey(selectionKey);
 
     public bool TryActivateSkinKey(string selectionKey)
+        => TryActivateSkinKey(selectionKey, CancellationToken.None);
+
+    internal bool TryActivateSkinKey(
+        string selectionKey,
+        CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
         if (!_skinController.TryPrepare(
                 selectionKey,
                 out var candidate,
@@ -149,14 +159,145 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             return false;
         }
 
-        if (!_viewModel.TrySelectSkinKey(selectionKey))
+        var previousCandidate = _skinController.CaptureActiveCandidate();
+        var previousSelectionKey = _viewModel.SelectedSkinKey;
+        if (cancellationToken.IsCancellationRequested ||
+            !_viewModel.TrySelectSkinKey(selectionKey, cancellationToken))
         {
             return false;
         }
 
-        _skinController.Activate(candidate!);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ResolveRollbackOutcome(
+                selectionKey,
+                candidate!,
+                previousSelectionKey,
+                previousCandidate);
+        }
+
+        try
+        {
+            _skinController.Activate(candidate!);
+        }
+        catch (Exception)
+        {
+            return ResolveRollbackOutcome(
+                selectionKey,
+                candidate!,
+                previousSelectionKey,
+                previousCandidate);
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ResolveRollbackOutcome(
+                selectionKey,
+                candidate!,
+                previousSelectionKey,
+                previousCandidate);
+        }
+
         return true;
     }
+
+    private bool ResolveRollbackOutcome(
+        string targetSelectionKey,
+        SkinActivationCandidate targetCandidate,
+        string previousSelectionKey,
+        SkinActivationCandidate previousCandidate)
+    {
+        if (TryRollbackActivation(previousSelectionKey, previousCandidate))
+        {
+            return false;
+        }
+
+        return TryFinalizePreparedTarget(targetSelectionKey, targetCandidate);
+    }
+
+    private bool TryRollbackActivation(
+        string previousSelectionKey,
+        SkinActivationCandidate previousCandidate)
+    {
+        if (!_viewModel.TrySelectSkinKey(previousSelectionKey))
+        {
+            return false;
+        }
+
+        try
+        {
+            _skinController.RestoreActiveCandidate(previousCandidate);
+        }
+        catch (Exception)
+        {
+            // The controller changes its active state before notifying listeners.
+            // A listener failure is contained as an activation failure.
+        }
+
+        var rolledBack = IsActiveCandidate(
+            previousSelectionKey,
+            previousCandidate);
+        if (rolledBack)
+        {
+            ApplyActiveSkin();
+            RebuildOrbSkinMenu();
+        }
+
+        return rolledBack;
+    }
+
+    private bool TryFinalizePreparedTarget(
+        string targetSelectionKey,
+        SkinActivationCandidate targetCandidate)
+    {
+        if (!string.Equals(
+                _viewModel.SelectedSkinKey,
+                targetSelectionKey,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!IsActiveCandidate(targetSelectionKey, targetCandidate))
+        {
+            try
+            {
+                _skinController.RestoreActiveCandidate(targetCandidate);
+            }
+            catch (Exception)
+            {
+                // RestoreActiveCandidate changes controller state before
+                // notifying listeners, so audit the resulting state below.
+            }
+        }
+
+        if (!IsActiveCandidate(targetSelectionKey, targetCandidate))
+        {
+            return false;
+        }
+
+        ApplyActiveSkin();
+        RebuildOrbSkinMenu();
+        _viewModel.ClearSkinSelectionError();
+        return true;
+    }
+
+    private bool IsActiveCandidate(
+        string selectionKey,
+        SkinActivationCandidate candidate) =>
+        string.Equals(
+            _viewModel.SelectedSkinKey,
+            selectionKey,
+            StringComparison.Ordinal) &&
+        string.Equals(
+            _skinController.CurrentDescriptor.SelectionKey,
+            selectionKey,
+            StringComparison.Ordinal) &&
+        ReferenceEquals(_skinController.CurrentDescriptor, candidate.Descriptor) &&
+        ReferenceEquals(_skinController.CurrentSkin, candidate.Skin) &&
+        ReferenceEquals(
+            _skinController.CurrentPresentation,
+            candidate.Presentation);
 
     public void SetSkinView(FrameworkElement view)
     {

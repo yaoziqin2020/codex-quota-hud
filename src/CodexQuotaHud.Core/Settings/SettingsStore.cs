@@ -10,6 +10,13 @@ public interface ISettingsStore
     AppSettings Load();
 
     void Save(AppSettings settings);
+
+    void Save(AppSettings settings, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Save(settings);
+        cancellationToken.ThrowIfCancellationRequested();
+    }
 }
 
 public sealed record SettingsLoadResult(
@@ -29,6 +36,7 @@ public sealed class SettingsStore : ISettingsStore
 
     private readonly string _saveLockKey;
     private readonly Func<string, bool> _selectionExists;
+    private readonly Action? _beforeAtomicCommit;
 
     internal static int ActiveSaveLockCount => SaveLocks.Count;
 
@@ -43,11 +51,20 @@ public sealed class SettingsStore : ISettingsStore
     public SettingsStore(
         string settingsPath,
         Func<string, bool>? selectionExists = null)
+        : this(settingsPath, selectionExists, beforeAtomicCommit: null)
+    {
+    }
+
+    internal SettingsStore(
+        string settingsPath,
+        Func<string, bool>? selectionExists,
+        Action? beforeAtomicCommit)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsPath);
         SettingsPath = settingsPath;
         _saveLockKey = Path.GetFullPath(settingsPath);
         _selectionExists = selectionExists ?? DefaultSelectionExists;
+        _beforeAtomicCommit = beforeAtomicCommit;
     }
 
     public string SettingsPath { get; }
@@ -99,9 +116,15 @@ public sealed class SettingsStore : ISettingsStore
         }
     }
 
-    public void Save(AppSettings settings)
+    public void Save(AppSettings settings) =>
+        Save(settings, CancellationToken.None);
+
+    public void Save(
+        AppSettings settings,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var directory = Path.GetDirectoryName(SettingsPath);
         if (!string.IsNullOrEmpty(directory))
@@ -111,6 +134,7 @@ public sealed class SettingsStore : ISettingsStore
 
         using (AcquireSaveLock(_saveLockKey))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var temporaryPath =
                 $"{SettingsPath}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
             try
@@ -125,13 +149,45 @@ public sealed class SettingsStore : ISettingsStore
                     stream.Flush(flushToDisk: true);
                 }
 
-                File.Move(temporaryPath, SettingsPath, overwrite: true);
+                _beforeAtomicCommit?.Invoke();
+                CommitUnlessCancelled(
+                    cancellationToken,
+                    () => File.Move(
+                        temporaryPath,
+                        SettingsPath,
+                        overwrite: true));
             }
             catch
             {
                 TryDelete(temporaryPath);
                 throw;
             }
+        }
+    }
+
+    private static void CommitUnlessCancelled(
+        CancellationToken cancellationToken,
+        Action commit)
+    {
+        var state = new CommitGateState(cancellationToken.IsCancellationRequested);
+        using var registration = cancellationToken.UnsafeRegister(
+            static value =>
+            {
+                var gate = (CommitGateState)value!;
+                lock (gate.Sync)
+                {
+                    gate.Cancelled = true;
+                }
+            },
+            state);
+        lock (state.Sync)
+        {
+            if (state.Cancelled || cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            commit();
         }
     }
 
@@ -305,6 +361,13 @@ public sealed class SettingsStore : ISettingsStore
         public int ReferenceCount { get; set; }
 
         public bool IsRetired { get; set; }
+    }
+
+    private sealed class CommitGateState(bool cancelled)
+    {
+        public object Sync { get; } = new();
+
+        public bool Cancelled { get; set; } = cancelled;
     }
 
     private sealed record SelectionReadResult(

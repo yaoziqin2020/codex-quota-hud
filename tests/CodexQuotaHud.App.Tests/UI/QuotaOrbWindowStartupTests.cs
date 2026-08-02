@@ -1,4 +1,6 @@
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.Infrastructure.LocalControl;
+using CodexQuotaHud.App.UI.SkinManagement;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Refresh;
 using CodexQuotaHud.Core.Settings;
@@ -6,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
+using System.Windows.Threading;
 using CodexQuotaHud.Core.Models;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Storage;
@@ -346,6 +349,470 @@ public sealed class QuotaOrbWindowStartupTests
                 secondWindow.FindName("SkinHost")).Content);
             secondWindow.CloseForExit();
         });
+    }
+
+    [Fact]
+    public void LocalControlSelection_CancelledDuringPrepareNeverSavesOrActivates()
+    {
+        RunSta(() =>
+        {
+            using var cancellation = new CancellationTokenSource();
+            var store = new RecordingSettingsStore([]);
+            var controller = new SkinController(
+                CatalogWithCustom(),
+                descriptor => descriptor.SelectionKey == CustomKey
+                    ? new RecordingQuotaSkin(CustomKey, cancellation.Cancel)
+                    : new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            using var viewModel = ViewModel(store);
+            var window = new QuotaOrbWindow(viewModel, controller);
+
+            var activated = window.TryActivateSkinKey(
+                CustomKey,
+                cancellation.Token);
+
+            Assert.False(activated);
+            Assert.Equal(0, store.SaveCount);
+            Assert.Equal(SkinSelectionKey.HudDial, store.Load().SelectedSkinKey);
+            Assert.Equal(SkinSelectionKey.HudDial, viewModel.SelectedSkinKey);
+            Assert.Equal(
+                SkinSelectionKey.HudDial,
+                controller.CurrentDescriptor.SelectionKey);
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void LocalControlSelection_CancelledAtSaveActivateBoundaryRollsBackFormalState()
+    {
+        RunSta(() =>
+        {
+            using var cancellation = new CancellationTokenSource();
+            var store = new CancellingSettingsStore(cancellation);
+            var controller = new SkinController(
+                CatalogWithCustom(),
+                descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            using var viewModel = ViewModel(store);
+            var window = new QuotaOrbWindow(viewModel, controller);
+
+            var activated = window.TryActivateSkinKey(
+                CustomKey,
+                cancellation.Token);
+
+            Assert.False(activated);
+            Assert.Equal(2, store.SaveCount);
+            Assert.Equal(SkinSelectionKey.HudDial, store.Load().SelectedSkinKey);
+            Assert.Equal(SkinSelectionKey.HudDial, viewModel.SelectedSkinKey);
+            Assert.Equal(
+                SkinSelectionKey.HudDial,
+                controller.CurrentDescriptor.SelectionKey);
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void LocalControlSelection_CancelledAfterSaveBeforeActivateRollsBackBothStates()
+    {
+        RunSta(() =>
+        {
+            using var cancellation = new CancellationTokenSource();
+            var store = new RecordingSettingsStore([]);
+            var controller = new SkinController(
+                CatalogWithCustom(),
+                descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            using var viewModel = ViewModel(store);
+            viewModel.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(QuotaOrbViewModel.SelectedSkinKey) &&
+                    viewModel.SelectedSkinKey == CustomKey)
+                {
+                    cancellation.Cancel();
+                }
+            };
+            var window = new QuotaOrbWindow(viewModel, controller);
+
+            var activated = window.TryActivateSkinKey(
+                CustomKey,
+                cancellation.Token);
+
+            Assert.False(activated);
+            Assert.Equal(2, store.SaveCount);
+            Assert.Equal(SkinSelectionKey.HudDial, store.Load().SelectedSkinKey);
+            Assert.Equal(SkinSelectionKey.HudDial, viewModel.SelectedSkinKey);
+            Assert.Equal(
+                SkinSelectionKey.HudDial,
+                controller.CurrentDescriptor.SelectionKey);
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void LocalControlSelection_BlockedActiveSkinChangedPastCutoffRollsBackEverything()
+    {
+        RunSta(() =>
+        {
+            const string targetKey = "builtin:EnergyRing";
+            using var cancellation = new CancellationTokenSource();
+            var store = new RecordingSettingsStore([]);
+            var controller = new SkinController(
+                CatalogWithCustom(),
+                descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            using var viewModel = ViewModel(store);
+            var window = new QuotaOrbWindow(viewModel, controller);
+            var previousSkin = controller.CurrentSkin;
+            var previousPresentation = controller.CurrentPresentation;
+            var previousView = Assert.IsType<ContentControl>(
+                window.FindName("SkinHost")).Content;
+            var activationEvents = new List<string>();
+            controller.ActiveSkinChanged += (_, _) =>
+            {
+                activationEvents.Add(controller.CurrentDescriptor.SelectionKey);
+                if (string.Equals(
+                        controller.CurrentDescriptor.SelectionKey,
+                        targetKey,
+                        StringComparison.Ordinal))
+                {
+                    cancellation.CancelAfter(TimeSpan.FromMilliseconds(75));
+                    Assert.True(cancellation.Token.WaitHandle.WaitOne(
+                        TimeSpan.FromSeconds(2)));
+                }
+            };
+
+            var activated = window.TryActivateSkinKey(
+                targetKey,
+                cancellation.Token);
+
+            Assert.False(activated);
+            Assert.True(cancellation.IsCancellationRequested);
+            Assert.Equal(2, store.SaveCount);
+            Assert.Equal(SkinSelectionKey.HudDial, store.Load().SelectedSkinKey);
+            Assert.Equal(SkinSelectionKey.HudDial, viewModel.SelectedSkinKey);
+            Assert.Equal(
+                SkinSelectionKey.HudDial,
+                controller.CurrentDescriptor.SelectionKey);
+            Assert.Same(previousSkin, controller.CurrentSkin);
+            Assert.Same(previousPresentation, controller.CurrentPresentation);
+            Assert.Same(previousView, Assert.IsType<ContentControl>(
+                window.FindName("SkinHost")).Content);
+            Assert.Equal([targetKey, SkinSelectionKey.HudDial], activationEvents);
+
+            var menu = Assert.IsType<MenuItem>(window.FindName("SkinMenuRoot"));
+            var checkedKeys = menu.Items
+                .OfType<MenuItem>()
+                .Where(item => item.IsChecked)
+                .Select(item => Assert.IsType<string>(item.Tag))
+                .ToArray();
+            Assert.Equal([SkinSelectionKey.HudDial], checkedKeys);
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void LocalControlSelection_RollbackSaveFailureKeepsFormalAndLiveStateAligned()
+    {
+        RunSta(() =>
+        {
+            const string targetKey = "builtin:EnergyRing";
+            using var cancellation = new CancellationTokenSource();
+            var store = new FailingRollbackSettingsStore();
+            var controller = new SkinController(
+                CatalogWithCustom(),
+                descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            using var viewModel = ViewModel(store);
+            var window = new QuotaOrbWindow(viewModel, controller);
+            controller.ActiveSkinChanged += (_, _) =>
+            {
+                if (string.Equals(
+                        controller.CurrentDescriptor.SelectionKey,
+                        targetKey,
+                        StringComparison.Ordinal))
+                {
+                    cancellation.CancelAfter(TimeSpan.FromMilliseconds(75));
+                    Assert.True(cancellation.Token.WaitHandle.WaitOne(
+                        TimeSpan.FromSeconds(2)));
+                }
+            };
+
+            var activated = window.TryActivateSkinKey(
+                targetKey,
+                cancellation.Token);
+
+            Assert.True(activated);
+            Assert.Equal(2, store.SaveCount);
+            Assert.Equal(targetKey, store.Load().SelectedSkinKey);
+            Assert.Equal(targetKey, viewModel.SelectedSkinKey);
+            Assert.Equal(targetKey, controller.CurrentDescriptor.SelectionKey);
+            Assert.Same(
+                controller.CurrentView,
+                Assert.IsType<ContentControl>(
+                    window.FindName("SkinHost")).Content);
+            Assert.Null(viewModel.LastSettingsError);
+            var menu = Assert.IsType<MenuItem>(window.FindName("SkinMenuRoot"));
+            var checkedItem = Assert.Single(
+                menu.Items.OfType<MenuItem>(),
+                item => item.IsChecked);
+            Assert.Equal(targetKey, checkedItem.Tag);
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void LocalControlSelection_PreActivateRollbackSaveFailureCommitsPreparedTarget()
+    {
+        RunSta(() =>
+        {
+            const string targetKey = "builtin:EnergyRing";
+            using var cancellation = new CancellationTokenSource();
+            var store = new FailingRollbackSettingsStore();
+            var controller = new SkinController(
+                CatalogWithCustom(),
+                descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            using var viewModel = ViewModel(store);
+            viewModel.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(QuotaOrbViewModel.SelectedSkinKey) &&
+                    viewModel.SelectedSkinKey == targetKey)
+                {
+                    cancellation.Cancel();
+                }
+            };
+            var window = new QuotaOrbWindow(viewModel, controller);
+
+            var activated = window.TryActivateSkinKey(
+                targetKey,
+                cancellation.Token);
+
+            Assert.True(activated);
+            Assert.Equal(2, store.SaveCount);
+            Assert.Equal(targetKey, store.Load().SelectedSkinKey);
+            Assert.Equal(targetKey, viewModel.SelectedSkinKey);
+            Assert.Equal(targetKey, controller.CurrentDescriptor.SelectionKey);
+            Assert.Same(
+                controller.CurrentView,
+                Assert.IsType<ContentControl>(
+                    window.FindName("SkinHost")).Content);
+            Assert.Null(viewModel.LastSettingsError);
+            var menu = Assert.IsType<MenuItem>(window.FindName("SkinMenuRoot"));
+            var checkedItem = Assert.Single(
+                menu.Items.OfType<MenuItem>(),
+                item => item.IsChecked);
+            Assert.Equal(targetKey, checkedItem.Tag);
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public void LocalControlSelection_ActivateEventFailureAndRollbackSaveFailureCommitsTarget()
+    {
+        RunSta(() =>
+        {
+            const string targetKey = "builtin:EnergyRing";
+            var store = new FailingRollbackSettingsStore();
+            var controller = new SkinController(
+                CatalogWithCustom(),
+                descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                SkinSelectionKey.HudDial);
+            using var viewModel = ViewModel(store);
+            var window = new QuotaOrbWindow(viewModel, controller);
+            controller.ActiveSkinChanged += (_, _) =>
+            {
+                if (string.Equals(
+                        controller.CurrentDescriptor.SelectionKey,
+                        targetKey,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("listener failed");
+                }
+            };
+
+            var activated = window.TryActivateSkinKey(targetKey);
+
+            Assert.True(activated);
+            Assert.Equal(2, store.SaveCount);
+            Assert.Equal(targetKey, store.Load().SelectedSkinKey);
+            Assert.Equal(targetKey, viewModel.SelectedSkinKey);
+            Assert.Equal(targetKey, controller.CurrentDescriptor.SelectionKey);
+            Assert.Same(
+                controller.CurrentView,
+                Assert.IsType<ContentControl>(
+                    window.FindName("SkinHost")).Content);
+            Assert.Null(viewModel.LastSettingsError);
+            var menu = Assert.IsType<MenuItem>(window.FindName("SkinMenuRoot"));
+            var checkedItem = Assert.Single(
+                menu.Items.OfType<MenuItem>(),
+                item => item.IsChecked);
+            Assert.Equal(targetKey, checkedItem.Tag);
+            window.CloseForExit();
+        });
+    }
+
+    [Fact]
+    public async Task LocalControlPipeline_RollbackSaveFailureReturnsCommittedSuccess()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "CodexQuotaHud.Task10.RollbackPipeline",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var ready = new TaskCompletionSource<RollbackPipelineFixture>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var stopped = new TaskCompletionSource<Exception?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var uiThread = new Thread(() =>
+        {
+            try
+            {
+                var dispatcher = Dispatcher.CurrentDispatcher;
+                var catalog = CatalogWithCustom();
+                var store = new FailingRollbackSettingsStore();
+                var controller = new SkinController(
+                    catalog,
+                    descriptor => new RecordingQuotaSkin(descriptor.SelectionKey),
+                    SkinSelectionKey.HudDial);
+                var viewModel = ViewModel(store);
+                var hudVersion = SemanticVersion.Parse("1.1.1");
+                var management = new SkinManagementController(
+                    new SkinPackageInstaller(
+                        new SkinStoragePaths(root),
+                        hudVersion),
+                    catalog,
+                    viewModel,
+                    controller,
+                    new DesignerLauncher(
+                        Path.Combine(root, "app"),
+                        _ => false,
+                        _ => throw new InvalidOperationException()),
+                    new RejectingSkinManagementDialogs(),
+                    hudVersion,
+                    new InlineDispatcher());
+                var window = new QuotaOrbWindow(
+                    viewModel,
+                    controller,
+                    management);
+                var requestCancellation = CancellationToken.None;
+                controller.ActiveSkinChanged += (_, _) =>
+                {
+                    if (string.Equals(
+                            controller.CurrentDescriptor.SelectionKey,
+                            CustomKey,
+                            StringComparison.Ordinal) &&
+                        !requestCancellation.WaitHandle.WaitOne(
+                            TimeSpan.FromSeconds(2)))
+                    {
+                        throw new TimeoutException(
+                            "The local-control commit cutoff was not observed.");
+                    }
+                };
+
+                ready.SetResult(new RollbackPipelineFixture(
+                    dispatcher,
+                    (selectionKey, cancellationToken) =>
+                    {
+                        requestCancellation = cancellationToken;
+                        return window.TryActivateSkinKey(
+                            selectionKey,
+                            cancellationToken);
+                    },
+                    () =>
+                    {
+                        var menu = Assert.IsType<MenuItem>(
+                            window.FindName("SkinMenuRoot"));
+                        var checkedItem = Assert.Single(
+                            menu.Items.OfType<MenuItem>(),
+                            item => item.IsChecked);
+                        return new RollbackPipelineSnapshot(
+                            store.SaveCount,
+                            store.Load().SelectedSkinKey,
+                            viewModel.SelectedSkinKey,
+                            controller.CurrentDescriptor.SelectionKey,
+                            Assert.IsType<string>(checkedItem.Tag),
+                            ReferenceEquals(
+                                controller.CurrentView,
+                                Assert.IsType<ContentControl>(
+                                    window.FindName("SkinHost")).Content),
+                            viewModel.LastSettingsError);
+                    },
+                    () =>
+                    {
+                        window.CloseForExit();
+                        viewModel.Dispose();
+                        dispatcher.BeginInvokeShutdown(
+                            DispatcherPriority.Send);
+                    }));
+                Dispatcher.Run();
+                stopped.TrySetResult(null);
+            }
+            catch (Exception exception)
+            {
+                ready.TrySetException(exception);
+                stopped.TrySetResult(exception);
+            }
+        });
+        uiThread.SetApartmentState(ApartmentState.STA);
+        uiThread.Start();
+
+        RollbackPipelineFixture? fixture = null;
+        try
+        {
+            fixture = await ready.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            var handler = new LocalControlActivationHandler(
+                key => CatalogWithCustom().TryGet(key, out _),
+                (key, cancellationToken) =>
+                    LocalControlActivationHandler.InvokeOnDispatcherAsync(
+                        fixture.Dispatcher,
+                        token => fixture.Activate(key, token),
+                        cancellationToken));
+            var pipeName = $"CodexQuotaHud.Task10.{Guid.NewGuid():N}";
+            await using (var server = new LocalControlServer(
+                pipeName,
+                handler.HandleAsync))
+            {
+                server.Start();
+                var response = await new LocalControlClient(pipeName).SendAsync(
+                    new LocalControlRequest(
+                        LocalControlProtocol.ProtocolVersion,
+                        LocalControlCommandKind.ActivateSkin,
+                        CustomKey));
+
+                Assert.True(response.Succeeded);
+                Assert.Null(response.ErrorCode);
+                Assert.Null(response.Message);
+            }
+
+            var snapshot = await fixture.Dispatcher.InvokeAsync(
+                fixture.Snapshot,
+                DispatcherPriority.Send).Task;
+            Assert.Equal(2, snapshot.SaveCount);
+            Assert.Equal(CustomKey, snapshot.PersistedSelectionKey);
+            Assert.Equal(CustomKey, snapshot.ViewModelSelectionKey);
+            Assert.Equal(CustomKey, snapshot.ControllerSelectionKey);
+            Assert.Equal(CustomKey, snapshot.CheckedMenuSelectionKey);
+            Assert.True(snapshot.ViewMatchesController);
+            Assert.Null(snapshot.LastSettingsError);
+        }
+        finally
+        {
+            if (fixture is not null && !fixture.Dispatcher.HasShutdownStarted)
+            {
+                await fixture.Dispatcher.InvokeAsync(
+                    fixture.Dispose,
+                    DispatcherPriority.Send).Task;
+            }
+
+            var threadFailure = await stopped.Task.WaitAsync(
+                TimeSpan.FromSeconds(3));
+            Assert.Null(threadFailure);
+            Assert.True(uiThread.Join(TimeSpan.FromSeconds(2)));
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -935,6 +1402,74 @@ public sealed class QuotaOrbWindowStartupTests
 
             _settings = settings;
         }
+    }
+
+    private sealed class CancellingSettingsStore(
+        CancellationTokenSource cancellation) : ISettingsStore
+    {
+        private AppSettings _settings = new();
+
+        public int SaveCount { get; private set; }
+
+        public AppSettings Load() => _settings;
+
+        public void Save(AppSettings settings)
+        {
+            SaveCount++;
+            _settings = settings;
+            if (SaveCount == 1)
+            {
+                cancellation.Cancel();
+            }
+        }
+    }
+
+    private sealed class FailingRollbackSettingsStore : ISettingsStore
+    {
+        private AppSettings _settings = new();
+
+        public int SaveCount { get; private set; }
+
+        public AppSettings Load() => _settings;
+
+        public void Save(AppSettings settings)
+        {
+            SaveCount++;
+            if (SaveCount == 2)
+            {
+                throw new UnauthorizedAccessException("rollback denied");
+            }
+
+            _settings = settings;
+        }
+    }
+
+    private sealed record RollbackPipelineFixture(
+        Dispatcher Dispatcher,
+        Func<string, CancellationToken, bool> Activate,
+        Func<RollbackPipelineSnapshot> Snapshot,
+        Action Dispose);
+
+    private sealed record RollbackPipelineSnapshot(
+        int SaveCount,
+        string PersistedSelectionKey,
+        string ViewModelSelectionKey,
+        string ControllerSelectionKey,
+        string CheckedMenuSelectionKey,
+        bool ViewMatchesController,
+        string? LastSettingsError);
+
+    private sealed class RejectingSkinManagementDialogs : ISkinManagementDialogs
+    {
+        public string? ChoosePackagePath() => null;
+
+        public SkinCollisionDecision ShowImportPreview(SkinInstallPreview preview) =>
+            SkinCollisionDecision.Cancel;
+
+        public bool ConfirmRemoval(SkinMenuEntry entry) => false;
+
+        public void ShowError(string message) =>
+            throw new InvalidOperationException(message);
     }
 
     private sealed class RecordingQuotaSkin(

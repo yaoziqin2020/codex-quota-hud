@@ -344,6 +344,37 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal(baseline, SettingsStore.ActiveSaveLockCount);
     }
 
+    [Fact]
+    public async Task Save_CancelledBeforeAtomicCommitPreservesExistingSettings()
+    {
+        var path = Path.Combine(_directory, "cancel-before-commit.json");
+        var baseline = new AppSettings(SelectedSkinKey: SkinSelectionKey.HudDial);
+        new SettingsStore(path).Save(baseline);
+        using var cancellation = new CancellationTokenSource();
+        using var beforeCommit = new ManualResetEventSlim();
+        using var releaseCommit = new ManualResetEventSlim();
+        var store = new SettingsStore(
+            path,
+            selectionExists: null,
+            beforeAtomicCommit: () =>
+            {
+                beforeCommit.Set();
+                releaseCommit.Wait();
+            });
+
+        var saving = Task.Run(() => Record.Exception(() => store.Save(
+            new AppSettings(SelectedSkinKey: SkinSelectionKey.Aurora),
+            cancellation.Token)));
+        Assert.True(beforeCommit.Wait(TimeSpan.FromSeconds(2)));
+        cancellation.Cancel();
+        releaseCommit.Set();
+        var failure = await saving.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.IsAssignableFrom<OperationCanceledException>(failure);
+        Assert.Equal(baseline, new SettingsStore(path).Load());
+        Assert.Empty(Directory.GetFiles(_directory, "*.tmp"));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))

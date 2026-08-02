@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Security;
 using CodexQuotaHud.App.Infrastructure;
+using CodexQuotaHud.App.Infrastructure.LocalControl;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.App.UI;
 using CodexQuotaHud.App.UI.SkinManagement;
@@ -21,6 +22,7 @@ public partial class App : System.Windows.Application
         "开发预览启动失败，无法安全检查或替换已安装正式版。";
 
     private IDisposable? _singleInstance;
+    private LocalControlServer? _localControlServer;
     private InstalledAppShutdownListener? _shutdownListener;
     private CodexProcessMonitor? _processMonitor;
     private RestartableQuotaClient? _quotaClient;
@@ -39,29 +41,61 @@ public partial class App : System.Windows.Application
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        var preview = IsPreviewLaunch(e.Args);
-        InstalledAppLauncher? installedAppLauncher = null;
-        var acquired = TryAcquireForLaunch(
-            preview,
-            () => SingleInstanceGuard.TryAcquire(),
-            () =>
-            {
-                installedAppLauncher = new InstalledAppLauncher();
-                var coordinator = new InstalledAppShutdownCoordinator(
-                    () => SingleInstanceGuard.TryAcquire(),
-                    installedAppLauncher.ExecutablePath,
-                    new InstalledAppShutdownPlatform());
-                var success = coordinator.TryAcquireForPreview(
-                    out var lease,
-                    out var error);
-                return (success, lease, error);
-            },
-            message => System.Windows.MessageBox.Show(
-                message,
-                "Codex Quota HUD — 开发预览",
+        if (!AppLaunchRequest.TryParse(
+                e.Args,
+                out var launchRequest,
+                out _))
+        {
+            System.Windows.MessageBox.Show(
+                "启动参数无效。",
+                "Codex Quota HUD",
                 MessageBoxButton.OK,
-                MessageBoxImage.Warning),
-            out _singleInstance);
+                MessageBoxImage.Warning);
+            Shutdown();
+            return;
+        }
+
+        var preview = launchRequest!.IsPreview;
+        InstalledAppLauncher? installedAppLauncher = null;
+        var acquired = preview
+            ? TryAcquireForLaunch(
+                preview: true,
+                () => SingleInstanceGuard.TryAcquire(),
+                () =>
+                {
+                    installedAppLauncher = new InstalledAppLauncher();
+                    var coordinator = new InstalledAppShutdownCoordinator(
+                        () => SingleInstanceGuard.TryAcquire(),
+                        installedAppLauncher.ExecutablePath,
+                        new InstalledAppShutdownPlatform());
+                    var success = coordinator.TryAcquireForPreview(
+                        out var lease,
+                        out var error);
+                    return (success, lease, error);
+                },
+                message => System.Windows.MessageBox.Show(
+                    message,
+                    "Codex Quota HUD — 开发预览",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning),
+                out _singleInstance)
+            : TryAcquireNormalLaunch(
+                launchRequest.ActivationSelectionKey,
+                () => SingleInstanceGuard.TryAcquire(),
+                selectionKey => new LocalControlClient(
+                        LocalControlProtocol.PipeName)
+                    .SendAsync(new LocalControlRequest(
+                        LocalControlProtocol.ProtocolVersion,
+                        LocalControlCommandKind.ActivateSkin,
+                        selectionKey))
+                    .GetAwaiter()
+                    .GetResult(),
+                message => System.Windows.MessageBox.Show(
+                    message,
+                    "Codex Quota HUD",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning),
+                out _singleInstance);
         if (!acquired)
         {
             Shutdown();
@@ -153,6 +187,56 @@ public partial class App : System.Windows.Application
                 _window.TryActivateSkinKey,
                 skinManagement);
 
+            bool TryActivateInstalledSkin(
+                string selectionKey,
+                CancellationToken cancellationToken = default)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var snapshot = hudCatalog.Refresh();
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!snapshot.Healthy.Any(descriptor => string.Equals(
+                        descriptor.SelectionKey,
+                        selectionKey,
+                        StringComparison.Ordinal)) ||
+                    !skinController.ReplaceCatalog(snapshot, out _))
+                {
+                    return false;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                return _window.TryActivateSkinKey(
+                    selectionKey,
+                    cancellationToken);
+            }
+
+            if (ShouldStartLocalControlServer(launchRequest))
+            {
+                var activationHandler = new LocalControlActivationHandler(
+                    key => hudCatalog.Refresh().Healthy.Any(descriptor =>
+                        string.Equals(
+                            descriptor.SelectionKey,
+                            key,
+                            StringComparison.Ordinal)),
+                    (key, cancellationToken) =>
+                        LocalControlActivationHandler.InvokeOnDispatcherAsync(
+                            Dispatcher,
+                            token => TryActivateInstalledSkin(key, token),
+                            cancellationToken));
+                _localControlServer = new LocalControlServer(
+                    LocalControlProtocol.PipeName,
+                    activationHandler.HandleAsync);
+                _localControlServer.Start();
+
+                _ = TryApplyLaunchActivation(
+                    launchRequest.ActivationSelectionKey,
+                    key => TryActivateInstalledSkin(key),
+                    message => System.Windows.MessageBox.Show(
+                        message,
+                        "Codex Quota HUD",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning));
+            }
+
             _processMonitor.RunningChanged += OnCodexRunningChanged;
             OnCodexRunningChanged(_processMonitor.IsRunning);
 
@@ -187,7 +271,9 @@ public partial class App : System.Windows.Application
         string? launchError = null;
         CompleteExit(
             openInstalled,
-            () => EmergencyCleanup(
+            () => RunLocalControlFirstEmergencyCleanup(
+                () => _localControlServer?.DisposeAsync().AsTask()
+                    .GetAwaiter().GetResult(),
                 () => _runningCoordinator?.DisposeAsync().AsTask()
                     .GetAwaiter().GetResult(),
                 () => _refreshService?.DisposeAsync().AsTask()
@@ -225,7 +311,10 @@ public partial class App : System.Windows.Application
                 StringComparison.OrdinalIgnoreCase));
 
     internal static bool ShouldRegisterStartup(IReadOnlyList<string> arguments) =>
-        IsInteractiveLaunch(arguments) && !IsPreviewLaunch(arguments);
+        AppLaunchRequest.TryParse(arguments, out var request, out _) &&
+        request!.ActivationSelectionKey is null &&
+        IsInteractiveLaunch(arguments) &&
+        !IsPreviewLaunch(arguments);
 
     internal static bool TryApplyStartupSkinSelection(
         string requestedSelectionKey,
@@ -428,6 +517,94 @@ public partial class App : System.Windows.Application
         return result.Success;
     }
 
+    internal static bool TryAcquireNormalLaunch(
+        string? activationSelectionKey,
+        Func<IDisposable?> acquireNormal,
+        Func<string, LocalControlResponse> forwardActivation,
+        Action<string> showError,
+        out IDisposable? lease)
+    {
+        ArgumentNullException.ThrowIfNull(acquireNormal);
+        ArgumentNullException.ThrowIfNull(forwardActivation);
+        ArgumentNullException.ThrowIfNull(showError);
+
+        lease = acquireNormal();
+        if (lease is not null || activationSelectionKey is null)
+        {
+            return lease is not null;
+        }
+
+        LocalControlResponse response;
+        try
+        {
+            response = forwardActivation(activationSelectionKey);
+        }
+        catch (Exception)
+        {
+            response = new LocalControlResponse(
+                false,
+                "control.failed",
+                null);
+        }
+
+        if (!response.Succeeded)
+        {
+            showError(ActivationFailureMessage(response.ErrorCode));
+        }
+
+        return false;
+    }
+
+    internal static bool ShouldStartLocalControlServer(AppLaunchRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return !request.IsPreview;
+    }
+
+    internal static bool TryApplyLaunchActivation(
+        string? activationSelectionKey,
+        Func<string, bool> activate,
+        Action<string> showError)
+    {
+        ArgumentNullException.ThrowIfNull(activate);
+        ArgumentNullException.ThrowIfNull(showError);
+        if (activationSelectionKey is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            if (activate(activationSelectionKey))
+            {
+                return true;
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        showError(ActivationFailureMessage("skin.activation.failed"));
+        return false;
+    }
+
+    private static string ActivationFailureMessage(string? errorCode)
+    {
+        var stableCode = errorCode switch
+        {
+            "control.unavailable" => errorCode,
+            "control.timeout" => errorCode,
+            "control.protocol.invalid" => errorCode,
+            "control.request.invalid" => errorCode,
+            "control.handler.failed" => errorCode,
+            "control.failed" => errorCode,
+            "skin.selection.missing" => errorCode,
+            "skin.activation.failed" => errorCode,
+            _ => "control.failed"
+        };
+        return $"皮肤激活失败（{stableCode}）。请从 HUD 菜单重试。";
+    }
+
     private static string? TryResolveInstalledExecutablePath()
     {
         try
@@ -531,7 +708,16 @@ public partial class App : System.Windows.Application
             _processMonitor.RunningChanged -= OnCodexRunningChanged;
         }
 
-        await BestEffortCleanup.RunAsync(
+        await RunLocalControlFirstCleanupAsync(
+            async () =>
+            {
+                var localControlServer = _localControlServer;
+                _localControlServer = null;
+                if (localControlServer is not null)
+                {
+                    await localControlServer.DisposeAsync();
+                }
+            },
             () =>
             {
                 var previewComposition = _previewComposition;
@@ -610,6 +796,40 @@ public partial class App : System.Windows.Application
                 singleInstance?.Dispose();
                 return ValueTask.CompletedTask;
             });
+    }
+
+    internal static Task RunLocalControlFirstCleanupAsync(
+        Func<ValueTask> stopLocalControl,
+        params Func<ValueTask>[] remainingCleanup)
+    {
+        ArgumentNullException.ThrowIfNull(stopLocalControl);
+        ArgumentNullException.ThrowIfNull(remainingCleanup);
+        var cleanupActions = new Func<ValueTask>[remainingCleanup.Length + 1];
+        cleanupActions[0] = stopLocalControl;
+        Array.Copy(
+            remainingCleanup,
+            0,
+            cleanupActions,
+            1,
+            remainingCleanup.Length);
+        return BestEffortCleanup.RunAsync(cleanupActions);
+    }
+
+    internal static void RunLocalControlFirstEmergencyCleanup(
+        Action stopLocalControl,
+        params Action[] remainingCleanup)
+    {
+        ArgumentNullException.ThrowIfNull(stopLocalControl);
+        ArgumentNullException.ThrowIfNull(remainingCleanup);
+        var cleanupActions = new Action[remainingCleanup.Length + 1];
+        cleanupActions[0] = stopLocalControl;
+        Array.Copy(
+            remainingCleanup,
+            0,
+            cleanupActions,
+            1,
+            remainingCleanup.Length);
+        EmergencyCleanup(cleanupActions);
     }
 
     private static void EmergencyCleanup(params Action[] cleanupActions)

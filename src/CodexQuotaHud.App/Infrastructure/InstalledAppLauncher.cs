@@ -1,10 +1,11 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using CodexQuotaHud.Core.Settings;
 
 namespace CodexQuotaHud.App.Infrastructure;
 
-internal sealed class InstalledAppLauncher
+public sealed class InstalledAppLauncher
 {
     private readonly Func<string, bool> _fileExists;
     private readonly Func<ProcessStartInfo, bool> _startProcess;
@@ -62,6 +63,44 @@ internal sealed class InstalledAppLauncher
             IOException)
         {
             error = exception.Message;
+            return false;
+        }
+    }
+
+    public bool TryLaunchActivation(string selectionKey, out string? error)
+    {
+        if (selectionKey is null ||
+            selectionKey.Length > 64 ||
+            !SkinSelectionKey.TryGetCustomId(selectionKey, out _))
+        {
+            error = "无效的自定义皮肤选择键";
+            return false;
+        }
+
+        if (!IsAvailable)
+        {
+            error = "未找到已安装正式版";
+            return false;
+        }
+
+        try
+        {
+            var startInfo = new ProcessStartInfo(ExecutablePath)
+            {
+                UseShellExecute = true
+            };
+            startInfo.ArgumentList.Add("--activate-skin");
+            startInfo.ArgumentList.Add(selectionKey);
+            var started = _startProcess(startInfo);
+            error = started ? null : "正式版启动失败";
+            return started;
+        }
+        catch (Exception exception) when (
+            exception is Win32Exception or
+            InvalidOperationException or
+            IOException)
+        {
+            error = "正式版启动失败";
             return false;
         }
     }

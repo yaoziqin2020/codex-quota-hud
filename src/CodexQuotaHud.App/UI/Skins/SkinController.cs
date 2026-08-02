@@ -69,6 +69,12 @@ public sealed class SkinController
 
     public FrameworkElement CurrentView => CurrentSkin.View;
 
+    internal SkinActivationCandidate CaptureActiveCandidate() => new(
+        CurrentDescriptor,
+        CurrentSkin,
+        CurrentPresentation,
+        _catalog.Generation);
+
     public bool TryPrepare(
         string selectionKey,
         out SkinActivationCandidate? candidate,
@@ -132,6 +138,13 @@ public sealed class SkinController
                 "The prepared skin does not belong to the current catalog generation.");
         }
 
+        SetActive(candidate);
+        ActiveSkinChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    internal void RestoreActiveCandidate(SkinActivationCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
         SetActive(candidate);
         ActiveSkinChanged?.Invoke(this, EventArgs.Empty);
     }
