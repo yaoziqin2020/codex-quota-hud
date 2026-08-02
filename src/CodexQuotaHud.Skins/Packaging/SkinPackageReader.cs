@@ -75,6 +75,7 @@ public sealed class SkinPackageReader
                 "The skin package stream must be readable and seekable.");
         }
 
+        var originalPosition = package.Position;
         try
         {
             if (package.Length > SkinPackageLimits.MaximumPackageBytes)
@@ -94,24 +95,23 @@ public sealed class SkinPackageReader
             }
 
             package.Position = 0;
+            var preflight = ZipEntryPolicy.Preflight(
+                package,
+                packageLength,
+                cancellationToken);
+            package.Position = 0;
             using var archive = new ZipArchive(
                 package,
                 ZipArchiveMode.Read,
                 leaveOpen: true);
-            var catalogResult = ZipEntryPolicy.Validate(
-                package,
-                packageLength,
+            var catalog = ZipEntryPolicy.BindArchive(
+                preflight,
                 archive,
                 cancellationToken);
-            if (!catalogResult.IsValid)
-            {
-                return new SkinValidationResult<SkinPackageDocument>(
-                    null,
-                    catalogResult.Errors);
-            }
 
             return ValidateCatalog(
-                catalogResult.Value!,
+                package,
+                catalog,
                 installedHudVersion,
                 cancellationToken);
         }
@@ -157,9 +157,14 @@ public sealed class SkinPackageReader
                 "$package",
                 "The skin package could not be read.");
         }
+        finally
+        {
+            package.Position = originalPosition;
+        }
     }
 
     private static SkinValidationResult<SkinPackageDocument> ValidateCatalog(
+        Stream package,
         SafeZipCatalog catalog,
         SemanticVersion installedHudVersion,
         CancellationToken cancellationToken)
@@ -181,12 +186,14 @@ public sealed class SkinPackageReader
 
         long extractedBytes = 0;
         var manifestContent = CopyEntry(
+            package,
             manifestEntry,
             perEntryLimit: null,
             ref extractedBytes,
             cancellationToken,
             calculateHash: false);
         var themeContent = CopyEntry(
+            package,
             themeEntry,
             perEntryLimit: null,
             ref extractedBytes,
@@ -260,6 +267,7 @@ public sealed class SkinPackageReader
             cancellationToken.ThrowIfCancellationRequested();
             _ = catalog.TryGet(assetReference.Path, out var assetEntry);
             var copied = CopyEntry(
+                package,
                 assetEntry,
                 SkinPackageLimits.MaximumImageBytes,
                 ref extractedBytes,
@@ -279,18 +287,10 @@ public sealed class SkinPackageReader
             var decoded = SkinImageDecoder.Decode(
                 assetReference.Slot,
                 assetReference.Path,
-                copied.Content);
+                copied.Content,
+                SkinPackageLimits.MaximumDecodedPixels - decodedPixels);
             var pixels = checked(
                 (long)decoded.PixelWidth * decoded.PixelHeight);
-            if (pixels >
-                SkinPackageLimits.MaximumDecodedPixels - decodedPixels)
-            {
-                return Invalid(
-                    "image.pixel-budget",
-                    "$image",
-                    "Decoded images exceed the supported pixel budget.");
-            }
-
             decodedPixels += pixels;
             assets.Add(
                 assetReference.Slot,
@@ -309,6 +309,7 @@ public sealed class SkinPackageReader
     }
 
     private static CopiedEntry CopyEntry(
+        Stream package,
         SafeZipEntry entry,
         long? perEntryLimit,
         ref long extractedBytes,
@@ -316,11 +317,12 @@ public sealed class SkinPackageReader
         bool calculateHash)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var source = entry.Entry.Open();
+        using var source = entry.OpenDataStream(package);
         using var destination = new MemoryStream();
         using var hash = calculateHash
             ? IncrementalHash.CreateHash(HashAlgorithmName.SHA256)
             : null;
+        var crc32 = new Crc32Accumulator();
         var buffer = new byte[CopyBufferSize];
         long entryBytes = 0;
 
@@ -355,6 +357,23 @@ public sealed class SkinPackageReader
             extractedBytes += read;
             destination.Write(buffer, 0, read);
             hash?.AppendData(buffer, 0, read);
+            crc32.Append(buffer.AsSpan(0, read));
+        }
+
+        if (entryBytes != entry.DeclaredUncompressedSize)
+        {
+            throw new PackageValidationException(
+                "archive.size.mismatch",
+                $"$archive.entries[{entry.Index}]",
+                "An archive entry's actual size does not match its header.");
+        }
+
+        if (crc32.Value != entry.ExpectedCrc32)
+        {
+            throw new PackageValidationException(
+                "archive.crc.mismatch",
+                $"$archive.entries[{entry.Index}]",
+                "An archive entry failed its CRC-32 integrity check.");
         }
 
         return new CopiedEntry(
@@ -392,6 +411,27 @@ public sealed class SkinPackageReader
             [new SkinValidationError(code, location, message)]);
 
     private sealed record CopiedEntry(byte[] Content, string? Sha256);
+
+    private sealed class Crc32Accumulator
+    {
+        private uint _crc = uint.MaxValue;
+
+        public uint Value => ~_crc;
+
+        public void Append(ReadOnlySpan<byte> content)
+        {
+            foreach (var value in content)
+            {
+                _crc ^= value;
+                for (var bit = 0; bit < 8; bit++)
+                {
+                    _crc = (_crc & 1) != 0
+                        ? 0xEDB88320u ^ (_crc >> 1)
+                        : _crc >> 1;
+                }
+            }
+        }
+    }
 }
 
 internal sealed class PackageValidationException : IOException
@@ -399,8 +439,9 @@ internal sealed class PackageValidationException : IOException
     public PackageValidationException(
         string code,
         string location,
-        string message)
-        : base(message)
+        string message,
+        Exception? innerException = null)
+        : base(message, innerException)
     {
         Code = code;
         Location = location;

@@ -34,6 +34,16 @@ public sealed class SkinPackageAttackTests
     }
 
     [Fact]
+    public void ValidateFile_RejectsEocdCountBeforeCentralDirectoryMaterialization()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreateValidPackage();
+        fixture.SetEndOfCentralDirectoryEntryCount(packagePath, 65);
+
+        AssertRejected(fixture, packagePath, "archive.entry-count");
+    }
+
+    [Fact]
     public void ValidateFile_RejectsAggregateUncompressedBytesOverSixtyFourMebibytes()
     {
         using var fixture = new SkinPackageFixture();
@@ -60,36 +70,174 @@ public sealed class SkinPackageAttackTests
                 new SkinPackageFixture.FixtureAsset(
                     SkinAssetSlot.Background,
                     "assets/background.png",
-                    oversizedImage)
+                    oversizedImage,
+                    System.IO.Compression.CompressionLevel.NoCompression)
             ]);
 
         AssertRejected(fixture, packagePath, "archive.entry-size");
     }
 
     [Fact]
-    public void ValidateFile_RejectsEncryptedZipFlag()
+    public void ValidateFile_CountsActualStoredImageBytesWhenDeclaredSizeIsForgedSmall()
+    {
+        using var fixture = new SkinPackageFixture();
+        var oversizedImage = new byte[SkinPackageLimits.MaximumImageBytes + 1];
+        var packagePath = fixture.CreatePackage(
+            assets:
+            [
+                new SkinPackageFixture.FixtureAsset(
+                    SkinAssetSlot.Background,
+                    "assets/background.png",
+                    oversizedImage,
+                    System.IO.Compression.CompressionLevel.NoCompression)
+            ]);
+        fixture.SetEntryDeclaredUncompressedSize(
+            packagePath,
+            "assets/background.png",
+            declaredSize: 1);
+
+        AssertRejected(fixture, packagePath, "archive.entry-size");
+    }
+
+    [Fact]
+    public void ValidateFile_CountsActualDeflatedAggregateWhenDeclaredSizeIsForgedSmall()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreatePackage(
+            manifestPaddingBytes:
+                SkinPackageLimits.MaximumExtractedBytes + 1);
+        fixture.SetEntryDeclaredUncompressedSize(
+            packagePath,
+            SkinPackageLimits.ManifestFileName,
+            declaredSize: 1);
+
+        AssertRejected(fixture, packagePath, "archive.extracted-size");
+    }
+
+    [Theory]
+    [InlineData(SkinPackageFixture.ZipHeaderTarget.Central)]
+    [InlineData(SkinPackageFixture.ZipHeaderTarget.Local)]
+    public void ValidateFile_RejectsEncryptionFlagInEitherHeader(
+        SkinPackageFixture.ZipHeaderTarget target)
     {
         using var fixture = new SkinPackageFixture();
         var packagePath = fixture.CreateValidPackage();
-        fixture.MarkEntryEncrypted(packagePath, SkinPackageLimits.ThemeFileName);
+        fixture.MarkEntryEncrypted(
+            packagePath,
+            SkinPackageLimits.ThemeFileName,
+            target);
 
         AssertRejected(fixture, packagePath, "archive.entry.encrypted");
     }
 
-    [Fact]
-    public void ValidateFile_RejectsUnsupportedCompressionMethod()
+    [Theory]
+    [InlineData(SkinPackageFixture.ZipHeaderTarget.Central)]
+    [InlineData(SkinPackageFixture.ZipHeaderTarget.Local)]
+    public void ValidateFile_RejectsUnsupportedCompressionInEitherHeader(
+        SkinPackageFixture.ZipHeaderTarget target)
     {
         using var fixture = new SkinPackageFixture();
         var packagePath = fixture.CreateValidPackage();
         fixture.SetEntryCompressionMethod(
             packagePath,
             SkinPackageLimits.ThemeFileName,
-            compressionMethod: 12);
+            compressionMethod: 12,
+            target);
 
         AssertRejected(
             fixture,
             packagePath,
             "archive.compression.unsupported");
+    }
+
+    [Fact]
+    public void ValidateFile_RejectsLocalTraversalEvenWhenCentralNameIsSafe()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreateValidPackage();
+        fixture.SetLocalEntryName(
+            packagePath,
+            SkinPackageLimits.ManifestFileName,
+            "../escape.png");
+
+        AssertRejected(fixture, packagePath, "archive.path.traversal");
+    }
+
+    [Fact]
+    public void ValidateFile_RejectsDifferentSafeCentralAndLocalNames()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreateValidPackage();
+        fixture.SetLocalEntryName(
+            packagePath,
+            SkinPackageLimits.ThemeFileName,
+            "other.json");
+
+        AssertRejected(fixture, packagePath, "archive.name.mismatch");
+    }
+
+    [Fact]
+    public void ValidateFile_RejectsCentralLocalEncodingFlagMismatch()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreateValidPackage();
+        fixture.ToggleLocalUtf8NameFlag(
+            packagePath,
+            SkinPackageLimits.ThemeFileName);
+
+        AssertRejected(fixture, packagePath, "archive.name.mismatch");
+    }
+
+    [Fact]
+    public void ValidateFile_RejectsLocalVariableFieldsOutsideDataBoundary()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreateValidPackage();
+        fixture.SetLocalEntryNameLength(
+            packagePath,
+            SkinPackageLimits.ThemeFileName,
+            ushort.MaxValue);
+
+        AssertRejected(fixture, packagePath, "archive.invalid");
+    }
+
+    [Fact]
+    public void ValidateFile_RejectsDataDescriptorEntriesExplicitly()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreateValidPackage();
+        fixture.MarkEntryDataDescriptor(
+            packagePath,
+            SkinPackageLimits.ThemeFileName);
+
+        AssertRejected(
+            fixture,
+            packagePath,
+            "archive.data-descriptor.unsupported");
+    }
+
+    [Fact]
+    public void ValidateFile_RejectsEntryLevelZip64Explicitly()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreateValidPackage();
+        fixture.MarkEntryZip64(
+            packagePath,
+            SkinPackageLimits.ThemeFileName);
+
+        AssertRejected(fixture, packagePath, "archive.zip64.unsupported");
+    }
+
+    [Fact]
+    public void ValidateFile_RejectsZip64EocdSentinelBeforeMaterialization()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreateValidPackage();
+        fixture.SetEndOfCentralDirectoryEntryCount(
+            packagePath,
+            ushort.MaxValue);
+
+        AssertRejected(fixture, packagePath, "archive.zip64.unsupported");
     }
 
     [Theory]
@@ -220,6 +368,28 @@ public sealed class SkinPackageAttackTests
                     SkinAssetSlot.Center,
                     "assets/center.jpg",
                     SkinPackageFixture.OneByOneJpeg)
+            ]);
+
+        AssertRejected(fixture, packagePath, "image.pixel-budget");
+    }
+
+    [Fact]
+    public void ValidateFile_RejectsSecondHighBitDepthImageByBudgetBeforePixelDecode()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreatePackage(
+            assets:
+            [
+                new SkinPackageFixture.FixtureAsset(
+                    SkinAssetSlot.Background,
+                    "assets/background.png",
+                    SkinPackageFixture.HalfMaximumPixelPng),
+                new SkinPackageFixture.FixtureAsset(
+                    SkinAssetSlot.Center,
+                    "assets/center.png",
+                    SkinPackageFixture.CreateCorruptHighBitDepthPng(
+                        4097,
+                        SkinPackageLimits.MaximumImageDimension))
             ]);
 
         AssertRejected(fixture, packagePath, "image.pixel-budget");

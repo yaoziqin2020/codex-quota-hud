@@ -129,6 +129,82 @@ public sealed class SkinPackageReaderTests
     }
 
     [Fact]
+    public void ValidateFile_AcceptsTwoImagesAtExactAggregatePixelLimit()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreatePackage(
+            assets:
+            [
+                new SkinPackageFixture.FixtureAsset(
+                    SkinAssetSlot.Background,
+                    "assets/background.png",
+                    SkinPackageFixture.HalfMaximumPixelPng),
+                new SkinPackageFixture.FixtureAsset(
+                    SkinAssetSlot.Center,
+                    "assets/center.png",
+                    SkinPackageFixture.HalfMaximumPixelPng)
+            ]);
+
+        var result = new SkinPackageReader().ValidateFile(
+            packagePath,
+            InstalledVersion,
+            CancellationToken.None);
+
+        Assert.True(result.IsValid, string.Join(" | ", result.Errors));
+        Assert.Equal(2, result.Value!.Assets.Count);
+        Assert.Equal(
+            SkinPackageLimits.MaximumDecodedPixels,
+            result.Value.Assets.Values.Sum(
+                asset => (long)asset.PixelWidth * asset.PixelHeight));
+        fixture.AssertNoEscape();
+    }
+
+    [Fact]
+    public void ValidateStream_RestoresCallerPositionAfterSuccess()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreateValidPackage();
+        using var package = File.OpenRead(packagePath);
+        const long originalPosition = 17;
+        package.Position = originalPosition;
+
+        var result = new SkinPackageReader().ValidateStream(
+            package,
+            package.Length,
+            InstalledVersion,
+            CancellationToken.None);
+
+        Assert.True(result.IsValid, string.Join(" | ", result.Errors));
+        Assert.Equal(originalPosition, package.Position);
+    }
+
+    [Fact]
+    public void ValidateStream_RestoresCallerPositionAfterValidationFailure()
+    {
+        using var fixture = new SkinPackageFixture();
+        var packagePath = fixture.CreatePackage(
+            additionalEntries:
+            [
+                new SkinPackageFixture.FixtureEntry("notes.txt", [0x01])
+            ]);
+        using var package = File.OpenRead(packagePath);
+        const long originalPosition = 19;
+        package.Position = originalPosition;
+
+        var result = new SkinPackageReader().ValidateStream(
+            package,
+            package.Length,
+            InstalledVersion,
+            CancellationToken.None);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            error => error.Code == "archive.file.undeclared");
+        Assert.Equal(originalPosition, package.Position);
+    }
+
+    [Fact]
     public void ValidateStream_ObservesCancellationDuringBoundedEntryCopy()
     {
         using var fixture = new SkinPackageFixture();
@@ -149,6 +225,8 @@ public sealed class SkinPackageReaderTests
             package,
             cancellation,
             cancelAfterBytes: 200 * 1024);
+        const long originalPosition = 23;
+        cancelingStream.Position = originalPosition;
 
         Assert.Throws<OperationCanceledException>(() =>
             new SkinPackageReader().ValidateStream(
@@ -156,6 +234,7 @@ public sealed class SkinPackageReaderTests
                 package.Length,
                 InstalledVersion,
                 cancellation.Token));
+        Assert.Equal(originalPosition, cancelingStream.Position);
         fixture.AssertNoEscape();
     }
 

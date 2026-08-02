@@ -24,6 +24,11 @@ public sealed class SkinPackageFixture : IDisposable
             SkinPackageLimits.MaximumImageDimension,
             SkinPackageLimits.MaximumImageDimension));
 
+    private static readonly Lazy<byte[]> HalfMaximumPixelPngBytes = new(
+        () => CreateGrayscalePng(
+            SkinPackageLimits.MaximumImageDimension / 2,
+            SkinPackageLimits.MaximumImageDimension));
+
     private readonly string _outerDirectory;
     private int _packageNumber;
     private bool _disposed;
@@ -48,6 +53,9 @@ public sealed class SkinPackageFixture : IDisposable
     public static byte[] OneByOneJpeg => [.. OneByOneJpegBytes];
 
     public static byte[] MaximumPixelPng => [.. MaximumPixelPngBytes.Value];
+
+    public static byte[] HalfMaximumPixelPng =>
+        [.. HalfMaximumPixelPngBytes.Value];
 
     public string CreateValidPackage(params SkinAssetSlot[] slots)
     {
@@ -93,7 +101,8 @@ public sealed class SkinPackageFixture : IDisposable
     public string CreatePackage(
         IReadOnlyList<FixtureAsset>? assets = null,
         IReadOnlyList<FixtureEntry>? additionalEntries = null,
-        Func<SkinManifest, SkinManifest>? transformManifest = null)
+        Func<SkinManifest, SkinManifest>? transformManifest = null,
+        long manifestPaddingBytes = 0)
     {
         assets ??= [];
         additionalEntries ??= [];
@@ -133,7 +142,9 @@ public sealed class SkinPackageFixture : IDisposable
         WriteEntry(
             archive,
             SkinPackageLimits.ManifestFileName,
-            SkinJsonCodec.WriteManifest(manifest));
+            SkinJsonCodec.WriteManifest(manifest),
+            repeatedByteCount: manifestPaddingBytes,
+            repeatedByteValue: 0x20);
         WriteEntry(
             archive,
             SkinPackageLimits.ThemeFileName,
@@ -156,28 +167,147 @@ public sealed class SkinPackageFixture : IDisposable
                 entry.Content ?? [],
                 entry.ExternalAttributes,
                 entry.RepeatedByteCount,
-                entry.CompressionLevel);
+                entry.CompressionLevel,
+                entry.RepeatedByteValue);
         }
 
         return packagePath;
     }
 
-    public void MarkEntryEncrypted(string packagePath, string entryName) =>
-        PatchEntryHeaders(
-            packagePath,
-            entryName,
-            encrypted: true,
-            compressionMethod: null);
+    public void MarkEntryEncrypted(
+        string packagePath,
+        string entryName,
+        ZipHeaderTarget target = ZipHeaderTarget.Both) =>
+        MutateEntryHeaders(packagePath, entryName, (bytes, central, local) =>
+        {
+            if (target is ZipHeaderTarget.Central or ZipHeaderTarget.Both)
+            {
+                SetFlag(bytes, central + 8, 0x0001);
+            }
+
+            if (target is ZipHeaderTarget.Local or ZipHeaderTarget.Both)
+            {
+                SetFlag(bytes, local + 6, 0x0001);
+            }
+        });
 
     public void SetEntryCompressionMethod(
         string packagePath,
         string entryName,
-        ushort compressionMethod) =>
-        PatchEntryHeaders(
+        ushort compressionMethod,
+        ZipHeaderTarget target = ZipHeaderTarget.Both) =>
+        MutateEntryHeaders(packagePath, entryName, (bytes, central, local) =>
+        {
+            if (target is ZipHeaderTarget.Central or ZipHeaderTarget.Both)
+            {
+                BinaryPrimitives.WriteUInt16LittleEndian(
+                    bytes.AsSpan(central + 10, 2),
+                    compressionMethod);
+            }
+
+            if (target is ZipHeaderTarget.Local or ZipHeaderTarget.Both)
+            {
+                BinaryPrimitives.WriteUInt16LittleEndian(
+                    bytes.AsSpan(local + 8, 2),
+                    compressionMethod);
+            }
+        });
+
+    public void MarkEntryDataDescriptor(
+        string packagePath,
+        string entryName) =>
+        MutateEntryHeaders(packagePath, entryName, (bytes, central, local) =>
+        {
+            SetFlag(bytes, central + 8, 0x0008);
+            SetFlag(bytes, local + 6, 0x0008);
+            bytes.AsSpan(local + 14, 12).Clear();
+        });
+
+    public void MarkEntryZip64(
+        string packagePath,
+        string entryName) =>
+        MutateEntryHeaders(packagePath, entryName, (bytes, central, local) =>
+        {
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                bytes.AsSpan(central + 24, 4),
+                uint.MaxValue);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                bytes.AsSpan(local + 22, 4),
+                uint.MaxValue);
+        });
+
+    public void SetEntryDeclaredUncompressedSize(
+        string packagePath,
+        string entryName,
+        uint declaredSize) =>
+        MutateEntryHeaders(packagePath, entryName, (bytes, central, local) =>
+        {
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                bytes.AsSpan(central + 24, 4),
+                declaredSize);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                bytes.AsSpan(local + 22, 4),
+                declaredSize);
+        });
+
+    public void SetLocalEntryName(
+        string packagePath,
+        string centralEntryName,
+        string localEntryName) =>
+        MutateEntryHeaders(
+            packagePath,
+            centralEntryName,
+            (bytes, _, local) =>
+            {
+                var replacement = Encoding.UTF8.GetBytes(localEntryName);
+                var localNameLength = BinaryPrimitives.ReadUInt16LittleEndian(
+                    bytes.AsSpan(local + 26, 2));
+                Assert.Equal(localNameLength, replacement.Length);
+                replacement.CopyTo(bytes.AsSpan(local + 30, localNameLength));
+            });
+
+    public void ToggleLocalUtf8NameFlag(
+        string packagePath,
+        string entryName) =>
+        MutateEntryHeaders(
             packagePath,
             entryName,
-            encrypted: false,
-            compressionMethod);
+            (bytes, _, local) =>
+            {
+                var flags = BinaryPrimitives.ReadUInt16LittleEndian(
+                    bytes.AsSpan(local + 6, 2));
+                BinaryPrimitives.WriteUInt16LittleEndian(
+                    bytes.AsSpan(local + 6, 2),
+                    (ushort)(flags ^ 0x0800));
+            });
+
+    public void SetLocalEntryNameLength(
+        string packagePath,
+        string entryName,
+        ushort nameLength) =>
+        MutateEntryHeaders(
+            packagePath,
+            entryName,
+            (bytes, _, local) =>
+                BinaryPrimitives.WriteUInt16LittleEndian(
+                    bytes.AsSpan(local + 26, 2),
+                    nameLength));
+
+    public void SetEndOfCentralDirectoryEntryCount(
+        string packagePath,
+        ushort entryCount)
+    {
+        var bytes = File.ReadAllBytes(packagePath);
+        var end = FindSignatureFromEnd(bytes, 0x06054b50);
+        Assert.True(end >= 0, "ZIP EOCD was not found.");
+        BinaryPrimitives.WriteUInt16LittleEndian(
+            bytes.AsSpan(end + 8, 2),
+            entryCount);
+        BinaryPrimitives.WriteUInt16LittleEndian(
+            bytes.AsSpan(end + 10, 2),
+            entryCount);
+        File.WriteAllBytes(packagePath, bytes);
+    }
 
     public static byte[] CreateGrayscalePng(int width, int height)
     {
@@ -208,6 +338,25 @@ public sealed class SkinPackageFixture : IDisposable
         }
 
         WritePngChunk(png, "IDAT", compressed.ToArray());
+        WritePngChunk(png, "IEND", []);
+        return png.ToArray();
+    }
+
+    public static byte[] CreateCorruptHighBitDepthPng(
+        int width,
+        int height)
+    {
+        using var png = new MemoryStream();
+        png.Write([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+
+        var header = new byte[13];
+        BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(0, 4), width);
+        BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(4, 4), height);
+        header[8] = 16;
+        header[9] = 6;
+        WritePngChunk(png, "IHDR", header);
+
+        WritePngChunk(png, "IDAT", [0x00, 0x01, 0x02, 0x03]);
         WritePngChunk(png, "IEND", []);
         return png.ToArray();
     }
@@ -243,7 +392,15 @@ public sealed class SkinPackageFixture : IDisposable
         byte[]? Content = null,
         int? ExternalAttributes = null,
         long RepeatedByteCount = 0,
-        CompressionLevel CompressionLevel = CompressionLevel.Optimal);
+        CompressionLevel CompressionLevel = CompressionLevel.Optimal,
+        byte RepeatedByteValue = 0);
+
+    public enum ZipHeaderTarget
+    {
+        Central,
+        Local,
+        Both
+    }
 
     private static FixtureAsset DefaultAsset(SkinAssetSlot slot) => slot switch
     {
@@ -268,7 +425,8 @@ public sealed class SkinPackageFixture : IDisposable
         byte[] content,
         int? externalAttributes = null,
         long repeatedByteCount = 0,
-        CompressionLevel compressionLevel = CompressionLevel.Optimal)
+        CompressionLevel compressionLevel = CompressionLevel.Optimal,
+        byte repeatedByteValue = 0)
     {
         var entry = archive.CreateEntry(name, compressionLevel);
         if (externalAttributes is { } attributes)
@@ -281,6 +439,11 @@ public sealed class SkinPackageFixture : IDisposable
         if (repeatedByteCount > 0)
         {
             var buffer = new byte[64 * 1024];
+            if (repeatedByteValue != 0)
+            {
+                Array.Fill(buffer, repeatedByteValue);
+            }
+
             while (repeatedByteCount > 0)
             {
                 var writeCount = (int)Math.Min(buffer.Length, repeatedByteCount);
@@ -290,11 +453,10 @@ public sealed class SkinPackageFixture : IDisposable
         }
     }
 
-    private static void PatchEntryHeaders(
+    private static void MutateEntryHeaders(
         string packagePath,
         string entryName,
-        bool encrypted,
-        ushort? compressionMethod)
+        Action<byte[], int, int> mutation)
     {
         var bytes = File.ReadAllBytes(packagePath);
         var endOfCentralDirectory = FindSignatureFromEnd(bytes, 0x06054b50);
@@ -329,22 +491,7 @@ public sealed class SkinPackageFixture : IDisposable
                     0x04034b50u,
                     BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(localOffset, 4)));
 
-                if (encrypted)
-                {
-                    SetFlag(bytes, position + 8, 0x0001);
-                    SetFlag(bytes, localOffset + 6, 0x0001);
-                }
-
-                if (compressionMethod is { } method)
-                {
-                    BinaryPrimitives.WriteUInt16LittleEndian(
-                        bytes.AsSpan(position + 10, 2),
-                        method);
-                    BinaryPrimitives.WriteUInt16LittleEndian(
-                        bytes.AsSpan(localOffset + 8, 2),
-                        method);
-                }
-
+                mutation(bytes, position, localOffset);
                 patched = true;
             }
 

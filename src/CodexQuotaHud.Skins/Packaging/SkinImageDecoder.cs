@@ -20,9 +20,21 @@ public static class SkinImageDecoder
     public static SkinDecodedImage Decode(
         SkinAssetSlot slot,
         string relativePath,
-        ReadOnlyMemory<byte> encoded)
+        ReadOnlyMemory<byte> encoded) =>
+        Decode(
+            slot,
+            relativePath,
+            encoded,
+            SkinPackageLimits.MaximumDecodedPixels);
+
+    internal static SkinDecodedImage Decode(
+        SkinAssetSlot slot,
+        string relativePath,
+        ReadOnlyMemory<byte> encoded,
+        long remainingPixelBudget)
     {
         ArgumentNullException.ThrowIfNull(relativePath);
+        ArgumentOutOfRangeException.ThrowIfNegative(remainingPixelBudget);
 
         var hasPngSignature = encoded.Span.StartsWith(PngSignature);
         var hasJpegSignature = encoded.Span is [0xFF, 0xD8, ..];
@@ -53,40 +65,50 @@ public static class SkinImageDecoder
 
         try
         {
+            var content = encoded.ToArray();
+            int expectedWidth;
+            int expectedHeight;
+            using (var headerStream = new MemoryStream(
+                       content,
+                       writable: false))
+            {
+                var headerDecoder = BitmapDecoder.Create(
+                    headerStream,
+                    BitmapCreateOptions.PreservePixelFormat,
+                    BitmapCacheOption.OnDemand);
+                ValidateCodec(headerDecoder, expectsPng, expectsJpeg);
+                var headerFrame = GetFirstFrame(headerDecoder);
+                ValidateDimensions(headerFrame);
+                expectedWidth = headerFrame.PixelWidth;
+                expectedHeight = headerFrame.PixelHeight;
+                var pixels = checked(
+                    (long)expectedWidth * expectedHeight);
+                if (pixels > remainingPixelBudget)
+                {
+                    throw Error(
+                        "image.pixel-budget",
+                        "Decoded images exceed the supported pixel budget.");
+                }
+            }
+
             using var stream = new MemoryStream(
-                encoded.ToArray(),
+                content,
                 writable: false);
             var decoder = BitmapDecoder.Create(
                 stream,
                 BitmapCreateOptions.PreservePixelFormat,
                 BitmapCacheOption.OnLoad);
-            if ((expectsPng && decoder is not PngBitmapDecoder) ||
-                (expectsJpeg && decoder is not JpegBitmapDecoder))
-            {
-                throw Error(
-                    "image.signature",
-                    "Image content does not match its declared format.");
-            }
-
-            if (decoder.Frames.Count == 0)
+            ValidateCodec(decoder, expectsPng, expectsJpeg);
+            var frame = GetFirstFrame(decoder);
+            ValidateDimensions(frame);
+            if (frame.PixelWidth != expectedWidth ||
+                frame.PixelHeight != expectedHeight)
             {
                 throw Error(
                     "image.decode",
-                    "Image content could not be decoded.");
+                    "Image dimensions changed during decoding.");
             }
 
-            var frame = decoder.Frames[0];
-            if (frame.PixelWidth <= 0 ||
-                frame.PixelHeight <= 0 ||
-                frame.PixelWidth > SkinPackageLimits.MaximumImageDimension ||
-                frame.PixelHeight > SkinPackageLimits.MaximumImageDimension)
-            {
-                throw Error(
-                    "image.dimension",
-                    "Image dimensions exceed the supported limit.");
-            }
-
-            _ = checked((long)frame.PixelWidth * frame.PixelHeight);
             ForceCompleteDecode(frame);
             if (!frame.IsFrozen)
             {
@@ -112,6 +134,45 @@ public static class SkinImageDecoder
                 "image.decode",
                 "Image content could not be decoded.",
                 exception);
+        }
+    }
+
+    private static void ValidateCodec(
+        BitmapDecoder decoder,
+        bool expectsPng,
+        bool expectsJpeg)
+    {
+        if ((expectsPng && decoder is not PngBitmapDecoder) ||
+            (expectsJpeg && decoder is not JpegBitmapDecoder))
+        {
+            throw Error(
+                "image.signature",
+                "Image content does not match its declared format.");
+        }
+    }
+
+    private static BitmapFrame GetFirstFrame(BitmapDecoder decoder)
+    {
+        if (decoder.Frames.Count == 0)
+        {
+            throw Error(
+                "image.decode",
+                "Image content could not be decoded.");
+        }
+
+        return decoder.Frames[0];
+    }
+
+    private static void ValidateDimensions(BitmapSource frame)
+    {
+        if (frame.PixelWidth <= 0 ||
+            frame.PixelHeight <= 0 ||
+            frame.PixelWidth > SkinPackageLimits.MaximumImageDimension ||
+            frame.PixelHeight > SkinPackageLimits.MaximumImageDimension)
+        {
+            throw Error(
+                "image.dimension",
+                "Image dimensions exceed the supported limit.");
         }
     }
 
