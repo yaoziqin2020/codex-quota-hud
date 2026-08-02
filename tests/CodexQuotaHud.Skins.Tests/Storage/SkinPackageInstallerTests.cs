@@ -295,6 +295,47 @@ public sealed class SkinPackageInstallerTests
     }
 
     [Fact]
+    public void Remove_DoesNotCreateQuarantineOutsideWhenImportsChangesBeforeOperationCreation()
+    {
+        using var fixture = new InstallerFixture();
+        var installed = fixture.InstallInitial("1.2.3");
+        var outsideDirectory = Path.Combine(
+            Path.GetDirectoryName(fixture.Paths.SettingsRoot)!,
+            "outside-remove-operation-create-transition");
+        Directory.CreateDirectory(outsideDirectory);
+        File.WriteAllText(
+            Path.Combine(outsideDirectory, "sentinel.txt"),
+            "remove operation create target must survive byte-for-byte");
+        var outsideBefore = SnapshotDirectory(outsideDirectory);
+        var fileSystem = new ImportsCreateTransitionFileSystem(
+            fixture.Paths.ImportsRoot,
+            outsideDirectory);
+        var installer = new SkinPackageInstaller(
+            fixture.Paths,
+            InstalledHudVersion,
+            fileSystem,
+            ownedStorageWriter:
+                new RemoveOperationTransitionOwnedStorageWriter(fileSystem));
+
+        var result = installer.Remove(installed.SkinId);
+
+        Assert.True(fileSystem.TransitionedBeforeCandidateCreation);
+        Assert.False(result.IsValid);
+        Assert.Equal(outsideBefore, SnapshotDirectory(outsideDirectory));
+        Assert.Equal(
+            ["sentinel.txt"],
+            Directory.EnumerateFileSystemEntries(
+                    outsideDirectory,
+                    "*",
+                    SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(outsideDirectory, path)
+                    .Replace('\\', '/'))
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToArray());
+        Assert.True(Directory.Exists(installed.DirectoryPath));
+    }
+
+    [Fact]
     public void Remove_CleanupFailureRetainsRecoveryOperationAfterSkinIsQuarantined()
     {
         using var fixture = new InstallerFixture();
@@ -308,6 +349,7 @@ public sealed class SkinPackageInstallerTests
         var result = installer.Remove(installed.SkinId);
 
         Assert.False(result.IsValid);
+        Assert.Equal(installed.SkinId, result.Value);
         var error = Assert.Single(
             result.Errors,
             item => item.Code == "remove.cleanup-failed");
@@ -316,6 +358,88 @@ public sealed class SkinPackageInstallerTests
             fixture.Paths,
             InstalledHudVersion).Find(installed.SkinId));
         Assert.Single(Directory.EnumerateDirectories(fixture.Paths.ImportsRoot));
+    }
+
+    [Fact]
+    public void Remove_UncommittedQuarantineFailure_CleansTemporaryOperation()
+    {
+        using var fixture = new InstallerFixture();
+        var installed = fixture.InstallInitial("1.2.3");
+        var installedBytes = SnapshotDirectory(installed.DirectoryPath);
+        var installer = new SkinPackageInstaller(
+            fixture.Paths,
+            InstalledHudVersion,
+            PhysicalSkinFileSystem.Instance,
+            directoryMoveProvider: ThrowingBeforeMoveDirectoryMoveProvider.Instance);
+
+        var result = installer.Remove(installed.SkinId);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Code == "remove.io");
+        Assert.Equal(installedBytes, SnapshotDirectory(installed.DirectoryPath));
+        fixture.AssertNoOperationDirectories();
+    }
+
+    [Fact]
+    public void Remove_UncommittedFailureAndCleanupFailure_ReturnsRecoveryOperation()
+    {
+        using var fixture = new InstallerFixture();
+        var installed = fixture.InstallInitial("1.2.3");
+        var installer = new SkinPackageInstaller(
+            fixture.Paths,
+            InstalledHudVersion,
+            PhysicalSkinFileSystem.Instance,
+            directoryMoveProvider: ThrowingBeforeMoveDirectoryMoveProvider.Instance,
+            directoryDeleteProvider: ThrowingDirectoryDeleteProvider.Instance);
+
+        var result = installer.Remove(installed.SkinId);
+
+        Assert.False(result.IsValid);
+        var error = Assert.Single(
+            result.Errors,
+            item => item.Code == "remove.operation-cleanup-failed");
+        var operationPath = Assert.Single(
+            Directory.EnumerateDirectories(fixture.Paths.ImportsRoot));
+        Assert.Contains(
+            Path.GetFileName(operationPath),
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.True(Directory.Exists(installed.DirectoryPath));
+    }
+
+    [Fact]
+    public void Remove_CommittedQuarantinePostCheckFailure_ReportsRemovedAndRetainsEvidence()
+    {
+        using var fixture = new InstallerFixture();
+        var installed = fixture.InstallInitial("1.2.3");
+        var installedBytes = SnapshotDirectory(installed.DirectoryPath);
+        var installer = new SkinPackageInstaller(
+            fixture.Paths,
+            InstalledHudVersion,
+            PhysicalSkinFileSystem.Instance,
+            directoryMoveProvider: CommittedRemovePostCheckFailureMoveProvider.Instance);
+
+        var result = installer.Remove(installed.SkinId);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(installed.SkinId, result.Value);
+        var error = Assert.Single(
+            result.Errors,
+            item => item.Code == "remove.quarantine-verification-failed");
+        var operationPath = Assert.Single(
+            Directory.EnumerateDirectories(fixture.Paths.ImportsRoot));
+        Assert.Contains(
+            Path.GetFileName(operationPath),
+            error.Message,
+            StringComparison.Ordinal);
+        var quarantinePath = Path.Combine(
+            operationPath,
+            "remove",
+            installed.SkinId.ToString("D").ToLowerInvariant());
+        Assert.Equal(installedBytes, SnapshotDirectory(quarantinePath));
+        Assert.Null(new InstalledSkinCatalog(
+            fixture.Paths,
+            InstalledHudVersion).Find(installed.SkinId));
     }
 
     [Theory]
@@ -382,6 +506,84 @@ public sealed class SkinPackageInstallerTests
             CancellationToken.None);
 
         Assert.True(fileSystem.Transitioned);
+        Assert.Null(result.Installed);
+        Assert.Equal(outsideBefore, SnapshotDirectory(outsideDirectory));
+        fixture.AssertNoOperationDirectories();
+    }
+
+    [Fact]
+    public void Install_DoesNotCreateCandidateOutsideWhenImportsChangesBeforeCandidateCreation()
+    {
+        using var fixture = new InstallerFixture();
+        var preview = fixture.Inspect(
+            fixture.CreatePackage("1.2.3", includeAllAssets: true));
+        var outsideDirectory = Path.Combine(
+            Path.GetDirectoryName(fixture.Paths.SettingsRoot)!,
+            "outside-imports-create-transition");
+        Directory.CreateDirectory(outsideDirectory);
+        File.WriteAllText(
+            Path.Combine(outsideDirectory, "sentinel.txt"),
+            "imports create target must survive byte-for-byte");
+        var outsideBefore = SnapshotDirectory(outsideDirectory);
+        var fileSystem = new ImportsCreateTransitionFileSystem(
+            fixture.Paths.ImportsRoot,
+            outsideDirectory);
+        var installer = new SkinPackageInstaller(
+            fixture.Paths,
+            InstalledHudVersion,
+            fileSystem,
+            directoryDeleteProvider: ThrowingDirectoryDeleteProvider.Instance,
+            ownedStorageWriter:
+                new ImportsCreateTransitionOwnedStorageWriter(fileSystem));
+
+        var result = installer.Install(
+            preview,
+            SkinCollisionDecision.Replace,
+            CancellationToken.None);
+
+        Assert.True(fileSystem.TransitionedBeforeCandidateCreation);
+        Assert.Null(result.Installed);
+        Assert.Equal(outsideBefore, SnapshotDirectory(outsideDirectory));
+        Assert.Equal(
+            ["sentinel.txt"],
+            Directory.EnumerateFileSystemEntries(
+                    outsideDirectory,
+                    "*",
+                    SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(outsideDirectory, path)
+                    .Replace('\\', '/'))
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToArray());
+    }
+
+    [Fact]
+    public void Install_DoesNotWriteAssetOutsideWhenAssetsChangesAfterParentCreation()
+    {
+        using var fixture = new InstallerFixture();
+        var preview = fixture.Inspect(
+            fixture.CreatePackage("1.2.3", includeAllAssets: true));
+        var outsideDirectory = Path.Combine(
+            Path.GetDirectoryName(fixture.Paths.SettingsRoot)!,
+            "outside-assets-write-transition");
+        Directory.CreateDirectory(outsideDirectory);
+        File.WriteAllText(
+            Path.Combine(outsideDirectory, "sentinel.txt"),
+            "assets write target must survive byte-for-byte");
+        var outsideBefore = SnapshotDirectory(outsideDirectory);
+        var fileSystem = new AssetsWriteTransitionFileSystem(outsideDirectory);
+        var installer = new SkinPackageInstaller(
+            fixture.Paths,
+            InstalledHudVersion,
+            fileSystem,
+            ownedStorageWriter:
+                new AssetsWriteTransitionOwnedStorageWriter(fileSystem));
+
+        var result = installer.Install(
+            preview,
+            SkinCollisionDecision.Replace,
+            CancellationToken.None);
+
+        Assert.True(fileSystem.TransitionedAfterAssetsCreation);
         Assert.Null(result.Installed);
         Assert.Equal(outsideBefore, SnapshotDirectory(outsideDirectory));
         fixture.AssertNoOperationDirectories();
@@ -648,6 +850,7 @@ public sealed class SkinPackageInstallerTests
         public InstallerFixture()
         {
             Paths = new SkinStoragePaths(Path.Combine(_packages.RootDirectory, "local"));
+            Directory.CreateDirectory(Path.GetDirectoryName(Paths.SettingsRoot)!);
             Installer = new SkinPackageInstaller(Paths, InstalledHudVersion);
         }
 
@@ -880,14 +1083,14 @@ public sealed class SkinPackageInstallerTests
                 throw new IOException("The candidate changed before its directory lease.");
             }
 
-            return EmptyLease.Instance;
+            return new EmptyLease(expectedPath);
         }
 
-        private sealed class EmptyLease : IDirectoryLease
+        private sealed class EmptyLease(string expectedPath) : IDirectoryLease
         {
-            public static EmptyLease Instance { get; } = new();
-
             public DirectoryIdentity Identity => default;
+
+            public string ExpectedPath { get; } = Path.GetFullPath(expectedPath);
 
             public void Dispose()
             {
@@ -955,6 +1158,293 @@ public sealed class SkinPackageInstallerTests
         }
     }
 
+    private sealed class ImportsCreateTransitionFileSystem(
+        string importsRoot,
+        string outsideDirectory) : ISkinFileSystem
+    {
+        private readonly ISkinFileSystem _inner = PhysicalSkinFileSystem.Instance;
+        private readonly string _importsRoot = Path.GetFullPath(importsRoot);
+        private readonly string _outsideDirectory = Path.GetFullPath(outsideDirectory);
+
+        public bool TransitionedBeforeCandidateCreation { get; private set; }
+
+        public void TransitionBeforeCandidateCreation() =>
+            TransitionedBeforeCandidateCreation = true;
+
+        public bool DirectoryExists(string path) => _inner.DirectoryExists(Map(path));
+
+        public bool FileExists(string path) => _inner.FileExists(Map(path));
+
+        public FileAttributes GetAttributes(string path) =>
+            _inner.GetAttributes(Map(path));
+
+        public IReadOnlyList<string> EnumerateDirectories(string path) =>
+            _inner.EnumerateDirectories(Map(path));
+
+        public IReadOnlyList<string> EnumerateFiles(
+            string path,
+            SearchOption searchOption) =>
+            _inner.EnumerateFiles(Map(path), searchOption);
+
+        public byte[] ReadAllBytes(string path, long maximumBytes) =>
+            _inner.ReadAllBytes(Map(path), maximumBytes);
+
+        public void CreateDirectory(string path)
+        {
+            if (!TransitionedBeforeCandidateCreation && IsUnderImports(path))
+            {
+                TransitionedBeforeCandidateCreation = true;
+            }
+
+            _inner.CreateDirectory(Map(path));
+        }
+
+        public void WriteAllBytesAndFlush(string path, ReadOnlySpan<byte> content) =>
+            _inner.WriteAllBytesAndFlush(Map(path), content);
+
+        public void MoveDirectory(string sourcePath, string destinationPath) =>
+            _inner.MoveDirectory(Map(sourcePath), Map(destinationPath));
+
+        public void DeleteDirectory(string path, bool recursive) =>
+            _inner.DeleteDirectory(Map(path), recursive);
+
+        private bool IsUnderImports(string path)
+        {
+            var fullPath = Path.GetFullPath(path);
+            return fullPath.StartsWith(
+                _importsRoot + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string Map(string path)
+        {
+            if (!TransitionedBeforeCandidateCreation || !IsUnderImports(path))
+            {
+                return path;
+            }
+
+            return Path.Combine(
+                _outsideDirectory,
+                Path.GetRelativePath(_importsRoot, Path.GetFullPath(path)));
+        }
+    }
+
+    private sealed class ImportsCreateTransitionOwnedStorageWriter(
+        ImportsCreateTransitionFileSystem fileSystem) : IOwnedStorageWriter
+    {
+        private readonly FileSystemOwnedStorageWriter _inner = new(
+            fileSystem,
+            PhysicalDirectoryLeaseProvider.Instance);
+
+        public IDirectoryLease OpenOrCreateChildDirectory(
+            IDirectoryLease parentLease,
+            string fixedSingleSegmentName,
+            string expectedPath)
+        {
+            if (string.Equals(
+                    parentLease.ExpectedPath,
+                    Path.GetDirectoryName(expectedPath),
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    parentLease.ExpectedPath,
+                    Path.GetFullPath(
+                        Path.Combine(
+                            Path.GetDirectoryName(parentLease.ExpectedPath)!,
+                            "imports")),
+                    StringComparison.OrdinalIgnoreCase) &&
+                Guid.TryParseExact(fixedSingleSegmentName, "D", out _))
+            {
+                fileSystem.TransitionBeforeCandidateCreation();
+                throw new IOException(
+                    "The imports directory changed before relative creation.");
+            }
+
+            return _inner.OpenOrCreateChildDirectory(
+                parentLease,
+                fixedSingleSegmentName,
+                expectedPath);
+        }
+
+        public void CreateNewChildFileAndFlush(
+            IDirectoryLease parentLease,
+            string fixedSingleSegmentName,
+            ReadOnlySpan<byte> content) =>
+            _inner.CreateNewChildFileAndFlush(
+                parentLease,
+                fixedSingleSegmentName,
+                content);
+    }
+
+    private sealed class RemoveOperationTransitionOwnedStorageWriter(
+        ImportsCreateTransitionFileSystem fileSystem) : IOwnedStorageWriter
+    {
+        private readonly FileSystemOwnedStorageWriter _inner = new(
+            fileSystem,
+            PhysicalDirectoryLeaseProvider.Instance);
+
+        public IDirectoryLease OpenOrCreateChildDirectory(
+            IDirectoryLease parentLease,
+            string fixedSingleSegmentName,
+            string expectedPath)
+        {
+            if (string.Equals(
+                    Path.GetFileName(parentLease.ExpectedPath),
+                    "imports",
+                    StringComparison.OrdinalIgnoreCase) &&
+                Guid.TryParseExact(fixedSingleSegmentName, "D", out _))
+            {
+                fileSystem.TransitionBeforeCandidateCreation();
+                throw new IOException(
+                    "The imports directory changed before removal operation creation.");
+            }
+
+            return _inner.OpenOrCreateChildDirectory(
+                parentLease,
+                fixedSingleSegmentName,
+                expectedPath);
+        }
+
+        public void CreateNewChildFileAndFlush(
+            IDirectoryLease parentLease,
+            string fixedSingleSegmentName,
+            ReadOnlySpan<byte> content) =>
+            _inner.CreateNewChildFileAndFlush(
+                parentLease,
+                fixedSingleSegmentName,
+                content);
+    }
+
+    private sealed class AssetsWriteTransitionFileSystem(
+        string outsideDirectory) : ISkinFileSystem
+    {
+        private readonly ISkinFileSystem _inner = PhysicalSkinFileSystem.Instance;
+        private readonly string _outsideDirectory = Path.GetFullPath(outsideDirectory);
+        private string? _assetsRoot;
+
+        public bool TransitionedAfterAssetsCreation { get; private set; }
+
+        public void TransitionAfterAssetsCreation()
+        {
+            Assert.NotNull(_assetsRoot);
+            TransitionedAfterAssetsCreation = true;
+        }
+
+        public bool DirectoryExists(string path) => _inner.DirectoryExists(Map(path));
+
+        public bool FileExists(string path) => _inner.FileExists(Map(path));
+
+        public FileAttributes GetAttributes(string path) =>
+            _inner.GetAttributes(Map(path));
+
+        public IReadOnlyList<string> EnumerateDirectories(string path) =>
+            _inner.EnumerateDirectories(Map(path));
+
+        public IReadOnlyList<string> EnumerateFiles(
+            string path,
+            SearchOption searchOption) =>
+            _inner.EnumerateFiles(Map(path), searchOption);
+
+        public byte[] ReadAllBytes(string path, long maximumBytes) =>
+            _inner.ReadAllBytes(Map(path), maximumBytes);
+
+        public void CreateDirectory(string path)
+        {
+            _inner.CreateDirectory(Map(path));
+            if (_assetsRoot is null &&
+                string.Equals(
+                    Path.GetFileName(path),
+                    "assets",
+                    StringComparison.OrdinalIgnoreCase) &&
+                Guid.TryParseExact(
+                    Path.GetFileName(Path.GetDirectoryName(path)),
+                    "D",
+                    out _))
+            {
+                _assetsRoot = Path.GetFullPath(path);
+            }
+        }
+
+        public void WriteAllBytesAndFlush(
+            string path,
+            ReadOnlySpan<byte> content) =>
+            _inner.WriteAllBytesAndFlush(Map(path), content);
+
+        public void MoveDirectory(string sourcePath, string destinationPath) =>
+            _inner.MoveDirectory(Map(sourcePath), Map(destinationPath));
+
+        public void DeleteDirectory(string path, bool recursive) =>
+            _inner.DeleteDirectory(Map(path), recursive);
+
+        private string Map(string path)
+        {
+            if (!TransitionedAfterAssetsCreation || _assetsRoot is null)
+            {
+                return path;
+            }
+
+            var fullPath = Path.GetFullPath(path);
+            if (!fullPath.StartsWith(
+                    _assetsRoot + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return path;
+            }
+
+            return Path.Combine(
+                _outsideDirectory,
+                Path.GetRelativePath(_assetsRoot, fullPath));
+        }
+    }
+
+    private sealed class AssetsWriteTransitionOwnedStorageWriter(
+        AssetsWriteTransitionFileSystem fileSystem) : IOwnedStorageWriter
+    {
+        private readonly FileSystemOwnedStorageWriter _inner = new(
+            fileSystem,
+            PhysicalDirectoryLeaseProvider.Instance);
+
+        public IDirectoryLease OpenOrCreateChildDirectory(
+            IDirectoryLease parentLease,
+            string fixedSingleSegmentName,
+            string expectedPath)
+        {
+            var lease = _inner.OpenOrCreateChildDirectory(
+                parentLease,
+                fixedSingleSegmentName,
+                expectedPath);
+            if (string.Equals(
+                    fixedSingleSegmentName,
+                    "assets",
+                    StringComparison.Ordinal))
+            {
+                fileSystem.TransitionAfterAssetsCreation();
+            }
+
+            return lease;
+        }
+
+        public void CreateNewChildFileAndFlush(
+            IDirectoryLease parentLease,
+            string fixedSingleSegmentName,
+            ReadOnlySpan<byte> content)
+        {
+            if (fileSystem.TransitionedAfterAssetsCreation &&
+                string.Equals(
+                    Path.GetFileName(parentLease.ExpectedPath),
+                    "assets",
+                    StringComparison.Ordinal))
+            {
+                throw new IOException(
+                    "The assets directory changed before relative file creation.");
+            }
+
+            _inner.CreateNewChildFileAndFlush(
+                parentLease,
+                fixedSingleSegmentName,
+                content);
+        }
+    }
+
     private sealed class RemoveTransitionDirectoryMoveProvider(
         RemoveTransitionFileSystem fileSystem) : IDirectoryMoveProvider
     {
@@ -983,5 +1473,45 @@ public sealed class SkinPackageInstallerTests
 
         public void DeleteOwnedTree(string rootPath, int maximumEntries) =>
             throw new IOException("Injected cleanup failure.");
+    }
+
+    private sealed class ThrowingBeforeMoveDirectoryMoveProvider : IDirectoryMoveProvider
+    {
+        public static ThrowingBeforeMoveDirectoryMoveProvider Instance { get; } = new();
+
+        public void Move(
+            IDirectoryLease sourceLease,
+            string sourcePath,
+            IDirectoryLease destinationParentLease,
+            string destinationParentPath,
+            string destinationChildName,
+            string expectedDestinationPath) =>
+            throw new IOException("Injected failure before quarantine move.");
+    }
+
+    private sealed class CommittedRemovePostCheckFailureMoveProvider : IDirectoryMoveProvider
+    {
+        public static CommittedRemovePostCheckFailureMoveProvider Instance { get; } = new();
+
+        public void Move(
+            IDirectoryLease sourceLease,
+            string sourcePath,
+            IDirectoryLease destinationParentLease,
+            string destinationParentPath,
+            string destinationChildName,
+            string expectedDestinationPath)
+        {
+            PhysicalDirectoryLeaseProvider.Instance.Move(
+                sourceLease,
+                sourcePath,
+                destinationParentLease,
+                destinationParentPath,
+                destinationChildName,
+                expectedDestinationPath);
+            throw new DirectoryMoveException(
+                "Injected committed quarantine post-check failure.",
+                moveCommitted: true,
+                innerException: new IOException("Injected post-check failure."));
+        }
     }
 }

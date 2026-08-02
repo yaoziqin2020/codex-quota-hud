@@ -10,6 +10,8 @@ namespace CodexQuotaHud.Skins.Storage;
 internal interface IDirectoryLease : IDisposable
 {
     DirectoryIdentity Identity { get; }
+
+    string ExpectedPath { get; }
 }
 
 internal interface IDirectoryLeaseProvider
@@ -26,6 +28,34 @@ internal interface IDirectoryMoveProvider
         string destinationParentPath,
         string destinationChildName,
         string expectedDestinationPath);
+}
+
+internal static class DirectoryMoveGuard
+{
+    internal static void EnsureSameVolume(
+        DirectoryIdentity source,
+        DirectoryIdentity destinationParent)
+    {
+        if (source.VolumeSerialNumber != destinationParent.VolumeSerialNumber)
+        {
+            throw new IOException(
+                "The exact directory move target is on a different volume.");
+        }
+    }
+}
+
+internal sealed class DirectoryMoveException : IOException
+{
+    internal DirectoryMoveException(
+        string message,
+        bool moveCommitted,
+        Exception? innerException = null)
+        : base(message, innerException)
+    {
+        MoveCommitted = moveCommitted;
+    }
+
+    internal bool MoveCommitted { get; }
 }
 
 internal sealed class PhysicalDirectoryLeaseProvider :
@@ -49,6 +79,9 @@ internal sealed class PhysicalDirectoryLeaseProvider :
         string destinationChildName,
         string expectedDestinationPath)
     {
+        DirectoryMoveGuard.EnsureSameVolume(
+            sourceLease.Identity,
+            destinationParentLease.Identity);
         if (sourceLease is not WindowsDirectoryLease source ||
             destinationParentLease is not WindowsDirectoryLease destinationParent)
         {
@@ -86,6 +119,7 @@ internal sealed class WindowsDirectoryLease : IDirectoryLease
     private const uint FileAddSubdirectory = 0x00000004;
     private const uint FileReadAttributes = 0x00000080;
     private const uint FileTraverse = 0x00000020;
+    private const uint FileAttributeDirectory = 0x00000010;
     private const uint FileAttributeReparsePoint = 0x00000400;
     private const uint FileFlagOpenReparsePoint = 0x00200000;
     private const uint FileFlagBackupSemantics = 0x02000000;
@@ -97,6 +131,8 @@ internal sealed class WindowsDirectoryLease : IDirectoryLease
     private string _expectedPath;
 
     public DirectoryIdentity Identity => _identity;
+
+    public string ExpectedPath => _expectedPath;
 
     private WindowsDirectoryLease(
         SafeFileHandle handle,
@@ -146,6 +182,88 @@ internal sealed class WindowsDirectoryLease : IDirectoryLease
         }
     }
 
+    internal static WindowsDirectoryLease FromOwnedHandle(
+        SafeFileHandle handle,
+        string expectedPath)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedPath);
+        var fullExpectedPath = Path.GetFullPath(expectedPath);
+        try
+        {
+            if (handle.IsInvalid)
+            {
+                throw new IOException("The directory lease handle is invalid.");
+            }
+
+            var identity = ReadAndValidate(
+                handle,
+                fullExpectedPath,
+                expectedIdentity: null);
+            return new WindowsDirectoryLease(
+                handle,
+                fullExpectedPath,
+                identity);
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    internal TResult UseValidatedHandle<TResult>(Func<IntPtr, TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        var addedReference = false;
+        try
+        {
+            _handle.DangerousAddRef(ref addedReference);
+            _ = ReadAndValidate(_handle, _expectedPath, _identity);
+            return action(_handle.DangerousGetHandle());
+        }
+        finally
+        {
+            if (addedReference)
+            {
+                _handle.DangerousRelease();
+            }
+        }
+    }
+
+    internal static DirectoryIdentity ValidateFileHandle(
+        SafeFileHandle handle,
+        string expectedPath)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+        if (handle.IsInvalid ||
+            !GetFileInformationByHandle(handle, out var information))
+        {
+            throw Win32Error("The file identity could not be read.");
+        }
+
+        if ((information.FileAttributes &
+                (FileAttributeDirectory | FileAttributeReparsePoint)) != 0)
+        {
+            throw new IOException(
+                "The owned file target is a directory or reparse point.");
+        }
+
+        var finalPath = RemoveExtendedPathPrefix(GetFinalPath(handle));
+        if (!string.Equals(
+                finalPath,
+                Path.GetFullPath(expectedPath),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new IOException("The owned file target changed path.");
+        }
+
+        return new DirectoryIdentity(
+            information.VolumeSerialNumber,
+            ((ulong)information.FileIndexHigh << 32) |
+                information.FileIndexLow);
+    }
+
     public void RenameTo(
         string sourcePath,
         WindowsDirectoryLease destinationParent,
@@ -175,11 +293,16 @@ internal sealed class WindowsDirectoryLease : IDirectoryLease
             throw new IOException("The exact directory move target is invalid.");
         }
 
-        _ = ReadAndValidate(_handle, _expectedPath, _identity);
-        _ = ReadAndValidate(
+        var fullDestinationPath = Path.GetFullPath(expectedDestinationPath);
+
+        var sourceIdentity = ReadAndValidate(_handle, _expectedPath, _identity);
+        var destinationParentIdentity = ReadAndValidate(
             destinationParent._handle,
             destinationParent._expectedPath,
             destinationParent._identity);
+        DirectoryMoveGuard.EnsureSameVolume(
+            sourceIdentity,
+            destinationParentIdentity);
         if (Directory.Exists(expectedDestinationPath) ||
             File.Exists(expectedDestinationPath))
         {
@@ -216,15 +339,25 @@ internal sealed class WindowsDirectoryLease : IDirectoryLease
             {
                 throw NtStatusError("The exact directory move failed.", status);
             }
+
+            _expectedPath = fullDestinationPath;
         }
         finally
         {
             Marshal.FreeHGlobal(buffer);
         }
-
-        var fullDestinationPath = Path.GetFullPath(expectedDestinationPath);
-        _ = ReadAndValidate(_handle, fullDestinationPath, _identity);
-        _expectedPath = fullDestinationPath;
+        try
+        {
+            _ = ReadAndValidate(_handle, fullDestinationPath, _identity);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or OverflowException)
+        {
+            throw new DirectoryMoveException(
+                "The exact directory move committed, but its post-check failed.",
+                moveCommitted: true,
+                innerException: exception);
+        }
     }
 
     public void Dispose() => _handle.Dispose();
@@ -239,7 +372,8 @@ internal sealed class WindowsDirectoryLease : IDirectoryLease
             throw Win32Error("The directory lease identity could not be read.");
         }
 
-        if ((information.FileAttributes & FileAttributeReparsePoint) != 0)
+        if ((information.FileAttributes & FileAttributeDirectory) == 0 ||
+            (information.FileAttributes & FileAttributeReparsePoint) != 0)
         {
             throw new IOException("The directory lease target is a reparse point.");
         }

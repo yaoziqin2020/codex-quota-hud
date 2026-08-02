@@ -33,6 +33,7 @@ public sealed class SkinPackageInstaller
     private readonly IDirectoryLeaseProvider _directoryLeaseProvider;
     private readonly IDirectoryMoveProvider _directoryMoveProvider;
     private readonly ISafeDirectoryDeleteProvider _directoryDeleteProvider;
+    private readonly IOwnedStorageWriter _ownedStorageWriter;
 
     public SkinPackageInstaller(
         SkinStoragePaths paths,
@@ -49,7 +50,8 @@ public sealed class SkinPackageInstaller
         IDirectoryIdentityProvider? identityProvider = null,
         IDirectoryLeaseProvider? directoryLeaseProvider = null,
         IDirectoryMoveProvider? directoryMoveProvider = null,
-        ISafeDirectoryDeleteProvider? directoryDeleteProvider = null)
+        ISafeDirectoryDeleteProvider? directoryDeleteProvider = null,
+        IOwnedStorageWriter? ownedStorageWriter = null)
     {
         ArgumentNullException.ThrowIfNull(paths);
         ArgumentNullException.ThrowIfNull(fileSystem);
@@ -68,6 +70,12 @@ public sealed class SkinPackageInstaller
             (ReferenceEquals(fileSystem, PhysicalSkinFileSystem.Instance)
                 ? PhysicalDirectoryDeleteProvider.Instance
                 : new FileSystemDirectoryDeleteProvider(fileSystem));
+        _ownedStorageWriter = ownedStorageWriter ??
+            (ReferenceEquals(fileSystem, PhysicalSkinFileSystem.Instance)
+                ? PhysicalOwnedStorageWriter.Instance
+                : new FileSystemOwnedStorageWriter(
+                    fileSystem,
+                    _directoryLeaseProvider));
     }
 
     public SkinValidationResult<SkinInstallPreview> Inspect(
@@ -232,6 +240,10 @@ public sealed class SkinPackageInstaller
         IDirectoryLease? existingLease = null;
         IDirectoryLease? backupParentLease = null;
         IDirectoryLease? installedRootLease = null;
+        IDirectoryLease? operationLease = null;
+        IDirectoryLease? importsRootLease = null;
+        IDirectoryLease? settingsRootLease = null;
+        IDirectoryLease? localAppDataRootLease = null;
         SkinInstallResult result;
 
         void DisposeTransactionLeases()
@@ -246,6 +258,14 @@ public sealed class SkinPackageInstaller
             backupParentLease = null;
             candidateParentLease?.Dispose();
             candidateParentLease = null;
+            operationLease?.Dispose();
+            operationLease = null;
+            importsRootLease?.Dispose();
+            importsRootLease = null;
+            settingsRootLease?.Dispose();
+            settingsRootLease = null;
+            localAppDataRootLease?.Dispose();
+            localAppDataRootLease = null;
         }
 
         SkinInstallResult FinishTransaction(
@@ -269,14 +289,15 @@ public sealed class SkinPackageInstaller
                     return false;
                 }
 
-                _directoryMoveProvider.Move(
+                MoveDirectoryAndTrackCommit(
                     candidateLease,
                     finalPath,
                     candidateParentLease,
                     candidateRoot,
                     skinDirectoryName,
-                    candidatePath);
-                candidatePromoted = false;
+                    candidatePath,
+                    ref candidatePromoted,
+                    stateWhenCommitted: false);
             }
 
             if (backupMoved)
@@ -286,14 +307,15 @@ public sealed class SkinPackageInstaller
                     return false;
                 }
 
-                _directoryMoveProvider.Move(
+                MoveDirectoryAndTrackCommit(
                     existingLease,
                     backupPath,
                     installedRootLease,
                     _paths.InstalledSkinsRoot,
                     skinDirectoryName,
-                    finalPath);
-                backupMoved = false;
+                    finalPath,
+                    ref backupMoved,
+                    stateWhenCommitted: false);
             }
 
             return true;
@@ -302,10 +324,34 @@ public sealed class SkinPackageInstaller
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _fileSystem.CreateDirectory(candidatePath);
-            candidateParentLease = _directoryLeaseProvider.Lease(candidateRoot);
-            candidateLease = _directoryLeaseProvider.Lease(candidatePath);
-            WriteCandidate(candidatePath, package, cancellationToken);
+            var localAppDataRoot = Path.GetDirectoryName(_paths.SettingsRoot)!;
+            localAppDataRootLease = _directoryLeaseProvider.Lease(
+                localAppDataRoot);
+            settingsRootLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                localAppDataRootLease,
+                "CodexQuotaHud",
+                _paths.SettingsRoot);
+            importsRootLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                settingsRootLease,
+                "imports",
+                _paths.ImportsRoot);
+            installedRootLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                settingsRootLease,
+                "skins",
+                _paths.InstalledSkinsRoot);
+            operationLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                importsRootLease,
+                operationId.ToString("D").ToLowerInvariant(),
+                operationPath);
+            candidateParentLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                operationLease,
+                "candidate",
+                candidateRoot);
+            candidateLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                candidateParentLease,
+                skinDirectoryName,
+                candidatePath);
+            WriteCandidate(candidateLease, package, cancellationToken);
             var staged = new InstalledSkinReader(
                 candidateRoot,
                 _currentHudVersion,
@@ -322,36 +368,37 @@ public sealed class SkinPackageInstaller
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            _fileSystem.CreateDirectory(_paths.InstalledSkinsRoot);
-            installedRootLease = _directoryLeaseProvider.Lease(
-                _paths.InstalledSkinsRoot);
             if (existing is not null && decision == SkinCollisionDecision.Replace)
             {
-                _fileSystem.CreateDirectory(backupRoot);
                 existingLease = _directoryLeaseProvider.Lease(
                     existing.DirectoryPath);
-                backupParentLease = _directoryLeaseProvider.Lease(backupRoot);
-                _directoryMoveProvider.Move(
+                backupParentLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                    operationLease,
+                    "backup",
+                    backupRoot);
+                MoveDirectoryAndTrackCommit(
                     existingLease,
                     existing.DirectoryPath,
                     backupParentLease,
                     backupRoot,
                     skinDirectoryName,
-                    backupPath);
-                backupMoved = true;
+                    backupPath,
+                    ref backupMoved,
+                    stateWhenCommitted: true);
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
             try
             {
-                _directoryMoveProvider.Move(
+                MoveDirectoryAndTrackCommit(
                     candidateLease,
                     candidatePath,
                     installedRootLease,
                     _paths.InstalledSkinsRoot,
                     skinDirectoryName,
-                    finalPath);
-                candidatePromoted = true;
+                    finalPath,
+                    ref candidatePromoted,
+                    stateWhenCommitted: true);
                 if (candidateLease is null ||
                     !_identityProvider.TryGetIdentity(
                         finalPath,
@@ -368,7 +415,7 @@ public sealed class SkinPackageInstaller
             catch (Exception exception) when (
                 exception is IOException or UnauthorizedAccessException)
             {
-                if (backupMoved)
+                if (candidatePromoted || backupMoved)
                 {
                     try
                     {
@@ -582,19 +629,83 @@ public sealed class SkinPackageInstaller
                     "The removal quarantine path is unsafe.");
             }
 
-            _fileSystem.CreateDirectory(removeRoot);
-            using (var installedRootLease = _directoryLeaseProvider.Lease(
-                       _paths.InstalledSkinsRoot))
-            using (var targetLease = _directoryLeaseProvider.Lease(directoryPath))
-            using (var removeParentLease = _directoryLeaseProvider.Lease(removeRoot))
+            IDirectoryLease? localAppDataRootLease = null;
+            IDirectoryLease? settingsRootLease = null;
+            IDirectoryLease? importsRootLease = null;
+            IDirectoryLease? installedRootLease = null;
+            IDirectoryLease? operationLease = null;
+            IDirectoryLease? removeParentLease = null;
+            IDirectoryLease? targetLease = null;
+            var operationCreated = false;
+            var quarantineCommitted = false;
+            Exception? transactionFailure = null;
+            try
             {
-                _directoryMoveProvider.Move(
+                var localAppDataRoot = Path.GetDirectoryName(_paths.SettingsRoot)!;
+                localAppDataRootLease = _directoryLeaseProvider.Lease(
+                    localAppDataRoot);
+                settingsRootLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                    localAppDataRootLease,
+                    "CodexQuotaHud",
+                    _paths.SettingsRoot);
+                importsRootLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                    settingsRootLease,
+                    "imports",
+                    _paths.ImportsRoot);
+                installedRootLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                    settingsRootLease,
+                    "skins",
+                    _paths.InstalledSkinsRoot);
+                operationLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                    importsRootLease,
+                    operationId.ToString("D").ToLowerInvariant(),
+                    operationPath);
+                operationCreated = true;
+                removeParentLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+                    operationLease,
+                    "remove",
+                    removeRoot);
+                targetLease = _directoryLeaseProvider.Lease(directoryPath);
+                MoveDirectoryAndTrackCommit(
                     targetLease,
                     directoryPath,
                     removeParentLease,
                     removeRoot,
                     directoryName,
-                    quarantinePath);
+                    quarantinePath,
+                    ref quarantineCommitted,
+                    stateWhenCommitted: true);
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException)
+            {
+                transactionFailure = exception;
+            }
+            finally
+            {
+                targetLease?.Dispose();
+                removeParentLease?.Dispose();
+                operationLease?.Dispose();
+                installedRootLease?.Dispose();
+                importsRootLease?.Dispose();
+                settingsRootLease?.Dispose();
+                localAppDataRootLease?.Dispose();
+            }
+
+            if (transactionFailure is not null)
+            {
+                if (quarantineCommitted)
+                {
+                    return RemoveCommittedError(
+                        skinId,
+                        "remove.quarantine-verification-failed",
+                        $"The skin was removed from installed storage, but the quarantine move could not be verified. Recovery operation: {operationId:D}.");
+                }
+
+                return FinishUncommittedRemoveFailure(
+                    operationPath,
+                    operationId,
+                    operationCreated);
             }
 
             // C4 first quarantines the exact leased object. The operation tree is
@@ -608,7 +719,8 @@ public sealed class SkinPackageInstaller
             catch (Exception exception) when (
                 exception is IOException or UnauthorizedAccessException)
             {
-                return RemoveError(
+                return RemoveCommittedError(
+                    skinId,
                     "remove.cleanup-failed",
                     $"The skin was removed, but cleanup failed. Recovery operation: {operationId:D}.");
             }
@@ -870,38 +982,47 @@ public sealed class SkinPackageInstaller
             $"The skin was not installed, and temporary cleanup failed. Recovery operation: {operationId:D}.");
 
     private void WriteCandidate(
-        string candidatePath,
+        IDirectoryLease candidateLease,
         SkinPackageDocument package,
         CancellationToken cancellationToken)
     {
         WriteFile(
-            Path.Combine(candidatePath, SkinPackageLimits.ManifestFileName),
+            candidateLease,
+            SkinPackageLimits.ManifestFileName,
             SkinJsonCodec.WriteManifest(package.Manifest),
             cancellationToken);
         WriteFile(
-            Path.Combine(candidatePath, SkinPackageLimits.ThemeFileName),
+            candidateLease,
+            SkinPackageLimits.ThemeFileName,
             SkinJsonCodec.WriteTheme(package.Theme),
             cancellationToken);
+        using var assetsLease = _ownedStorageWriter.OpenOrCreateChildDirectory(
+            candidateLease,
+            "assets",
+            Path.Combine(candidateLease.ExpectedPath, "assets"));
         foreach (var reference in package.Manifest.Assets.OrderBy(asset => asset.Path, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var asset = package.Assets[reference.Slot];
-            var path = Path.Combine(
-                candidatePath,
-                reference.Path.Replace('/', Path.DirectorySeparatorChar));
-            var parent = Path.GetDirectoryName(path)!;
-            _fileSystem.CreateDirectory(parent);
-            WriteFile(path, asset.Content, cancellationToken);
+            WriteFile(
+                assetsLease,
+                Path.GetFileName(reference.Path),
+                asset.Content,
+                cancellationToken);
         }
     }
 
     private void WriteFile(
-        string path,
+        IDirectoryLease parentLease,
+        string fixedSingleSegmentName,
         byte[] content,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _fileSystem.WriteAllBytesAndFlush(path, content);
+        _ownedStorageWriter.CreateNewChildFileAndFlush(
+            parentLease,
+            fixedSingleSegmentName,
+            content);
         cancellationToken.ThrowIfCancellationRequested();
     }
 
@@ -911,10 +1032,73 @@ public sealed class SkinPackageInstaller
             null,
             [new SkinValidationError(code, "$install", message)]);
 
+    private void MoveDirectoryAndTrackCommit(
+        IDirectoryLease sourceLease,
+        string sourcePath,
+        IDirectoryLease destinationParentLease,
+        string destinationParentPath,
+        string destinationChildName,
+        string expectedDestinationPath,
+        ref bool state,
+        bool stateWhenCommitted)
+    {
+        try
+        {
+            _directoryMoveProvider.Move(
+                sourceLease,
+                sourcePath,
+                destinationParentLease,
+                destinationParentPath,
+                destinationChildName,
+                expectedDestinationPath);
+            state = stateWhenCommitted;
+        }
+        catch (DirectoryMoveException exception) when (exception.MoveCommitted)
+        {
+            state = stateWhenCommitted;
+            throw;
+        }
+    }
+
     private static SkinValidationResult<Guid> RemoveError(
         string code,
         string message) =>
         new(
             default,
             [new SkinValidationError(code, "$remove", message)]);
+
+    private static SkinValidationResult<Guid> RemoveCommittedError(
+        Guid skinId,
+        string code,
+        string message) =>
+        new(
+            skinId,
+            [new SkinValidationError(code, "$remove", message)]);
+
+    private SkinValidationResult<Guid> FinishUncommittedRemoveFailure(
+        string operationPath,
+        Guid operationId,
+        bool operationCreated)
+    {
+        try
+        {
+            if (operationCreated || _fileSystem.DirectoryExists(operationPath))
+            {
+                _directoryDeleteProvider.DeleteOwnedTree(
+                    operationPath,
+                    SkinPackageLimits.MaximumEntries + 3);
+            }
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            return RemoveError(
+                "remove.operation-cleanup-failed",
+                $"The skin was not removed, and temporary cleanup failed. Recovery operation: {operationId:D}.");
+        }
+
+        return RemoveError(
+            "remove.io",
+            "The custom skin could not be removed safely.");
+    }
 }
