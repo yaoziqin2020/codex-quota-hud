@@ -5,6 +5,7 @@ using System.Security;
 using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.SkinManagement;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Refresh;
 using CodexQuotaHud.Core.Settings;
@@ -132,12 +133,25 @@ public partial class App : System.Windows.Application
                     "Codex Quota HUD",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning));
-            _window = new QuotaOrbWindow(_viewModel, skinController);
+            var skinManagement = new SkinManagementController(
+                new SkinPackageInstaller(storagePaths, CurrentHudVersion()),
+                hudCatalog,
+                _viewModel,
+                skinController,
+                new DesignerLauncher(AppContext.BaseDirectory),
+                new SkinManagementDialogs(() => _window),
+                CurrentHudVersion(),
+                new WpfUiDispatcher(Dispatcher));
+            _window = new QuotaOrbWindow(
+                _viewModel,
+                skinController,
+                skinManagement);
             _tray = new TrayController(
                 _viewModel,
                 hudCatalog,
                 skinController,
-                _window.TryActivateSkinKey);
+                _window.TryActivateSkinKey,
+                skinManagement);
 
             _processMonitor.RunningChanged += OnCodexRunningChanged;
             OnCodexRunningChanged(_processMonitor.IsRunning);

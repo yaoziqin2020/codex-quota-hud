@@ -26,23 +26,7 @@
                          Opened="OnContextMenuOpened"
                          Closed="OnContextMenuClosed">
                 <MenuItem Header="立即刷新" Command="{Binding RefreshCommand}" />
-                <MenuItem Header="皮肤">
-                    <MenuItem x:Name="HudDialMenuItem" Header="HUD 科技仪表"
-                              IsCheckable="True" Command="{Binding SelectSkinCommand}"
-                              CommandParameter="builtin:HudDial" />
-                    <MenuItem x:Name="EnergyRingMenuItem" Header="双彩能量环"
-                              IsCheckable="True" Command="{Binding SelectSkinCommand}"
-                              CommandParameter="builtin:EnergyRing" />
-                    <MenuItem x:Name="LiquidGlassMenuItem" Header="流体玻璃球"
-                              IsCheckable="True" Command="{Binding SelectSkinCommand}"
-                              CommandParameter="builtin:LiquidGlass" />
-                    <MenuItem x:Name="AuroraMenuItem" Header="克制极光"
-                              IsCheckable="True" Command="{Binding SelectSkinCommand}"
-                              CommandParameter="builtin:Aurora" />
-                    <MenuItem x:Name="LiquidTankMenuItem" Header="液位储能舱"
-                              IsCheckable="True" Command="{Binding SelectSkinCommand}"
-                              CommandParameter="builtin:LiquidTank" />
-                </MenuItem>
+                <MenuItem x:Name="SkinMenuRoot" Header="皮肤" />
                 <MenuItem Header="动画" IsCheckable="True"
                           IsChecked="{Binding AnimationsEnabled, Mode=TwoWay}" />
                 <Separator />

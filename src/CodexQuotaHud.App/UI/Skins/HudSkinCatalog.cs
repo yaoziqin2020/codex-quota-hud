@@ -10,18 +10,36 @@ public sealed record HudSkinCatalogSnapshot(
 
 public sealed class HudSkinCatalog
 {
-    private readonly IReadOnlyDictionary<string, SkinDescriptor> _byKey;
-    private readonly HudSkinCatalogSnapshot _snapshot;
+    private readonly object _sync = new();
+    private readonly InstalledSkinCatalog? _installedCatalog;
+    private IReadOnlyDictionary<string, SkinDescriptor> _byKey =
+        new Dictionary<string, SkinDescriptor>(StringComparer.Ordinal);
+    private HudSkinCatalogSnapshot _snapshot = null!;
 
     public HudSkinCatalog(InstalledSkinCatalog installedCatalog)
-        : this((installedCatalog ?? throw new ArgumentNullException(
-            nameof(installedCatalog))).LoadAll())
+        : this(
+            (installedCatalog ?? throw new ArgumentNullException(
+                nameof(installedCatalog))).LoadAll(),
+            installedCatalog)
     {
     }
 
     internal HudSkinCatalog(InstalledSkinCatalogResult installedSnapshot)
+        : this(installedSnapshot, installedCatalog: null)
+    {
+    }
+
+    private HudSkinCatalog(
+        InstalledSkinCatalogResult installedSnapshot,
+        InstalledSkinCatalog? installedCatalog)
     {
         ArgumentNullException.ThrowIfNull(installedSnapshot);
+        _installedCatalog = installedCatalog;
+        Replace(installedSnapshot);
+    }
+
+    private void Replace(InstalledSkinCatalogResult installedSnapshot)
+    {
 
         var healthy = Enum.GetValues<SkinId>()
             .Select(id => new SkinDescriptor(
@@ -41,21 +59,43 @@ public sealed class HudSkinCatalog
                     Installed: record)))
             .ToArray();
         var corrupt = installedSnapshot.Corrupt.ToArray();
-        _snapshot = new HudSkinCatalogSnapshot(
+        var snapshot = new HudSkinCatalogSnapshot(
             Array.AsReadOnly(healthy),
             Array.AsReadOnly(corrupt));
-        _byKey = healthy.ToDictionary(
+        var byKey = healthy.ToDictionary(
             descriptor => descriptor.SelectionKey,
             StringComparer.Ordinal);
-        Generation = new object();
+        lock (_sync)
+        {
+            _snapshot = snapshot;
+            _byKey = byKey;
+            Generation = new object();
+        }
     }
 
-    internal object Generation { get; }
+    internal object Generation { get; private set; } = new();
 
     public static HudSkinCatalog CreateBuiltInOnly() =>
         new(new InstalledSkinCatalogResult([], []));
 
-    public HudSkinCatalogSnapshot Load() => _snapshot;
+    public HudSkinCatalogSnapshot Load()
+    {
+        lock (_sync)
+        {
+            return _snapshot;
+        }
+    }
+
+    public HudSkinCatalogSnapshot Refresh()
+    {
+        if (_installedCatalog is null)
+        {
+            return Load();
+        }
+
+        Replace(_installedCatalog.LoadAll());
+        return Load();
+    }
 
     public bool TryGet(string selectionKey, out SkinDescriptor descriptor)
     {
@@ -65,7 +105,10 @@ public sealed class HudSkinCatalog
             return false;
         }
 
-        return _byKey.TryGetValue(selectionKey, out descriptor!);
+        lock (_sync)
+        {
+            return _byKey.TryGetValue(selectionKey, out descriptor!);
+        }
     }
 
     private static string DisplayNameFor(SkinId id) => id switch

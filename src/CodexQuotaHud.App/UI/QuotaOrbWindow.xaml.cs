@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Controls.Primitives;
 using CodexQuotaHud.App.UI.Animation;
+using CodexQuotaHud.App.UI.SkinManagement;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.Core.Models;
@@ -25,6 +26,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             System.Windows.Forms.SystemInformation.DoubleClickTime);
     private readonly QuotaOrbViewModel _viewModel;
     private readonly SkinController _skinController;
+    private readonly SkinManagementController? _skinManagement;
     private readonly OrbAnimationController _animationController;
     private readonly EdgeAutoHideController _edgeAutoHideController;
     private readonly DetailsPopupTogglePolicy _detailsTogglePolicy = new();
@@ -36,26 +38,48 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
     private bool _contextMenuOpen;
 
     public QuotaOrbWindow(QuotaOrbViewModel viewModel)
-        : this(viewModel, new SkinController(), initializeSelection: true)
+        : this(
+            viewModel,
+            new SkinController(),
+            initializeSelection: true,
+            skinManagement: null)
     {
     }
 
     internal QuotaOrbWindow(
         QuotaOrbViewModel viewModel,
         SkinController skinController)
-        : this(viewModel, skinController, initializeSelection: false)
+        : this(
+            viewModel,
+            skinController,
+            initializeSelection: false,
+            skinManagement: null)
+    {
+    }
+
+    internal QuotaOrbWindow(
+        QuotaOrbViewModel viewModel,
+        SkinController skinController,
+        SkinManagementController skinManagement)
+        : this(
+            viewModel,
+            skinController,
+            initializeSelection: false,
+            skinManagement)
     {
     }
 
     private QuotaOrbWindow(
         QuotaOrbViewModel viewModel,
         SkinController skinController,
-        bool initializeSelection)
+        bool initializeSelection,
+        SkinManagementController? skinManagement)
     {
         InitializeComponent();
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _skinController = skinController ?? throw new ArgumentNullException(
             nameof(skinController));
+        _skinManagement = skinManagement;
         DataContext = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _viewModel.SetSkinActivationHandler(TryActivateSkinKey);
@@ -91,6 +115,12 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         ApplyPopupTheme();
         ApplyEdgeProgressState(EdgeDockSide.None);
         LocationChanged += (_, _) => RefreshPopupPlacement();
+        _skinController.ActiveSkinChanged += OnSkinControllerActiveSkinChanged;
+        if (_skinManagement is not null)
+        {
+            _skinManagement.CatalogChanged += OnManagedCatalogChanged;
+        }
+        RebuildOrbSkinMenu();
 
         var saved = viewModel.GetSavedPosition();
         if (saved.Left is { } left)
@@ -125,7 +155,6 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         }
 
         _skinController.Activate(candidate!);
-        ApplyActiveSkin();
         return true;
     }
 
@@ -203,6 +232,11 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         }
 
         _edgeAutoHideController.Dispose();
+        _skinController.ActiveSkinChanged -= OnSkinControllerActiveSkinChanged;
+        if (_skinManagement is not null)
+        {
+            _skinManagement.CatalogChanged -= OnManagedCatalogChanged;
+        }
         CleanupForExit(
             _viewModel,
             OnViewModelPropertyChanged,
@@ -400,11 +434,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         _contextMenuOpen = true;
         CloseDetailsPopup();
         _edgeAutoHideController.Expand();
-        SetSkinCheck(HudDialMenuItem, SkinSelectionKey.HudDial);
-        SetSkinCheck(EnergyRingMenuItem, SkinSelectionKey.EnergyRing);
-        SetSkinCheck(LiquidGlassMenuItem, SkinSelectionKey.LiquidGlass);
-        SetSkinCheck(AuroraMenuItem, SkinSelectionKey.Aurora);
-        SetSkinCheck(LiquidTankMenuItem, SkinSelectionKey.LiquidTank);
+        RebuildOrbSkinMenu();
     }
 
     private async void OnContextMenuClosed(object sender, RoutedEventArgs e)
@@ -440,11 +470,122 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         await ScheduleEdgeCollapseAsync();
     }
 
-    private void SetSkinCheck(MenuItem item, string selectionKey) =>
-        item.IsChecked = string.Equals(
-            _skinController.CurrentDescriptor.SelectionKey,
+    private void OnSkinControllerActiveSkinChanged(object? sender, EventArgs e)
+    {
+        ApplyActiveSkin();
+        RebuildOrbSkinMenu();
+    }
+
+    private void OnManagedCatalogChanged(object? sender, EventArgs e) =>
+        RebuildOrbSkinMenu();
+
+    private void RebuildOrbSkinMenu()
+    {
+        if (_skinManagement is null)
+        {
+            SkinMenuRoot.Items.Clear();
+            foreach (var entry in BuiltInMenuEntries())
+            {
+                var item = new MenuItem
+                {
+                    Header = entry.DisplayName,
+                    IsCheckable = true,
+                    IsChecked = entry.IsSelected,
+                    Tag = entry.SelectionKey
+                };
+                item.Click += (_, _) => _ = TryActivateSkinKey(entry.SelectionKey);
+                SkinMenuRoot.Items.Add(item);
+            }
+
+            return;
+        }
+
+        RebuildSkinMenu(
+            SkinMenuRoot,
+            _skinManagement.Entries,
+            _skinManagement.DesignerAvailable,
+            key => _ = TryActivateSkinKey(key),
+            key => _skinManagement.RemoveAsync(key),
+            async () =>
+            {
+                _ = await _skinManagement.ChooseAndImportAsync();
+            },
+            () => _ = _skinManagement.OpenDesigner());
+    }
+
+    private IReadOnlyList<SkinMenuEntry> BuiltInMenuEntries() =>
+    [
+        BuiltInEntry(SkinSelectionKey.HudDial, "HUD 科技仪表"),
+        BuiltInEntry(SkinSelectionKey.EnergyRing, "双彩能量环"),
+        BuiltInEntry(SkinSelectionKey.LiquidGlass, "流体玻璃球"),
+        BuiltInEntry(SkinSelectionKey.Aurora, "克制极光"),
+        BuiltInEntry(SkinSelectionKey.LiquidTank, "液位储能舱")
+    ];
+
+    private SkinMenuEntry BuiltInEntry(string selectionKey, string displayName) =>
+        new(
             selectionKey,
-            StringComparison.Ordinal);
+            displayName,
+            string.Equals(
+                selectionKey,
+                _skinController.CurrentDescriptor.SelectionKey,
+                StringComparison.Ordinal),
+            CanRemove: false);
+
+    internal static void RebuildSkinMenu(
+        MenuItem root,
+        IReadOnlyList<SkinMenuEntry> entries,
+        bool designerAvailable,
+        Action<string> select,
+        Func<string, Task> remove,
+        Func<Task> import,
+        Action openDesigner)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(select);
+        ArgumentNullException.ThrowIfNull(remove);
+        ArgumentNullException.ThrowIfNull(import);
+        ArgumentNullException.ThrowIfNull(openDesigner);
+        root.Items.Clear();
+
+        foreach (var entry in entries)
+        {
+            var item = new MenuItem
+            {
+                Header = entry.DisplayName,
+                IsCheckable = true,
+                IsChecked = entry.IsSelected,
+                Tag = entry.SelectionKey
+            };
+            if (entry.CanRemove)
+            {
+                var selectItem = new MenuItem { Header = "选择" };
+                selectItem.Click += (_, _) => select(entry.SelectionKey);
+                var removeItem = new MenuItem { Header = "删除" };
+                removeItem.Click += async (_, _) => await remove(entry.SelectionKey);
+                item.Items.Add(selectItem);
+                item.Items.Add(removeItem);
+            }
+            else
+            {
+                item.Click += (_, _) => select(entry.SelectionKey);
+            }
+
+            root.Items.Add(item);
+        }
+
+        root.Items.Add(new System.Windows.Controls.Separator());
+        var importItem = new MenuItem { Header = "导入皮肤…" };
+        importItem.Click += async (_, _) => await import();
+        root.Items.Add(importItem);
+        if (designerAvailable)
+        {
+            var designerItem = new MenuItem { Header = "打开皮肤设计器" };
+            designerItem.Click += (_, _) => openDesigner();
+            root.Items.Add(designerItem);
+        }
+    }
 
     private void ClampToNearestWorkArea(bool save)
     {

@@ -136,6 +136,41 @@ public sealed class SkinController
         ActiveSkinChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public bool ReplaceCatalog(
+        HudSkinCatalogSnapshot snapshot,
+        out SkinSelectionFailure? failure)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (!ReferenceEquals(snapshot, _catalog.Load()))
+        {
+            throw new ArgumentException(
+                "The snapshot is not the catalog's current generation.",
+                nameof(snapshot));
+        }
+
+        // The live instance remains active, but every cached activation target
+        // belongs to the previous immutable descriptor generation.
+        _instances.Clear();
+
+        var current = snapshot.Healthy.FirstOrDefault(descriptor =>
+            string.Equals(
+                descriptor.SelectionKey,
+                CurrentDescriptor.SelectionKey,
+                StringComparison.Ordinal));
+        if (current is null)
+        {
+            failure = new SkinSelectionFailure(
+                CurrentDescriptor.SelectionKey,
+                BoundedIdentity(CurrentDescriptor.DisplayName),
+                "skin.selection.missing");
+            return false;
+        }
+
+        CurrentDescriptor = current;
+        failure = null;
+        return true;
+    }
+
     public IQuotaSkin Select(SkinId skin)
     {
         var normalized = Enum.IsDefined(skin) ? skin : SkinId.HudDial;
