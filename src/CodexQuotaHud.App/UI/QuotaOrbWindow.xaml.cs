@@ -36,6 +36,9 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
     private bool _allowClose;
     private bool _isDragging;
     private bool _contextMenuOpen;
+    private SyntheticSkinCandidate? _activeSyntheticSkin;
+    private WorkArea? _previewWorkArea;
+    private bool _suppressAutomaticShow;
 
     public QuotaOrbWindow(QuotaOrbViewModel viewModel)
         : this(
@@ -135,6 +138,11 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
     }
 
     internal SkinController SkinController => _skinController;
+
+    internal IQuotaSkin? ActiveSyntheticSkin => _activeSyntheticSkin?.Skin;
+
+    internal SkinPresentation? ActiveSyntheticPresentation =>
+        _activeSyntheticSkin?.Presentation;
 
     bool IPreviewHud.TryActivateSkinKey(string selectionKey) =>
         TryActivateSkinKey(selectionKey);
@@ -305,6 +313,38 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         SkinHost.Content = view;
     }
 
+    internal void ActivateSyntheticSkin(SyntheticSkinCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        candidate.Skin.Render(_viewModel.SkinState);
+        _activeSyntheticSkin = candidate;
+        SetSkinView(candidate.Skin.View);
+        _animationController.Attach(candidate.Skin as IOrbAnimationTarget);
+        ApplyPopupTheme();
+        ApplyEdgeProgressState(_edgeAutoHideController.DockSide);
+        ApplyAnimationState();
+    }
+
+    internal void SetPreviewWorkArea(Rect workArea)
+    {
+        _suppressAutomaticShow = true;
+        _previewWorkArea = new WorkArea(
+            workArea.Left,
+            workArea.Top,
+            workArea.Width,
+            workArea.Height);
+        ClampToNearestWorkArea(save: false);
+    }
+
+    internal void ShowSyntheticHud()
+    {
+        _suppressAutomaticShow = false;
+        if (!IsVisible && _viewModel.IsVisible)
+        {
+            Show();
+        }
+    }
+
     public void CloseForExit()
     {
         _allowClose = true;
@@ -408,7 +448,15 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         }
         else if (e.PropertyName == nameof(QuotaOrbViewModel.SkinState))
         {
-            _skinController.Render(_viewModel.SkinState);
+            if (_activeSyntheticSkin is { } synthetic)
+            {
+                _skinController.Render(_viewModel.SkinState);
+                synthetic.Skin.Render(_viewModel.SkinState);
+            }
+            else
+            {
+                _skinController.Render(_viewModel.SkinState);
+            }
             ApplyEdgeProgressState(_edgeAutoHideController.DockSide);
             _animationController.SetAnimationsEnabled(
                 _viewModel.AnimationsEnabled);
@@ -459,7 +507,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         }
 
         ClampToNearestWorkArea(save: false);
-        if (!IsVisible)
+        if (!IsVisible && !_suppressAutomaticShow)
         {
             Show();
         }
@@ -613,6 +661,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
 
     private void OnSkinControllerActiveSkinChanged(object? sender, EventArgs e)
     {
+        _activeSyntheticSkin = null;
         ApplyActiveSkin();
         RebuildOrbSkinMenu();
     }
@@ -853,6 +902,17 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
                 side, Left, Top, width, height, workArea)
             : EdgeAutoHideGeometry.ExpandedPosition(
                 side, Left, Top, width, height, workArea);
+        if (_previewWorkArea is not null)
+        {
+            ApplyEdgeVisualState(side, collapsed, animate: false);
+            Left = target.Left;
+            Top = target.Top;
+            RefreshPopupPlacement();
+            _expandAnimationCompletion?.TrySetResult();
+            _expandAnimationCompletion = null;
+            return;
+        }
+
         TaskCompletionSource? expandCompletion = null;
         if (!collapsed)
         {
@@ -955,7 +1015,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
 
     private void ApplyEdgeProgressState(EdgeDockSide side)
     {
-        var theme = _skinController.CurrentPresentation.Edge;
+        var theme = CurrentPresentation.Edge;
         var level = _viewModel.DisplayMode == QuotaDisplayMode.Hidden
             ? QuotaAlertLevel.Normal
             : QuotaAlertPolicy.Classify(_viewModel.PrimaryPercent);
@@ -1137,7 +1197,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
 
     private void ApplyPopupTheme()
     {
-        var theme = _skinController.CurrentPresentation.Popup;
+        var theme = CurrentPresentation.Popup;
         PopupCard.Background = theme.Background;
         PopupShadowHost.Background = theme.Background;
         PopupCard.BorderBrush = theme.Border;
@@ -1190,6 +1250,11 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
 
     private IReadOnlyList<WorkArea> GetWorkAreas()
     {
+        if (_previewWorkArea is { } previewWorkArea)
+        {
+            return [previewWorkArea];
+        }
+
         _ = new WindowInteropHelper(this).EnsureHandle();
         var fromDevice =
             PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice ??
@@ -1224,4 +1289,8 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
                 fallback.Height)
         ];
     }
+
+    private SkinPresentation CurrentPresentation =>
+        _activeSyntheticSkin?.Presentation ??
+        _skinController.CurrentPresentation;
 }

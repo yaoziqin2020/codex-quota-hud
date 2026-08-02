@@ -119,6 +119,10 @@ assets/
   decoration.png
 ```
 
+Designer-owned draft assets use only the canonical `.png` or `.jpg` suffixes.
+JPEG inputs named with `.jpeg` are decoded and stored as `.jpg`; strict draft
+JSON does not accept `.jpeg` paths. The outer decoration remains PNG-only.
+
 `manifest.json` contains:
 
 - schema version;

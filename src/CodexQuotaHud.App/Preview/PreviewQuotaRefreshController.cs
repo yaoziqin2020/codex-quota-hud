@@ -4,7 +4,7 @@ using CodexQuotaHud.Core.Refresh;
 
 namespace CodexQuotaHud.App.Preview;
 
-internal sealed class PreviewQuotaRefreshController : IQuotaRefreshController
+public sealed class PreviewQuotaRefreshController : IQuotaRefreshController
 {
     private static readonly DateTimeOffset FetchedAt =
         DateTimeOffset.Parse("2030-01-01T00:00:00Z");
@@ -28,6 +28,21 @@ internal sealed class PreviewQuotaRefreshController : IQuotaRefreshController
         double weeklyPercent,
         bool isRefreshing)
     {
+        if (!Enum.IsDefined(choice))
+        {
+            throw new ArgumentOutOfRangeException(nameof(choice));
+        }
+
+        if (!double.IsFinite(fiveHourPercent))
+        {
+            throw new ArgumentOutOfRangeException(nameof(fiveHourPercent));
+        }
+
+        if (!double.IsFinite(weeklyPercent))
+        {
+            throw new ArgumentOutOfRangeException(nameof(weeklyPercent));
+        }
+
         CurrentState = CreateState(
             choice,
             fiveHourPercent,

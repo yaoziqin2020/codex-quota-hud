@@ -5,6 +5,58 @@ namespace CodexQuotaHud.App.Tests.Preview;
 
 public sealed class PreviewQuotaRefreshControllerTests
 {
+    public static TheoryData<PreviewDisplayChoice, QuotaDisplayMode,
+        QuotaWindowKind?, QuotaWindowKind?> DisplayShapes => new()
+    {
+        { PreviewDisplayChoice.Dual, QuotaDisplayMode.Dual,
+            QuotaWindowKind.FiveHour, QuotaWindowKind.Weekly },
+        { PreviewDisplayChoice.FiveHourOnly, QuotaDisplayMode.Single,
+            QuotaWindowKind.FiveHour, null },
+        { PreviewDisplayChoice.WeeklyOnly, QuotaDisplayMode.Single,
+            QuotaWindowKind.Weekly, null },
+        { PreviewDisplayChoice.NoQuota, QuotaDisplayMode.Hidden, null, null }
+    };
+
+    [Theory]
+    [MemberData(nameof(DisplayShapes))]
+    public void Publish_CoversEveryShapeAndExactBoundaryPreset(
+        PreviewDisplayChoice choice,
+        QuotaDisplayMode expectedMode,
+        QuotaWindowKind? expectedPrimary,
+        QuotaWindowKind? expectedSecondary)
+    {
+        var controller = new PreviewQuotaRefreshController();
+
+        foreach (var preset in new[] { 100d, 68d, 21d, 20d, 11d, 10d, 0d })
+        {
+            controller.Publish(choice, preset, preset, isRefreshing: false);
+
+            var display = controller.CurrentState.Display;
+            Assert.Equal(expectedMode, display.Mode);
+            Assert.Equal(expectedPrimary, display.Primary?.Kind);
+            Assert.Equal(expectedSecondary, display.Secondary?.Kind);
+            Assert.Equal(expectedPrimary is null ? null : preset,
+                display.Primary?.RemainingPercent);
+            Assert.Equal(expectedSecondary is null ? null : preset,
+                display.Secondary?.RemainingPercent);
+            if (display.Primary is not null)
+            {
+                Assert.Equal(
+                    CodexQuotaHud.App.UI.QuotaAlertPolicy.Classify(preset),
+                    CodexQuotaHud.App.UI.QuotaAlertPolicy.Classify(
+                        display.Primary.RemainingPercent));
+            }
+
+            if (display.Secondary is not null)
+            {
+                Assert.Equal(
+                    CodexQuotaHud.App.UI.QuotaAlertPolicy.Classify(preset),
+                    CodexQuotaHud.App.UI.QuotaAlertPolicy.Classify(
+                        display.Secondary.RemainingPercent));
+            }
+        }
+    }
+
     [Theory]
     [InlineData((int)PreviewDisplayChoice.Dual, QuotaDisplayMode.Dual,
         QuotaWindowKind.FiveHour, true)]
@@ -50,6 +102,34 @@ public sealed class PreviewQuotaRefreshControllerTests
         Assert.Equal(0,
             controller.CurrentState.Display.Secondary?.RemainingPercent);
         Assert.True(controller.CurrentState.IsRefreshing);
+    }
+
+    [Fact]
+    public void Publish_RejectsInvalidValuesBeforePublishing()
+    {
+        var controller = new PreviewQuotaRefreshController();
+        var original = controller.CurrentState;
+        var publications = 0;
+        controller.StateChanged += _ => publications++;
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => controller.Publish(
+            (PreviewDisplayChoice)999,
+            68,
+            34,
+            isRefreshing: false));
+        Assert.Throws<ArgumentOutOfRangeException>(() => controller.Publish(
+            PreviewDisplayChoice.Dual,
+            double.NaN,
+            34,
+            isRefreshing: false));
+        Assert.Throws<ArgumentOutOfRangeException>(() => controller.Publish(
+            PreviewDisplayChoice.Dual,
+            68,
+            double.PositiveInfinity,
+            isRefreshing: false));
+
+        Assert.Same(original, controller.CurrentState);
+        Assert.Equal(0, publications);
     }
 
     [Fact]

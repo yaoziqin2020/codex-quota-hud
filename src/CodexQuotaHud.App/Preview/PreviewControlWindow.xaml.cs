@@ -222,7 +222,7 @@ public partial class PreviewControlWindow : Window
     {
         if (_initialized && SkinBox.SelectedItem is SkinId skin)
         {
-            _session.SetSkin(skin);
+            _session.SetBuiltInSkin(skin);
         }
     }
 

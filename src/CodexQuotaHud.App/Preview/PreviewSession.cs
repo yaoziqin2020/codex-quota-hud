@@ -4,15 +4,12 @@ using CodexQuotaHud.Core.Settings;
 
 namespace CodexQuotaHud.App.Preview;
 
-internal sealed class PreviewSession
+public sealed class PreviewSession
 {
     private readonly PreviewQuotaRefreshController _controller;
     private readonly QuotaOrbViewModel _viewModel;
     private readonly IPreviewHud _hud;
-    private PreviewDisplayChoice _choice = PreviewDisplayChoice.Dual;
-    private double _fiveHourPercent = 68;
-    private double _weeklyPercent = 34;
-    private bool _isRefreshing;
+    private SyntheticPreviewState _state = SyntheticPreviewState.Default;
 
     public PreviewSession(
         PreviewQuotaRefreshController controller,
@@ -27,65 +24,91 @@ internal sealed class PreviewSession
 
     public void SetDisplayChoice(PreviewDisplayChoice choice)
     {
-        if (!Enum.IsDefined(choice))
-        {
-            throw new ArgumentOutOfRangeException(nameof(choice));
-        }
-
-        _choice = choice;
+        _state = _state with { DisplayChoice = choice };
         Publish();
     }
 
     public void SetFiveHourPercent(double value)
     {
-        _fiveHourPercent = Math.Clamp(value, 0, 100);
+        _state = _state with { FiveHourPercent = value };
         Publish();
     }
 
     public void SetWeeklyPercent(double value)
     {
-        _weeklyPercent = Math.Clamp(value, 0, 100);
+        _state = _state with { WeeklyPercent = value };
         Publish();
     }
 
     public void SetRefreshing(bool value)
     {
-        _isRefreshing = value;
+        _state = _state with { IsRefreshing = value };
         Publish();
     }
 
-    public void SetSkin(SkinId skin)
+    public bool SetBuiltInSkin(SkinId skin)
     {
         if (!Enum.IsDefined(skin))
         {
             throw new ArgumentOutOfRangeException(nameof(skin));
         }
 
-        _ = _hud.TryActivateSkinKey(SkinSelectionKey.FromBuiltIn(skin));
+        return _hud.TryActivateSkinKey(SkinSelectionKey.FromBuiltIn(skin));
     }
 
-    public void SetAnimationsEnabled(bool value) =>
+    public void SetAnimationsEnabled(bool value)
+    {
+        _state = _state with { AnimationsEnabled = value };
         _viewModel.AnimationsEnabled = value;
+    }
 
-    public void SetDetailsOpen(bool isOpen) =>
+    public void SetDetailsOpen(bool isOpen)
+    {
+        _state = _state with { DetailsOpen = isOpen };
         _hud.SetDetailsOpen(isOpen);
+    }
 
     public void PreviewEdge(EdgeDockSide side)
     {
-        if (side == EdgeDockSide.None || !Enum.IsDefined(side))
+        if (side == EdgeDockSide.None)
         {
             throw new ArgumentOutOfRangeException(nameof(side));
         }
 
+        _state = _state with { EdgeSide = side };
         _hud.PreviewEdge(side);
     }
 
-    public void ForceExpanded() => _hud.ForceExpanded();
+    public void ForceExpanded()
+    {
+        _state = _state with { EdgeSide = EdgeDockSide.None };
+        _hud.ForceExpanded();
+    }
+
+    public void Apply(SyntheticPreviewState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        SyntheticPreviewState.Validate(state);
+
+        _state = state;
+        _viewModel.AnimationsEnabled = state.AnimationsEnabled;
+        _hud.SetDetailsOpen(state.DetailsOpen);
+        if (state.EdgeSide == EdgeDockSide.None)
+        {
+            _hud.ForceExpanded();
+        }
+        else
+        {
+            _hud.PreviewEdge(state.EdgeSide);
+        }
+
+        Publish();
+    }
 
     private void Publish() =>
         _controller.Publish(
-            _choice,
-            _fiveHourPercent,
-            _weeklyPercent,
-            _isRefreshing);
+            _state.DisplayChoice,
+            _state.FiveHourPercent,
+            _state.WeeklyPercent,
+            _state.IsRefreshing);
 }

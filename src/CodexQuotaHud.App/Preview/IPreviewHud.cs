@@ -2,7 +2,7 @@ using CodexQuotaHud.App.UI;
 
 namespace CodexQuotaHud.App.Preview;
 
-internal interface IPreviewHud
+public interface IPreviewHud
 {
     bool TryActivateSkinKey(string selectionKey);
 

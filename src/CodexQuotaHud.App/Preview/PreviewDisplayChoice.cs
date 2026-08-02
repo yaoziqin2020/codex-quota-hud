@@ -1,6 +1,6 @@
 namespace CodexQuotaHud.App.Preview;
 
-internal enum PreviewDisplayChoice
+public enum PreviewDisplayChoice
 {
     Dual,
     FiveHourOnly,

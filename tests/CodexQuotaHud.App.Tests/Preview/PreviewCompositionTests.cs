@@ -27,6 +27,8 @@ public sealed class PreviewCompositionTests
                 ],
                 composition.HudWindow.SkinController.RegisteredKeys);
             Assert.IsType<InMemorySettingsStore>(composition.SettingsStore);
+            Assert.Same(composition.Session, composition.Synthetic.Session);
+            Assert.Same(composition.HudWindow, composition.Synthetic.HudWindow);
         });
 
     [Fact]

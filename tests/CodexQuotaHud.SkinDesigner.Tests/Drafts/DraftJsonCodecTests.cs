@@ -59,6 +59,37 @@ public sealed class DraftJsonCodecTests
     }
 
     [Theory]
+    [InlineData("assets/background.png", "assets/center.png")]
+    [InlineData("assets/background.png", "assets/center.jpg")]
+    [InlineData("assets/background.jpg", "assets/center.png")]
+    [InlineData("assets/background.jpg", "assets/center.jpg")]
+    public void ValidateWriteParseWrite_AcceptsCanonicalPngJpgPathMatrix(
+        string backgroundPath,
+        string centerPath)
+    {
+        var draft = WithImagePaths(
+            ValidDraft(),
+            backgroundPath,
+            centerPath);
+
+        var validation = SkinDraftValidator.Validate(draft);
+        Assert.True(validation.IsValid, string.Join("; ", validation.Errors));
+
+        var firstBytes = DraftJsonCodec.Write(draft);
+        var parsed = DraftJsonCodec.Parse(firstBytes);
+
+        Assert.True(parsed.IsValid, string.Join("; ", parsed.Errors));
+        var parsedDraft = Assert.IsType<SkinDraftDocument>(parsed.Value);
+        Assert.Equal(
+            backgroundPath,
+            parsedDraft.Assets[SkinAssetSlot.Background].RelativePath);
+        Assert.Equal(
+            centerPath,
+            parsedDraft.Assets[SkinAssetSlot.Center].RelativePath);
+        Assert.Equal(firstBytes, DraftJsonCodec.Write(parsedDraft));
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(2)]
     public void Parse_RejectsUnsupportedDraftSchemaAtExactLocation(int schema)
@@ -239,11 +270,28 @@ public sealed class DraftJsonCodecTests
     [InlineData(0, "C:/outside.png")]
     [InlineData(0, "assets/../background.png")]
     [InlineData(0, "assets/background.gif")]
-    [InlineData(0, "assets/background.jpg")]
+    [InlineData(0, "assets/background.webp")]
+    [InlineData(0, "assets/Background.png")]
+    [InlineData(0, "assets/background.PNG")]
     [InlineData(1, "assets/background.png")]
-    [InlineData(1, "assets/center.png")]
+    [InlineData(1, "assets/background.jpg")]
+    [InlineData(1, "assets/Center.png")]
+    [InlineData(1, "assets/center.JPG")]
     [InlineData(2, "assets/decoration.jpg")]
+    [InlineData(2, "assets/Decoration.png")]
     public void Parse_RejectsAbsoluteTraversalUnsupportedOrWrongSlotPaths(
+        int assetIndex,
+        string path) =>
+        AssertError(
+            DraftJsonCodec.Parse(Mutate(root =>
+                root["assets"]!.AsArray()[assetIndex]!["relativePath"] = path)),
+            "draft.asset.path.invalid",
+            $"$.assets[{assetIndex}].relativePath");
+
+    [Theory]
+    [InlineData(0, "assets/background.jpeg")]
+    [InlineData(1, "assets/center.jpeg")]
+    public void Parse_RejectsJpegExtensionWithoutImportNormalization(
         int assetIndex,
         string path) =>
         AssertError(
@@ -434,6 +482,25 @@ public sealed class DraftJsonCodecTests
             }),
             UpdatedAtUtc = created.AddMinutes(1)
         };
+    }
+
+    private static SkinDraftDocument WithImagePaths(
+        SkinDraftDocument draft,
+        string backgroundPath,
+        string centerPath)
+    {
+        var assets = draft.Assets.ToDictionary(pair => pair.Key, pair => pair.Value);
+        assets[SkinAssetSlot.Background] = assets[SkinAssetSlot.Background] with
+        {
+            RelativePath = backgroundPath,
+            OriginalFileName = Path.GetFileName(backgroundPath)
+        };
+        assets[SkinAssetSlot.Center] = assets[SkinAssetSlot.Center] with
+        {
+            RelativePath = centerPath,
+            OriginalFileName = Path.GetFileName(centerPath)
+        };
+        return draft with { Assets = ReadOnly(assets) };
     }
 
     private static byte[] Mutate(Action<JsonObject> mutation)

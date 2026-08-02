@@ -26,6 +26,7 @@ public sealed record SettingsLoadResult(
 
 public sealed class SettingsStore : ISettingsStore
 {
+    private static readonly object DefaultPathSync = new();
     private static readonly ConcurrentDictionary<string, SaveLockEntry> SaveLocks =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -37,14 +38,14 @@ public sealed class SettingsStore : ISettingsStore
     private readonly string _saveLockKey;
     private readonly Func<string, bool> _selectionExists;
     private readonly Action? _beforeAtomicCommit;
+    private static string? _defaultPathOverrideForTests;
+    private static int _defaultConstructorCountForTests;
+    private static int _defaultPathOverrideOwnerThreadId;
 
     internal static int ActiveSaveLockCount => SaveLocks.Count;
 
     public SettingsStore()
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CodexQuotaHud",
-            "settings.json"))
+        : this(ResolveDefaultSettingsPath())
     {
     }
 
@@ -68,6 +69,26 @@ public sealed class SettingsStore : ISettingsStore
     }
 
     public string SettingsPath { get; }
+
+    internal static DefaultPathOverrideScope OverrideDefaultPathForTests(
+        string settingsPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingsPath);
+        var fullPath = Path.GetFullPath(settingsPath);
+        Monitor.Enter(DefaultPathSync);
+        if (_defaultPathOverrideForTests is not null)
+        {
+            Monitor.Exit(DefaultPathSync);
+            throw new InvalidOperationException(
+                "A default settings path override is already active.");
+        }
+
+        _defaultPathOverrideForTests = fullPath;
+        _defaultConstructorCountForTests = 0;
+        _defaultPathOverrideOwnerThreadId = Environment.CurrentManagedThreadId;
+        return new DefaultPathOverrideScope(
+            _defaultPathOverrideOwnerThreadId);
+    }
 
     public AppSettings Load() => LoadWithMigration().Settings;
 
@@ -189,6 +210,24 @@ public sealed class SettingsStore : ISettingsStore
 
             commit();
         }
+    }
+
+    private static string ResolveDefaultSettingsPath()
+    {
+        lock (DefaultPathSync)
+        {
+            if (_defaultPathOverrideForTests is { } overridePath)
+            {
+                _defaultConstructorCountForTests++;
+                return overridePath;
+            }
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData),
+            "CodexQuotaHud",
+            "settings.json");
     }
 
     private static double? ReadNullableDouble(JsonElement root, string propertyName)
@@ -401,6 +440,65 @@ public sealed class SettingsStore : ISettingsStore
             finally
             {
                 ReleaseSaveLockReference(_path, entry);
+            }
+        }
+    }
+
+    internal sealed class DefaultPathOverrideScope : IDisposable
+    {
+        private readonly int _ownerThreadId;
+        private int _disposed;
+
+        internal DefaultPathOverrideScope(int ownerThreadId)
+        {
+            _ownerThreadId = ownerThreadId;
+        }
+
+        internal int ConstructionCount
+        {
+            get
+            {
+                ThrowIfUnavailable();
+                return _defaultConstructorCountForTests;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                return;
+            }
+
+            if (Environment.CurrentManagedThreadId != _ownerThreadId)
+            {
+                throw new InvalidOperationException(
+                    "The default settings path override must be disposed " +
+                    "on the thread that created it.");
+            }
+
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            _defaultPathOverrideForTests = null;
+            _defaultConstructorCountForTests = 0;
+            _defaultPathOverrideOwnerThreadId = 0;
+            Monitor.Exit(DefaultPathSync);
+        }
+
+        private void ThrowIfUnavailable()
+        {
+            ObjectDisposedException.ThrowIf(
+                Volatile.Read(ref _disposed) != 0,
+                this);
+            if (Environment.CurrentManagedThreadId != _ownerThreadId ||
+                _defaultPathOverrideOwnerThreadId != _ownerThreadId)
+            {
+                throw new InvalidOperationException(
+                    "The default settings path override is owned by another " +
+                    "thread.");
             }
         }
     }

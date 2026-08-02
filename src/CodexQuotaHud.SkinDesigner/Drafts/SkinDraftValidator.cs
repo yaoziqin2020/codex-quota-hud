@@ -257,8 +257,10 @@ public static class SkinDraftValidator
         SkinAssetSlot slot,
         string? path) => slot switch
         {
-            SkinAssetSlot.Background => path is "assets/background.png",
-            SkinAssetSlot.Center => path is "assets/center.jpg",
+            SkinAssetSlot.Background => path is
+                "assets/background.png" or "assets/background.jpg",
+            SkinAssetSlot.Center => path is
+                "assets/center.png" or "assets/center.jpg",
             SkinAssetSlot.Decoration => path is "assets/decoration.png",
             _ => false
         };

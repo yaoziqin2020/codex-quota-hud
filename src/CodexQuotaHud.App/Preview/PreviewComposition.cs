@@ -1,10 +1,7 @@
-using System.ComponentModel;
 using System.Windows.Threading;
-using CodexQuotaHud.App.UI;
 using CodexQuotaHud.App.Infrastructure;
+using CodexQuotaHud.App.UI;
 using CodexQuotaHud.App.UI.Skins;
-using CodexQuotaHud.Core.Settings;
-using CodexQuotaHud.Skins.Templates;
 
 namespace CodexQuotaHud.App.Preview;
 
@@ -29,29 +26,16 @@ internal sealed class PreviewComposition : IDisposable
         _requestExit = requestExit ?? throw new ArgumentNullException(
             nameof(requestExit));
 
-        Catalog = HudSkinCatalog.CreateBuiltInOnly();
-        SkinController = new SkinController(
-            Catalog,
-            SkinTemplateRegistry.CreateDefault());
-        SettingsStore = new InMemorySettingsStore(new AppSettings());
-        RefreshController = new PreviewQuotaRefreshController();
-        ViewModel = new QuotaOrbViewModel(
-            RefreshController,
-            SettingsStore,
-            SettingsStore.Load(),
-            new WpfUiDispatcher(dispatcher),
+        Synthetic = new SyntheticPreviewComposition(
+            dispatcher,
             requestExit,
-            key => Catalog.TryGet(key, out _));
-        HudWindow = new QuotaOrbWindow(ViewModel, SkinController);
+            templates: null,
+            usePhysicalWorkArea: true);
         Tray = new TrayController(
             ViewModel,
             Catalog,
             SkinController,
             HudWindow.TryActivateSkinKey);
-        Session = new PreviewSession(
-            RefreshController,
-            ViewModel,
-            HudWindow);
         WindowStateStore = new PreviewWindowStateStore();
         InstalledAppLauncher = installedAppLauncher ??
             throw new ArgumentNullException(nameof(installedAppLauncher));
@@ -61,17 +45,18 @@ internal sealed class PreviewComposition : IDisposable
             WindowStateStore);
         ControlWindow.ExitRequested += OnExitRequested;
         ControlWindow.OpenInstalledRequested += OnOpenInstalledRequested;
-        HudWindow.Closing += OnHudClosing;
     }
 
-    internal InMemorySettingsStore SettingsStore { get; }
-    internal HudSkinCatalog Catalog { get; }
-    internal SkinController SkinController { get; }
-    internal PreviewQuotaRefreshController RefreshController { get; }
-    internal QuotaOrbViewModel ViewModel { get; }
-    internal QuotaOrbWindow HudWindow { get; }
+    internal SyntheticPreviewComposition Synthetic { get; }
+    internal InMemorySettingsStore SettingsStore => Synthetic.SettingsStore;
+    internal HudSkinCatalog Catalog => Synthetic.Catalog;
+    internal SkinController SkinController => Synthetic.SkinController;
+    internal PreviewQuotaRefreshController RefreshController =>
+        Synthetic.RefreshController;
+    internal QuotaOrbViewModel ViewModel => Synthetic.ViewModel;
+    internal QuotaOrbWindow HudWindow => Synthetic.HudWindow;
     internal TrayController Tray { get; }
-    internal PreviewSession Session { get; }
+    internal PreviewSession Session => Synthetic.Session;
     internal PreviewControlWindow ControlWindow { get; }
     internal InstalledAppLauncher InstalledAppLauncher { get; }
     internal PreviewWindowStateStore WindowStateStore { get; }
@@ -82,10 +67,7 @@ internal sealed class PreviewComposition : IDisposable
         ObjectDisposedException.ThrowIf(
             Volatile.Read(ref _disposed) != 0,
             this);
-        if (!HudWindow.IsVisible && ViewModel.IsVisible)
-        {
-            HudWindow.Show();
-        }
+        Synthetic.ShowHud();
         ControlWindow.Show();
     }
 
@@ -98,11 +80,9 @@ internal sealed class PreviewComposition : IDisposable
 
         ControlWindow.ExitRequested -= OnExitRequested;
         ControlWindow.OpenInstalledRequested -= OnOpenInstalledRequested;
-        HudWindow.Closing -= OnHudClosing;
         ControlWindow.Close();
         Tray.Dispose();
-        HudWindow.CloseForExit();
-        ViewModel.Dispose();
+        Synthetic.Dispose();
     }
 
     private void OnExitRequested(object? sender, EventArgs e)
@@ -121,11 +101,4 @@ internal sealed class PreviewComposition : IDisposable
         }
     }
 
-    private void OnHudClosing(object? sender, CancelEventArgs e)
-    {
-        if (Volatile.Read(ref _disposed) == 0)
-        {
-            _requestExit();
-        }
-    }
 }

@@ -1679,8 +1679,9 @@ public sealed record SkinDraftDocument(
 
 Round-trip a document with all three assets and assert canonical bytes are
 stable across parse/write. The draft JSON embeds Task 2's canonical theme JSON;
-asset paths are only `assets/background.png`, `assets/center.jpg`, and
-`assets/decoration.png`.
+asset paths are only `assets/background.png|jpg`, `assets/center.png|jpg`, and
+`assets/decoration.png`. Draft-owned JPEG inputs are canonicalized to `.jpg`;
+strict draft JSON rejects `.jpeg` rather than silently rewriting it.
 
 Reject draft schema `0/2`, unknown/duplicate properties, missing fields,
 non-canonical GUID/version/time text, negative revision, non-UTC timestamps,
