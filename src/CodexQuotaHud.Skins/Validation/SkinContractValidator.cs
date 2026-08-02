@@ -330,14 +330,6 @@ public static class SkinContractValidator
             }
         }
 
-        if (seenSlots.Count != Enum.GetValues<SkinAssetSlot>().Length)
-        {
-            Add(
-                errors,
-                "asset.missing-slot",
-                "$.assets",
-                "Each schema-v1 asset slot must be declared exactly once.");
-        }
     }
 
     private static bool IsValidAssetPath(

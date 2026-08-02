@@ -254,6 +254,33 @@ public sealed class SkinJsonCodecTests
         Assert.Equal(themeBytes, SkinJsonCodec.WriteTheme(reparsedTheme));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    public void ManifestWriter_RoundTripsEveryOptionalAssetSubsetCanonically(
+        int includedSlotMask)
+    {
+        var manifest = AssertValid(
+            SkinJsonCodec.ParseManifest(Utf8(ValidManifestJson)));
+        var optionalAssets = manifest.Assets
+            .Where(asset =>
+                (includedSlotMask & (1 << (int)asset.Slot)) != 0)
+            .ToArray();
+        manifest = manifest with { Assets = optionalAssets };
+
+        var firstWrite = SkinJsonCodec.WriteManifest(manifest);
+        var reparsed = AssertValid(SkinJsonCodec.ParseManifest(firstWrite));
+        var secondWrite = SkinJsonCodec.WriteManifest(reparsed);
+
+        Assert.Equal(optionalAssets, reparsed.Assets);
+        Assert.Equal(firstWrite, secondWrite);
+    }
+
     private static readonly string CanonicalManifestJson = """
         {
           "schemaVersion": 1,

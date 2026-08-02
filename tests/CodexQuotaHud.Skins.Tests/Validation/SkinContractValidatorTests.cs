@@ -138,8 +138,24 @@ public sealed class SkinContractValidatorTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(OptionalAssetSubsets))]
+    public void Validate_AcceptsEveryOptionalAssetSubset(
+        SkinAssetSlot[] includedSlots)
+    {
+        var assets = ValidManifest().Assets
+            .Where(asset => includedSlots.Contains(asset.Slot))
+            .ToArray();
+
+        var result = Validate(
+            manifest: ValidManifest() with { Assets = assets });
+
+        Assert.True(result.IsValid, string.Join("; ", result.Errors));
+        Assert.Equal(assets, result.Value.Manifest.Assets);
+    }
+
     [Fact]
-    public void Validate_RejectsDuplicateAndMissingAssetSlots()
+    public void Validate_RejectsDuplicateAssetSlots()
     {
         var duplicate = ValidManifest() with
         {
@@ -152,21 +168,10 @@ public sealed class SkinContractValidatorTests
                     new string('d', 64))
             ]
         };
-        var missing = ValidManifest() with
-        {
-            Assets = ValidManifest().Assets
-                .Where(asset => asset.Slot != SkinAssetSlot.Center)
-                .ToArray()
-        };
-
         AssertError(
             Validate(manifest: duplicate),
             "asset.duplicate-slot",
             "$.assets[3].slot");
-        AssertError(
-            Validate(manifest: missing),
-            "asset.missing-slot",
-            "$.assets");
     }
 
     [Theory]
@@ -319,6 +324,17 @@ public sealed class SkinContractValidatorTests
         yield return ["displayName", string.Concat(Enumerable.Repeat("😀", 80)), string.Concat(Enumerable.Repeat("😀", 81))];
         yield return ["author", string.Concat(Enumerable.Repeat("🎨", 80)), string.Concat(Enumerable.Repeat("🎨", 81))];
         yield return ["description", string.Concat(Enumerable.Repeat("🚀", 500)), string.Concat(Enumerable.Repeat("🚀", 501))];
+    }
+
+    public static IEnumerable<object[]> OptionalAssetSubsets()
+    {
+        yield return [Array.Empty<SkinAssetSlot>()];
+        yield return [new[] { SkinAssetSlot.Background }];
+        yield return [new[] { SkinAssetSlot.Center }];
+        yield return [new[] { SkinAssetSlot.Decoration }];
+        yield return [new[] { SkinAssetSlot.Background, SkinAssetSlot.Center }];
+        yield return [new[] { SkinAssetSlot.Background, SkinAssetSlot.Decoration }];
+        yield return [new[] { SkinAssetSlot.Center, SkinAssetSlot.Decoration }];
     }
 
     public static IEnumerable<object[]> TransformBoundaryCases()
