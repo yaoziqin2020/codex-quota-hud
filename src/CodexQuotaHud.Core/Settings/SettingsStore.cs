@@ -12,6 +12,11 @@ public interface ISettingsStore
     void Save(AppSettings settings);
 }
 
+public sealed record SettingsLoadResult(
+    AppSettings Settings,
+    bool RequiresWriteBack,
+    string? SelectionErrorCode);
+
 public sealed class SettingsStore : ISettingsStore
 {
     private static readonly ConcurrentDictionary<string, SaveLockEntry> SaveLocks =
@@ -23,6 +28,7 @@ public sealed class SettingsStore : ISettingsStore
     };
 
     private readonly string _saveLockKey;
+    private readonly Func<string, bool> _selectionExists;
 
     internal static int ActiveSaveLockCount => SaveLocks.Count;
 
@@ -34,20 +40,25 @@ public sealed class SettingsStore : ISettingsStore
     {
     }
 
-    public SettingsStore(string settingsPath)
+    public SettingsStore(
+        string settingsPath,
+        Func<string, bool>? selectionExists = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsPath);
         SettingsPath = settingsPath;
         _saveLockKey = Path.GetFullPath(settingsPath);
+        _selectionExists = selectionExists ?? DefaultSelectionExists;
     }
 
     public string SettingsPath { get; }
 
-    public AppSettings Load()
+    public AppSettings Load() => LoadWithMigration().Settings;
+
+    public SettingsLoadResult LoadWithMigration()
     {
         if (!File.Exists(SettingsPath))
         {
-            return new AppSettings();
+            return DefaultLoadResult();
         }
 
         try
@@ -60,26 +71,31 @@ public sealed class SettingsStore : ISettingsStore
             using var document = JsonDocument.Parse(stream);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                return new AppSettings();
+                return DefaultLoadResult();
             }
 
             var root = document.RootElement;
-            return new AppSettings(
+            var selection = ReadSelection(root);
+            var settings = new AppSettings(
                 Left: ReadNullableDouble(root, nameof(AppSettings.Left)),
                 Top: ReadNullableDouble(root, nameof(AppSettings.Top)),
                 AnimationsEnabled: ReadBoolean(
                     root,
                     nameof(AppSettings.AnimationsEnabled),
                     defaultValue: true),
-                SelectedSkin: ReadSkin(root),
+                SelectedSkinKey: selection.Key,
                 LastSuccessfulRefresh: ReadTimestamp(
                     root,
                     nameof(AppSettings.LastSuccessfulRefresh)));
+            return new SettingsLoadResult(
+                settings,
+                selection.RequiresWriteBack,
+                selection.ErrorCode);
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or JsonException)
         {
-            return new AppSettings();
+            return DefaultLoadResult();
         }
     }
 
@@ -151,11 +167,40 @@ public sealed class SettingsStore : ISettingsStore
         };
     }
 
-    private static SkinId ReadSkin(JsonElement root)
+    private SelectionReadResult ReadSelection(JsonElement root)
+    {
+        var hasSelectedSkinKey = root.TryGetProperty(
+            nameof(AppSettings.SelectedSkinKey),
+            out var selectedSkinKey);
+        if (hasSelectedSkinKey &&
+            selectedSkinKey.ValueKind == JsonValueKind.String)
+        {
+            var key = selectedSkinKey.GetString();
+            if (key is not null &&
+                SkinSelectionKey.IsSyntacticallyValid(key) &&
+                _selectionExists(key))
+            {
+                return new SelectionReadResult(
+                    key,
+                    RequiresWriteBack: false,
+                    ErrorCode: null);
+            }
+        }
+
+        var legacyKey = ReadLegacySkin(root) is { } legacySkin
+            ? SkinSelectionKey.FromBuiltIn(legacySkin)
+            : SkinSelectionKey.HudDial;
+        return new SelectionReadResult(
+            legacyKey,
+            RequiresWriteBack: true,
+            ErrorCode: hasSelectedSkinKey ? "skin.selection.invalid" : null);
+    }
+
+    private static SkinId? ReadLegacySkin(JsonElement root)
     {
         if (!root.TryGetProperty(nameof(AppSettings.SelectedSkin), out var value))
         {
-            return SkinId.HudDial;
+            return null;
         }
 
         if (value.ValueKind == JsonValueKind.String &&
@@ -172,8 +217,14 @@ public sealed class SettingsStore : ISettingsStore
             return (SkinId)numericSkin;
         }
 
-        return SkinId.HudDial;
+        return null;
     }
+
+    private static bool DefaultSelectionExists(string key) =>
+        SkinSelectionKey.TryGetBuiltIn(key, out _);
+
+    private static SettingsLoadResult DefaultLoadResult() =>
+        new(new AppSettings(), RequiresWriteBack: false, SelectionErrorCode: null);
 
     private static DateTimeOffset? ReadTimestamp(JsonElement root, string propertyName)
     {
@@ -255,6 +306,11 @@ public sealed class SettingsStore : ISettingsStore
 
         public bool IsRetired { get; set; }
     }
+
+    private sealed record SelectionReadResult(
+        string Key,
+        bool RequiresWriteBack,
+        string? ErrorCode);
 
     private sealed class SaveLockLease : IDisposable
     {

@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Diagnostics;
 using System.IO;
+using System.Security;
 using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.App.UI;
@@ -88,7 +89,7 @@ public partial class App : System.Windows.Application
                     () => Dispatcher.BeginInvoke(RequestExit));
             }
             var settingsStore = new SettingsStore();
-            var settings = settingsStore.Load();
+            var settings = LoadSettingsForStartup(settingsStore);
             _processMonitor = new CodexProcessMonitor();
             _quotaClient = new RestartableQuotaClient();
             _refreshService = new QuotaRefreshService(
@@ -179,6 +180,28 @@ public partial class App : System.Windows.Application
 
     internal static bool ShouldRegisterStartup(IReadOnlyList<string> arguments) =>
         IsInteractiveLaunch(arguments) && !IsPreviewLaunch(arguments);
+
+    internal static AppSettings LoadSettingsForStartup(SettingsStore settingsStore)
+    {
+        ArgumentNullException.ThrowIfNull(settingsStore);
+        var loadResult = settingsStore.LoadWithMigration();
+        if (loadResult.RequiresWriteBack)
+        {
+            try
+            {
+                settingsStore.Save(loadResult.Settings);
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException or SecurityException)
+            {
+                Trace.TraceWarning(
+                    "Could not persist settings migration: {0}",
+                    exception);
+            }
+        }
+
+        return loadResult.Settings;
+    }
 
     internal static bool ShouldStartInstalledShutdownListener(
         string? currentExecutablePath,

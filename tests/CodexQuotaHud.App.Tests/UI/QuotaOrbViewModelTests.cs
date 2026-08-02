@@ -111,7 +111,27 @@ public sealed class QuotaOrbViewModelTests : IDisposable
         viewModel.SelectSkinCommand.Execute(SkinId.LiquidTank);
 
         Assert.Equal(SkinId.LiquidTank, viewModel.SelectedSkin);
-        Assert.Equal(SkinId.LiquidTank, store.Load().SelectedSkin);
+        Assert.Equal(SkinSelectionKey.LiquidTank, store.Load().SelectedSkinKey);
+    }
+
+    [Fact]
+    public void SelectedSkin_ProjectsBuiltInKeyAndSetterPersistsExactStringKey()
+    {
+        var source = new FakeRefreshController();
+        var store = CreateStore();
+        var settings = new AppSettings(SelectedSkinKey: SkinSelectionKey.EnergyRing);
+        using var viewModel = new QuotaOrbViewModel(
+            source,
+            store,
+            settings,
+            new QueuedDispatcher(checkAccess: true),
+            () => { });
+
+        Assert.Equal(SkinId.EnergyRing, viewModel.SelectedSkin);
+
+        viewModel.SelectedSkin = SkinId.Aurora;
+
+        Assert.Equal(SkinSelectionKey.Aurora, store.Load().SelectedSkinKey);
     }
 
     [Fact]

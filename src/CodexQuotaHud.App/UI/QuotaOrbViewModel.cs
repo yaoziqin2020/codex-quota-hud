@@ -227,15 +227,25 @@ public sealed class QuotaOrbViewModel :
 
     public SkinId SelectedSkin
     {
-        get => _settings.SelectedSkin;
+        get => SkinSelectionKey.TryGetBuiltIn(
+            _settings.SelectedSkinKey,
+            out var skin)
+            ? skin
+            : SkinId.HudDial;
         set
         {
-            if (!Enum.IsDefined(value) || _settings.SelectedSkin == value)
+            if (!Enum.IsDefined(value))
             {
                 return;
             }
 
-            SaveSettings(_settings with { SelectedSkin = value });
+            var selectionKey = SkinSelectionKey.FromBuiltIn(value);
+            if (_settings.SelectedSkinKey == selectionKey)
+            {
+                return;
+            }
+
+            SaveSettings(_settings with { SelectedSkinKey = selectionKey });
             OnPropertyChanged();
         }
     }

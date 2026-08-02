@@ -15,6 +15,57 @@ namespace CodexQuotaHud.App.Tests.UI;
 [Collection(WpfUiCollection.Name)]
 public sealed class QuotaOrbWindowStartupTests
 {
+    [Fact]
+    public void StartupMigration_WhenSaveFails_ContinuesWithMigratedSettings()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"CodexQuotaHud-StartupMigration-{Guid.NewGuid():N}");
+        var settingsPath = Path.Combine(directory, "settings.json");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            settingsPath,
+            """
+            {
+              "Left": 12.5,
+              "Top": 34.5,
+              "AnimationsEnabled": false,
+              "SelectedSkin": "Aurora",
+              "LastSuccessfulRefresh": "2026-08-02T01:02:03+09:00"
+            }
+            """);
+
+        try
+        {
+            var store = new SettingsStore(settingsPath);
+            using var lockedTarget = new FileStream(
+                settingsPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
+
+            AppSettings? settings = null;
+            var exception = Record.Exception(
+                () => settings = global::CodexQuotaHud.App.App
+                    .LoadSettingsForStartup(store));
+
+            Assert.Null(exception);
+            Assert.NotNull(settings);
+            Assert.Equal(SkinSelectionKey.Aurora, settings.SelectedSkinKey);
+            Assert.Equal(12.5, settings.Left);
+            Assert.Equal(34.5, settings.Top);
+            Assert.False(settings.AnimationsEnabled);
+            Assert.Equal(
+                DateTimeOffset.Parse("2026-08-02T01:02:03+09:00"),
+                settings.LastSuccessfulRefresh);
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]
@@ -245,7 +296,7 @@ public sealed class QuotaOrbWindowStartupTests
             using var viewModel = new QuotaOrbViewModel(
                 refresh,
                 new InMemorySettingsStore(),
-                new AppSettings { SelectedSkin = SkinId.Aurora },
+                new AppSettings(SelectedSkinKey: SkinSelectionKey.Aurora),
                 new InlineDispatcher(),
                 () => { });
             var window = new QuotaOrbWindow(viewModel);
@@ -304,7 +355,7 @@ public sealed class QuotaOrbWindowStartupTests
             using var viewModel = new QuotaOrbViewModel(
                 refresh,
                 new InMemorySettingsStore(),
-                new AppSettings { SelectedSkin = SkinId.LiquidTank },
+                new AppSettings(SelectedSkinKey: SkinSelectionKey.LiquidTank),
                 new InlineDispatcher(),
                 () => { });
             var window = new QuotaOrbWindow(viewModel);
@@ -350,7 +401,7 @@ public sealed class QuotaOrbWindowStartupTests
             using var viewModel = new QuotaOrbViewModel(
                 new InertRefreshController(),
                 new InMemorySettingsStore(),
-                new AppSettings { SelectedSkin = SkinId.EnergyRing },
+                new AppSettings(SelectedSkinKey: SkinSelectionKey.EnergyRing),
                 new InlineDispatcher(),
                 () => { });
             var window = new QuotaOrbWindow(viewModel);
