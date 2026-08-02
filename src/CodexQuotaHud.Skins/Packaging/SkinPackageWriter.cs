@@ -13,19 +13,43 @@ public sealed class SkinPackageWriter
         new(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     private readonly Action<string, string, bool> _finalMove;
+    private readonly Action<string> _deleteTemporary;
 
     public SkinPackageWriter()
-        : this(static (source, destination, overwrite) =>
-            File.Move(source, destination, overwrite))
+        : this(
+            static (source, destination, overwrite) =>
+                File.Move(source, destination, overwrite),
+            static path => File.Delete(path))
     {
     }
 
-    public SkinPackageWriter(Action<string, string, bool> finalMove)
+    internal SkinPackageWriter(Action<string, string, bool> finalMove)
+        : this(finalMove, static path => File.Delete(path))
+    {
+    }
+
+    internal SkinPackageWriter(
+        Action<string, string, bool> finalMove,
+        Action<string> deleteTemporary)
     {
         ArgumentNullException.ThrowIfNull(finalMove);
+        ArgumentNullException.ThrowIfNull(deleteTemporary);
         _finalMove = finalMove;
+        _deleteTemporary = deleteTemporary;
     }
 
+    /// <summary>
+    /// Builds a complete skin package and writes it to a seekable destination.
+    /// </summary>
+    /// <remarks>
+    /// Validation, archive construction, and cancellation checks complete in
+    /// an internal staging buffer before this method changes
+    /// <paramref name="destination"/>. Once the final stream copy begins,
+    /// arbitrary <see cref="Stream"/> implementations provide no atomic
+    /// rollback; a destination I/O exception can therefore leave that stream
+    /// partially written. Use <see cref="WriteFile"/> when an atomic file
+    /// replacement boundary is required.
+    /// </remarks>
     public SkinManifest Write(
         Stream destination,
         SkinPackageBuildRequest request,
@@ -33,7 +57,8 @@ public sealed class SkinPackageWriter
     {
         ArgumentNullException.ThrowIfNull(destination);
         var package = Prepare(request, cancellationToken);
-        WriteArchive(destination, package, cancellationToken);
+        var archiveBytes = BuildArchive(package, cancellationToken);
+        CommitToStream(destination, archiveBytes, cancellationToken);
         return package.Manifest;
     }
 
@@ -68,9 +93,11 @@ public sealed class SkinPackageWriter
         }
 
         var package = Prepare(request, cancellationToken);
+        var archiveBytes = BuildArchive(package, cancellationToken);
         var temporaryPath = Path.Combine(
             parentPath,
             $"{Path.GetFileName(targetPath)}.{Guid.NewGuid():N}.tmp");
+        Exception? primaryFailure = null;
         try
         {
             using (var temporary = new FileStream(
@@ -79,7 +106,9 @@ public sealed class SkinPackageWriter
                        FileAccess.ReadWrite,
                        FileShare.None))
             {
-                WriteArchive(temporary, package, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                temporary.Write(archiveBytes);
+                cancellationToken.ThrowIfCancellationRequested();
                 temporary.Flush(flushToDisk: true);
             }
 
@@ -109,12 +138,14 @@ public sealed class SkinPackageWriter
                 package.Manifest,
                 []);
         }
+        catch (Exception exception)
+        {
+            primaryFailure = exception;
+            throw;
+        }
         finally
         {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
+            CleanupTemporary(temporaryPath, primaryFailure);
         }
     }
 
@@ -226,6 +257,36 @@ public sealed class SkinPackageWriter
         return $"{SkinPackageLimits.AssetsDirectoryName}{fileName}{extension}";
     }
 
+    private static byte[] BuildArchive(
+        PreparedPackage package,
+        CancellationToken cancellationToken)
+    {
+        using var staging = new MemoryStream();
+        WriteArchive(staging, package, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return staging.ToArray();
+    }
+
+    private static void CommitToStream(
+        Stream destination,
+        byte[] archiveBytes,
+        CancellationToken cancellationToken)
+    {
+        var canWrite = destination.CanWrite;
+        var canSeek = destination.CanSeek;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!canWrite || !canSeek)
+        {
+            throw new ArgumentException(
+                "The destination stream must be writable and seekable.",
+                nameof(destination));
+        }
+
+        destination.Position = 0;
+        destination.SetLength(0);
+        destination.Write(archiveBytes);
+    }
+
     private static void WriteArchive(
         Stream destination,
         PreparedPackage package,
@@ -270,6 +331,30 @@ public sealed class SkinPackageWriter
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private void CleanupTemporary(
+        string temporaryPath,
+        Exception? primaryFailure)
+    {
+        if (!File.Exists(temporaryPath))
+        {
+            return;
+        }
+
+        try
+        {
+            _deleteTemporary(temporaryPath);
+        }
+        catch (Exception) when (primaryFailure is not null)
+        {
+        }
+        catch (Exception exception)
+        {
+            throw new IOException(
+                "The temporary skin package could not be deleted.",
+                exception);
+        }
     }
 
     private static void WriteEntry(
