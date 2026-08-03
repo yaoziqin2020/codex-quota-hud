@@ -1,5 +1,51 @@
 # AI Change Log
 
+## 2026-08-03 — Unreleased optional Skin Designer automated handoff
+
+- Added the unreleased shared `CodexQuotaHud.Skins` contracts, strict
+  data-only `.cqskin` validation/packaging/storage/runtime path, normal-HUD
+  import and rendering, and the separate `CodexQuotaHud.SkinDesigner` process
+  with isolated drafts/recovery, synthetic preview, apply, and export flows.
+  The unreleased Setup definition keeps Designer visible but unchecked by
+  default, adds only a Start-menu entry when selected, preserves all user data
+  on component removal, and keeps the fallback ZIP normal-HUD-only.
+- Verified source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` after a
+  forced canonical restore. Fresh per-project evidence was Core `75/75`, Skins
+  `325/325`, App/UI `590/590`, and Designer `334/334`. Two trustworthy
+  full-solution reruns passed `1324/1324` with `0` skipped; the final run was
+  independently counted from four external TRX files. Release build completed
+  with `0` warnings and `0` errors, and `git diff --check` passed.
+- Preserved an unresolved earlier full-solution failure at the same commit:
+  `SkinPackageInstallerTests.Remove_DeletesExactlyOneCanonicalCustomDirectoryAndPreservesSiblings`
+  failed `Assert.True(result.IsValid)`, giving `1323` passed / `1` failed. Its
+  original assertion did not expose `result.Errors`. Exact, class, Skins,
+  eight-testhost parallel, cross-project, and 1000-operation stress evidence
+  did not reproduce it, so no root cause or source fix is claimed. Two later
+  no-test batches caused by a diagnostic restore polluting ignored Skins
+  `obj` assets were explicitly excluded and the generated assets were repaired
+  before the trustworthy TRX run.
+- The three exact security/rollback filters passed Skins `223/223`, App
+  `224/224`, and Designer `116/116`, all with `0` failed and `0` skipped.
+- Built one real, internal-only `0.0.0` candidate without running Setup. Its
+  ephemeral hashes were Setup
+  `df89250dc2b68fa198196d48c6e2344efe4196c94c34f354728b2b66cc30cc8c`,
+  normal-only ZIP
+  `ca3ab3959633b241d2b4f709e2111a5e8e69cdfa64437f412df86933dea5d33d`,
+  and checksum file
+  `2db5e0053df13bedab36fec1e0b3de24b383c1b052df0775e20e6107f3a831b3`.
+  The two checksum lines matched, the ZIP had exactly five approved entries
+  and no Designer, and the Setup publish manifest had exactly the normal HUD
+  plus `designer/CodexQuotaHud.SkinDesigner.exe`. Reproduced publish hashes
+  matched the manifest; App, Designer, and Setup were all `NotSigned`.
+- The first temporary manifest proxy failed before ISCC because it used a
+  Windows PowerShell 5.1-incompatible API. That GUID root was checked clean and
+  removed. A new GUID root with a compatible proxy produced the evidence above
+  and was deleted with `ExistsAfter=False`.
+- No GUI, internal/canonical Setup launch, install/uninstall, user-data change,
+  sign-out, restart, version bump, tag, upload, public release, asset
+  replacement, or push was performed. Every manual row remains
+  `NOT RUN`; overall acceptance is `PARTIAL — no release is authorized`.
+
 ## 2026-08-01 — v1.1.1 ordinary-user installer correction
 
 - Restored the approved release boundary: public Setup defaults to current-user

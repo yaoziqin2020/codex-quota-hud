@@ -1,5 +1,59 @@
 # Current Task
 
+## Unreleased optional Skin Designer — PARTIAL
+
+Source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` adds the shared
+custom-skin runtime/import path and a separate optional Skin Designer. It is
+unreleased and is not part of the installed or published `v1.1.1` build.
+
+### Current status
+
+Automated evidence is `PASS with unresolved anomaly`; overall feature
+acceptance is **PARTIAL — no release is authorized**. Two trustworthy current
+full-solution reruns passed Core `75/75`, Skins `325/325`, App/UI `590/590`,
+and Designer `334/334`, for `1324/1324` with `0` skipped. Release build passed
+with `0` warnings and `0` errors. The exact security/rollback suites passed
+Skins `223/223`, App `224/224`, and Designer `116/116`.
+
+One earlier full-solution run at the same commit remains an unresolved anomaly:
+`SkinPackageInstallerTests.Remove_DeletesExactlyOneCanonicalCustomDirectoryAndPreservesSiblings`
+returned an invalid result, producing `1323` passed / `1` failed / `1324`
+total. The assertion did not expose `result.Errors`. The exact test, its class,
+the Skins project, eight parallel testhosts, cross-project load, and 1000 real
+install/remove cycles all passed afterward. No root cause was proved and no
+production or test change is claimed as a fix. Two later batches whose Skins
+generated restore assets had been polluted by a diagnostic restore were
+excluded rather than counted as passes; a forced canonical restore preceded
+the final TRX-backed `1324/1324` run.
+
+An internal-only `0.0.0` package was compiled in a unique system-temp root and
+was never run or installed. It contained exactly Setup, normal-only ZIP, and
+`SHA256SUMS.txt`; the ZIP had exactly five approved entries and no Designer.
+The Setup publish manifest contained exactly the normal HUD executable and
+`designer/CodexQuotaHud.SkinDesigner.exe`. All three executables were
+`NotSigned`, and the temporary root was deleted with a checked absent
+postcondition. These hashes are ephemeral verification evidence, not release
+hashes:
+
+- Setup: `df89250dc2b68fa198196d48c6e2344efe4196c94c34f354728b2b66cc30cc8c`
+- ZIP: `ca3ab3959633b241d2b4f709e2111a5e8e69cdfa64437f412df86933dea5d33d`
+- `SHA256SUMS.txt`: `2db5e0053df13bedab36fec1e0b3de24b383c1b052df0775e20e6107f3a831b3`
+
+### Next continuation point
+
+Continue from the manual matrix in
+`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`. Every
+Designer layout/DPI/image/slot row, simultaneous HUD/Designer and persistence
+row, real Setup add/remove/upgrade/uninstall row, and sign-out/restart row is
+still `NOT RUN`. Before any separately authorized real Setup run, preflight the
+exact candidate version/path/hash, settings and custom-data backup/hash set,
+and rollback route. Manual acceptance still does not authorize a version bump,
+tag, upload, release publication, replacement of `v1.1.1` assets, or push.
+
+If the storage Remove anomaly recurs, first preserve and expose the returned
+error code/location/message and failing temp-root evidence; do not add retries,
+sleeps, broad cleanup, or weaker path assertions without a proved root cause.
+
 ## v1.1.1 — released
 
 The ordinary-user installer correction is published from tag commit `6515e7c`.
@@ -31,13 +85,13 @@ prerelease. Setup, ZIP, and `SHA256SUMS.txt` are uploaded and their online sizes
 and SHA-256 digests match the local release assets. The retained `v1.1.0`
 Release is labeled developer-oriented and directs ordinary users to `v1.1.1`.
 
-## Status
+## v1.1.1 historical status
 
 Version `1.1.1` is released. The implementation is integrated into `main`, tag
 `v1.1.1` is pushed, the GitHub Release and all three assets are public, and the
 published Setup is installed locally. No release action remains.
 
-## Last completed work
+## v1.1.1 historical completed work
 
 - Added low-quota color alerts across the floating HUD's five skins, collapsed
   edge bars, tray percentage icon, and detail rows. Values above `20%` retain
@@ -81,7 +135,7 @@ published Setup is installed locally. No release action remains.
 - Stabilized the asynchronous test wait used by GitHub Windows CI.
 - Verified the latest GitHub CI run succeeded.
 
-## Next continuation point
+## Historical optional v1.1.1 GUI checks
 
 When GUI launch is authorized, use the Developer Preview sliders to inspect
 the `21`, `20`, `11`, `10`, and `0` boundaries, plus dual mixed states, across
@@ -96,8 +150,10 @@ before exactly one installed HUD returns. The installed `v1.1.1` release is
 listener-enabled, so this now exercises graceful signalling rather than the
 legacy fallback. Record tag commit `6515e7c` and the final Setup hash above.
 
-Future work should start from user feedback or the optional GUI checks above;
-do not reopen the completed installer release unless a concrete issue appears.
+These checks belong to the released `v1.1.1` history. They are not the active
+continuation point for the unreleased Designer work; use the Task 18 manual
+matrix linked at the top of this file. Do not reopen the completed installer
+release unless a concrete issue appears.
 
 ## Manual checks for future UI changes
 

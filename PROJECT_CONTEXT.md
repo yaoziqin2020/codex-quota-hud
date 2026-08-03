@@ -41,6 +41,60 @@ their hashes. After public-behavior acceptance, the maintainer machine was
 separately customized to keep only a local Developer Preview desktop shortcut;
 that local convenience is not Setup behavior.
 
+## Unreleased optional Skin Designer source
+
+Source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` contains an
+unreleased custom-skin runtime and separate Skin Designer. This work is not
+part of `v1.1.1`, has not been installed on the maintainer machine, and has no
+public tag, Setup, ZIP, or GitHub Release.
+
+Dependency direction is intentionally one-way:
+
+```text
+CodexQuotaHud.Core
+        ↑
+CodexQuotaHud.Skins ← CodexQuotaHud.App
+        ↑                    ↑
+CodexQuotaHud.SkinDesigner ──┘
+```
+
+`CodexQuotaHud.Skins` owns schema-v1 contracts, strict JSON/archive/image
+validation, deterministic data-only packaging, exact-root installed-skin
+storage, the template registry, and runtime rendering. The normal HUD consumes
+that shared runtime and has no project or assembly dependency on Designer; it
+may discover and launch the optional Designer executable at its exact installed
+path. Designer uses Skins for contracts, validation, storage, packaging, and
+output, and uses App for the existing synthetic Preview/UI composition plus
+typed local-control activation. It has its own mutex and draft/recovery
+lifecycle.
+
+The exact per-user storage boundary is:
+
+- settings root: `%LOCALAPPDATA%\CodexQuotaHud`
+- installed custom skins: `%LOCALAPPDATA%\CodexQuotaHud\skins\<skin-guid>`
+- Designer projects: `%LOCALAPPDATA%\CodexQuotaHud\designer\drafts\<draft-guid>`
+- named and recovery documents: `draft.json` and `recovery.json` inside that
+  exact draft directory
+- bounded import/install operation storage: `%LOCALAPPDATA%\CodexQuotaHud\imports`
+
+The unreleased Setup definition always includes normal HUD import/runtime
+support and exposes **Install Skin Designer / 安装皮肤设计器** as a visible,
+unchecked optional component. Selecting it adds the Designer below
+`%LOCALAPPDATA%\Programs\CodexQuotaHud\designer` and a Start-menu-only entry;
+it adds no Designer desktop shortcut or startup value. Rerun removal preserves
+settings, installed skins, drafts/recovery, and imports. The fallback ZIP stays
+normal-HUD-only and still supports `.cqskin` validation/import/rendering.
+
+Current automated evidence is `PASS with unresolved anomaly`: trustworthy
+full-solution reruns passed `1324/1324`, the Release build reported zero
+warnings/errors, and the three explicit security/rollback filters passed
+`223/223`, `224/224`, and `116/116`. One earlier full run at the same commit
+failed a single exact-directory Remove assertion; isolated, class, project,
+parallel, cross-project, and 1000-operation stress investigation did not
+reproduce it or capture `result.Errors`, so no root cause or source fix is
+claimed. Every GUI, real Setup, sign-out, and restart row remains `NOT RUN`.
+Overall acceptance is `PARTIAL — no release is authorized`.
+
 ## Product behavior
 
 - WPF floating HUD with five animated skins.
@@ -69,8 +123,10 @@ that local convenience is not Setup behavior.
 
 ```text
 src/CodexQuotaHud.Core/       quota models, mapping, refresh state, settings
-src/CodexQuotaHud.App/        WPF UI, skins, tray, app-server integration
-tests/                        Core and Windows UI tests
+src/CodexQuotaHud.Skins/      shared skin contracts, validation, storage, renderer
+src/CodexQuotaHud.App/        WPF UI, skin import/runtime, tray, app-server integration
+src/CodexQuotaHud.SkinDesigner/ separate designer, drafts, preview, apply/export
+tests/                        Core, Skins, App/UI, and Designer tests
 scripts/                      publish, install, uninstall, release packaging
 docs/                         design, verification, screenshots, release notes
 ```
@@ -106,6 +162,13 @@ Do not treat the old conversation worktree under
   total 387/387; build zero warnings and zero errors; four isolated installer
   scenarios and real-machine install/default-uninstall/purge-uninstall checks
   passed.
+- 2026-08-03 unreleased optional Designer evidence at `168bf8b`: current
+  per-project totals Core 75, Skins 325, App/UI 590, Designer 334; two
+  trustworthy full reruns passed 1324/1324 after one unresolved earlier
+  one-test storage failure. Security/rollback filters passed 223, 224, and 116
+  tests; build was zero warnings/errors. Internal `0.0.0` Setup/ZIP inspection
+  passed without installation. Manual/real-Windows acceptance remains NOT RUN,
+  so this is not a release baseline.
 - GitHub Windows CI covers restore, test, build, and self-contained publish.
 - The asynchronous test wait helper is time-based to remain stable on slower
   GitHub Windows runners.
@@ -127,7 +190,8 @@ Do not treat the old conversation worktree under
   timing as regression-sensitive.
 - The developer preview is entered only with `--preview`; it uses synthetic
   in-memory data and must never replace real app-server acceptance.
-- Run focused tests for changed behavior, then the full 388-test suite.
+- Run focused tests for changed behavior, then the current full solution suite;
+  do not reuse the historical `v1.1.1` 388-test count for unreleased source.
 - Use the Developer Preview sliders as the manual boundary and mixed-state
   tool for alert colors; inspect normal (`>20%`), Warning (`>10%..20%`), and
   Critical (`<=10%`) states independently for both quotas.

@@ -67,6 +67,47 @@ application or its release assets.
 若 Setup 不可用，`CodexQuotaHud-v1.1.1-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
 本应用和发布资产均不使用 GitHub Packages。
 
+## Unreleased source status / 未发布源码状态
+
+The current source after public `v1.1.1` adds safe data-only `.cqskin` import
+to the normal HUD, a shared `CodexQuotaHud.Skins` runtime library, and a
+separate Skin Designer application. These changes are **unreleased**: no new
+public Setup, ZIP, tag, GitHub Release, or installed build is claimed here.
+
+当前源码在公开版 `v1.1.1` 之后新增了正式 HUD 的安全 `.cqskin` 导入、共享的
+`CodexQuotaHud.Skins` 运行库，以及独立的皮肤设计器。这些变更**尚未发布**；本文不声称
+已有新的公开 Setup、ZIP、标签、GitHub Release 或本机安装版本。
+
+The unreleased Setup definition shows an optional component named **Install
+Skin Designer**, with this description: “Optional visual editor for creating
+and exporting Codex Quota HUD skins. It is not required to run or import
+skins.” The Simplified-Chinese component is **安装皮肤设计器**：
+“用于创建并导出 Codex Quota HUD 皮肤的可选可视化编辑器。运行主程序或导入皮肤无需安装此组件。”
+It is visible but unchecked by default. When selected, it adds only the
+Designer files under `designer\` and a Start-menu entry; it creates no Designer
+desktop shortcut or startup entry. Rerunning Setup can add or remove that
+component while preserving HUD settings, installed skins, drafts, recovery,
+and import storage. The fallback ZIP deliberately remains normal-HUD-only.
+
+`.cqskin` is a bounded data archive, not an extension-code format. It contains
+strict `manifest.json` and `theme.json` data plus zero to three optional
+PNG/JPEG assets. Validation rejects executable/script/XAML content, remote
+references, unsafe paths or links, malformed/oversized archives and images,
+and hash mismatches. The normal HUD never depends on the Designer executable.
+
+Run either unreleased application directly from source:
+
+```powershell
+dotnet run --project .\src\CodexQuotaHud.App\CodexQuotaHud.App.csproj
+dotnet run --project .\src\CodexQuotaHud.SkinDesigner\CodexQuotaHud.SkinDesigner.csproj
+```
+
+Automated Task 18 evidence is green for the latest trustworthy reruns, but one
+earlier full-solution run at the same source commit reported a single storage
+test failure that could not be reproduced or root-caused. All real Designer,
+HUD, Setup, sign-out, and restart acceptance remains `NOT RUN`; overall status
+is therefore `PARTIAL — no release is authorized`.
+
 ![Codex Quota HUD overview](docs/assets/codex-quota-hud-overview.png)
 
 ## 功能 / Features
@@ -226,24 +267,21 @@ two-direction handoff remains an optional manual UI check.
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
 
-生成自包含版本：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1
-```
-
-生成可发布 ZIP：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.1.1
-```
+当前 HEAD 包含 `v1.1.1` 之后的未发布功能。不要在当前 HEAD 上使用
+`publish.ps1` 的历史默认版本，也不要执行
+`package-release.ps1 -Version 1.1.1`；这会把未发布二进制错误标记为
+已公开的 `v1.1.1`。生产发布打包只能在新版本和发布动作被明确批准后
+由维护者执行。本次仅在独立系统临时目录中以 `0.0.0` 和
+`-InternalTestMode` 生成过一次内部验证候选，它已删除，不是可发布产物。
 
 ## 项目结构 / Project Structure
 
 ```text
 src/CodexQuotaHud.Core/       额度模型、映射、刷新状态和设置
-src/CodexQuotaHud.App/        WPF 浮窗、皮肤、托盘与 app-server 集成
-tests/                        Core 与 Windows UI 自动化测试
+src/CodexQuotaHud.Skins/      共享皮肤协议、校验、存储、打包与运行时渲染
+src/CodexQuotaHud.App/        WPF 浮窗、皮肤导入、托盘与 app-server 集成
+src/CodexQuotaHud.SkinDesigner/ 独立皮肤设计器进程、草稿、预览、应用与导出
+tests/                        Core、Skins、App/UI 与 Designer 自动化测试
 scripts/                      发布、安装、卸载和 Release 打包脚本
 docs/                         设计、实现计划、验收记录和预览资源
 .github/workflows/            Windows CI
@@ -251,11 +289,13 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前源码包含 388 项自动化测试：
+当前未发布源码包含 1324 项自动化测试：
 
-- Core：55 项
-- App / UI：333 项
-- Total：388 项
+- Core：75 项
+- Skins：325 项
+- App / UI：590 项
+- Skin Designer：334 项
+- Total：1324 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -264,6 +304,13 @@ dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 
 GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
 自包含发布检查。
+
+Task 18 的可信完整解法测试复跑为 `1324/1324`、跳过 `0`，Release build 为
+`0` warnings / `0` errors；三套安全与回滚筛选分别为 `223/223`、`224/224`
+和 `116/116`。同一提交较早的一次完整测试曾出现 `1` 项未能复现、未能取得
+`result.Errors` 的存储删除失败，因此自动 gate 记录为带未解决异常的通过证据，
+而不是发布许可。详见
+[`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and
 total `388/388`; the Release build completed with zero warnings and zero
