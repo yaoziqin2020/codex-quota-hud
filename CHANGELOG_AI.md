@@ -49,8 +49,8 @@
   startup execute `Show()` with `IsVisible=True`, `Visibility=Visible`, and a
   nonzero WPF handle. The trace code and local trace files were removed. The
   final installed binary reports
-  `1.2.0+c3d545ea0cd709d291d22fa8486ca5f270695b20`; direct user visual
-  confirmation remains pending.
+  `1.2.0+c3d545ea0cd709d291d22fa8486ca5f270695b20`; the user directly
+  confirmed that the formal HUD is visible after the final reinstall.
 - Distinguished two historical `0.0.0` candidates: the earlier isolated Task
   18 package was never run; a later production-structure candidate was
   mistakenly installed, then replaced by v1.2.0. Its obsolete Setup/ZIP were

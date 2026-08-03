@@ -58,8 +58,8 @@ before their fixes and now pass. A temporary opt-in runtime trace recorded the
 real startup transition from hidden data to `model=True`, followed by
 `Show()`, `IsVisible=True`, `Visibility=Visible`, and a nonzero WPF handle.
 The temporary trace code and files were removed; the installed formal process
-is now running from the packaged `c3d545e` executable. Direct user visual
-confirmation after this reinstall is still required.
+is now running from the packaged `c3d545e` executable. The user directly
+confirmed that the formal HUD is visible after the final reinstall.
 
 One earlier full-solution run at the same commit remains an unresolved anomaly:
 `SkinPackageInstallerTests.Remove_DeletesExactlyOneCanonicalCustomDirectoryAndPreservesSiblings`

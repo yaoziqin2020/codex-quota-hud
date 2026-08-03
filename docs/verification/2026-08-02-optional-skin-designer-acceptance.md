@@ -435,4 +435,5 @@ not convert the remaining manual matrix rows to PASS or authorize a release.
   real transition from hidden quota to `model=True`, then `Show()`,
   `IsVisible=True`, `Visibility=Visible`, and a nonzero WPF window handle. The
   trace code, installed diagnostic executable, and trace log were removed.
-  Direct user visual confirmation after the final reinstall remains `NOT RUN`.
+  The user directly confirmed the formal HUD visible after the final reinstall;
+  this startup-visibility row is `PASS`.
