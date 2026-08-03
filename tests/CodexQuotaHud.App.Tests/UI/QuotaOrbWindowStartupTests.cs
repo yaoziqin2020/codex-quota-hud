@@ -953,6 +953,35 @@ public sealed class QuotaOrbWindowStartupTests
     }
 
     [Fact]
+    public void ProductionWindow_ShowsWhenFirstQuotaArrives()
+    {
+        RunSta(() =>
+        {
+            var refresh = new MutableRefreshController();
+            using var viewModel = new QuotaOrbViewModel(
+                refresh,
+                new InMemorySettingsStore(),
+                new AppSettings(),
+                new InlineDispatcher(),
+                () => { });
+            var window = new QuotaOrbWindow(viewModel);
+
+            try
+            {
+                Assert.False(window.IsVisible);
+
+                refresh.Publish(DisplayState(39));
+
+                Assert.True(window.IsVisible);
+            }
+            finally
+            {
+                window.CloseForExit();
+            }
+        });
+    }
+
+    [Fact]
     public void PopupChrome_SeparatesShadowFromRoundedClippedCard()
     {
         RunSta(() =>

@@ -56,7 +56,8 @@ public sealed class SyntheticPreviewComposition : IDisposable
         HudWindow = new QuotaOrbWindow(
             ViewModel,
             SkinController,
-            About.Show);
+            About.Show,
+            suppressAutomaticShow: true);
         if (!usePhysicalWorkArea)
         {
             HudWindow.SetPreviewWorkArea(new Rect(0, 0, 520, 420));

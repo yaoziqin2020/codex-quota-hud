@@ -39,7 +39,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
     private bool _contextMenuOpen;
     private SyntheticSkinCandidate? _activeSyntheticSkin;
     private WorkArea? _previewWorkArea;
-    private bool _suppressAutomaticShow = true;
+    private bool _suppressAutomaticShow;
 
     public QuotaOrbWindow(QuotaOrbViewModel viewModel)
         : this(
@@ -47,7 +47,8 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             new SkinController(),
             initializeSelection: true,
             skinManagement: null,
-            showAbout: null)
+            showAbout: null,
+            suppressAutomaticShow: false)
     {
     }
 
@@ -59,7 +60,8 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             skinController,
             initializeSelection: false,
             skinManagement: null,
-            showAbout: null)
+            showAbout: null,
+            suppressAutomaticShow: false)
     {
     }
 
@@ -72,7 +74,23 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             skinController,
             initializeSelection: false,
             skinManagement: null,
-            showAbout)
+            showAbout,
+            suppressAutomaticShow: false)
+    {
+    }
+
+    internal QuotaOrbWindow(
+        QuotaOrbViewModel viewModel,
+        SkinController skinController,
+        Action showAbout,
+        bool suppressAutomaticShow)
+        : this(
+            viewModel,
+            skinController,
+            initializeSelection: false,
+            skinManagement: null,
+            showAbout,
+            suppressAutomaticShow)
     {
     }
 
@@ -85,7 +103,8 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             skinController,
             initializeSelection: false,
             skinManagement,
-            showAbout: null)
+            showAbout: null,
+            suppressAutomaticShow: false)
     {
     }
 
@@ -99,7 +118,8 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             skinController,
             initializeSelection: false,
             skinManagement,
-            showAbout)
+            showAbout,
+            suppressAutomaticShow: false)
     {
     }
 
@@ -108,7 +128,8 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         SkinController skinController,
         bool initializeSelection,
         SkinManagementController? skinManagement,
-        Action? showAbout)
+        Action? showAbout,
+        bool suppressAutomaticShow)
     {
         InitializeComponent();
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
@@ -116,6 +137,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             nameof(skinController));
         _skinManagement = skinManagement;
         _showAbout = showAbout ?? (() => { });
+        _suppressAutomaticShow = suppressAutomaticShow;
         DataContext = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _viewModel.SetSkinActivationHandler(TryActivateSkinKey);
