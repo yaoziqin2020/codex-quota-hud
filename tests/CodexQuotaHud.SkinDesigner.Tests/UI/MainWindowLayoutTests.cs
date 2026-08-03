@@ -7,12 +7,14 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
+using CodexQuotaHud.SkinDesigner.Tests.Preview;
 using CodexQuotaHud.SkinDesigner.UI;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Storage;
 
 namespace CodexQuotaHud.SkinDesigner.Tests.UI;
 
+[Collection(DesignerPreviewWpfCollection.Name)]
 public sealed class MainWindowLayoutTests
 {
     [Fact]
@@ -774,17 +776,30 @@ public sealed class MainWindowLayoutTests
         RunSta(() =>
         {
             using var temporary = new TemporaryDirectory();
+            var paths = new SkinStoragePaths(temporary.Path);
+            var store = new DraftStore(paths);
+            var recovery = new DraftRecoveryService(store);
             var window = CreateWindow(
                 temporary,
                 out _,
-                UnsavedCloseChoice.Discard);
+                UnsavedCloseChoice.Discard,
+                draftStore: store,
+                recovery: recovery);
             Assert.True(window.Editor.BasicInformation
                 .SetDisplayName("Unsaved change").Succeeded);
+            recovery.FlushAsync().GetAwaiter().GetResult();
             var project = new DraftProjectPaths(
-                new SkinStoragePaths(temporary.Path).DraftsRoot,
+                paths.DraftsRoot,
                 window.Editor.Current.DraftId);
-            Directory.CreateDirectory(project.ProjectRoot);
-            File.WriteAllBytes(project.RecoveryPath, "{broken"u8.ToArray());
+            var settled = DraftJsonCodec.Parse(
+                File.ReadAllBytes(project.RecoveryPath));
+            Assert.True(settled.IsValid);
+            Assert.NotNull(settled.Value);
+            Assert.Equal(window.Editor.Current.Revision, settled.Value.Revision);
+
+            var corruptBytes = "{broken"u8.ToArray();
+            File.WriteAllBytes(project.RecoveryPath, corruptBytes);
+            Assert.Equal(corruptBytes, File.ReadAllBytes(project.RecoveryPath));
             window.AttachPreviewOwnerForTesting();
 
             window.Close();
@@ -865,6 +880,7 @@ public sealed class MainWindowLayoutTests
         out RecordingDialog dialog,
         UnsavedCloseChoice choice = UnsavedCloseChoice.Cancel,
         DraftStore? draftStore = null,
+        DraftRecoveryService? recovery = null,
         DesignerDocumentService? documents = null,
         IDesignerDocumentRequestSource? requests = null,
         Func<DesignerDocumentResult, IDesignerWindow>? createReplacementWindow = null,
@@ -887,6 +903,7 @@ public sealed class MainWindowLayoutTests
             requests ?? new RecordingDocumentRequests(),
             createReplacementWindow,
             draftStore: draftStore,
+            recovery: recovery,
             systemEventDispatcherPost: systemEventDispatcherPost);
     }
 

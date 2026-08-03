@@ -3,12 +3,14 @@ using CodexQuotaHud.App.Infrastructure.LocalControl;
 using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Output;
+using CodexQuotaHud.SkinDesigner.Tests.Preview;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Packaging;
 using CodexQuotaHud.Skins.Storage;
 
 namespace CodexQuotaHud.SkinDesigner.Tests.Output;
 
+[Collection(DesignerPreviewWpfCollection.Name)]
 public sealed class ProductionOutputCompositionTests
 {
     [Fact]
