@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Images;
+using CodexQuotaHud.SkinDesigner.Output;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Validation;
 
@@ -92,6 +93,8 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
 
     public IReadOnlyDictionary<SkinAssetSlot, SkinAsset> Assets => _assetsView;
 
+    public DesignerOutputCoordinator? Output { get; private set; }
+
     internal bool CanUseImageWorkflow =>
         Volatile.Read(ref _disposed) == 0 &&
         _imagePicker is not null &&
@@ -107,6 +110,21 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
         _imagePicker = picker ?? throw new ArgumentNullException(nameof(picker));
         _imageService = service ?? throw new ArgumentNullException(nameof(service));
         Images.NotifyStateChanged();
+    }
+
+    internal void ConfigureOutput(DesignerOutputCoordinator output)
+    {
+        ObjectDisposedException.ThrowIf(
+            Volatile.Read(ref _disposed) != 0,
+            this);
+        ArgumentNullException.ThrowIfNull(output);
+        if (Output is not null)
+        {
+            throw new InvalidOperationException(
+                "Designer output has already been configured.");
+        }
+
+        Output = output;
     }
 
     internal async Task<ImageMutationResult?> ReplaceImageAsync(
@@ -185,6 +203,7 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
         }
 
         _session.MeaningfulChange -= OnMeaningfulChange;
+        Output?.Dispose();
         Images.Dispose();
     }
 

@@ -1217,6 +1217,10 @@ public sealed class MainWindowLayoutTests
         public int ShowCount { get; private set; }
 
         public void Show() => ShowCount++;
+
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class RecordingMonitorSource(DesignerMonitorMetrics metrics) :

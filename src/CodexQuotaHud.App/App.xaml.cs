@@ -189,25 +189,13 @@ public partial class App : System.Windows.Application
 
             bool TryActivateInstalledSkin(
                 string selectionKey,
-                CancellationToken cancellationToken = default)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var snapshot = hudCatalog.Refresh();
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!snapshot.Healthy.Any(descriptor => string.Equals(
-                        descriptor.SelectionKey,
-                        selectionKey,
-                        StringComparison.Ordinal)) ||
-                    !skinController.ReplaceCatalog(snapshot, out _))
-                {
-                    return false;
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
-                return _window.TryActivateSkinKey(
+                CancellationToken cancellationToken = default) =>
+                global::CodexQuotaHud.App.App.TryActivateInstalledSkin(
+                    hudCatalog,
+                    skinController,
+                    _window,
                     selectionKey,
                     cancellationToken);
-            }
 
             if (ShouldStartLocalControlServer(launchRequest))
             {
@@ -294,6 +282,32 @@ public partial class App : System.Windows.Application
                 message,
                 launchError is null ? string.Empty : $": {launchError}"));
         base.OnExit(e);
+    }
+
+    internal static bool TryActivateInstalledSkin(
+        HudSkinCatalog hudCatalog,
+        SkinController skinController,
+        QuotaOrbWindow window,
+        string selectionKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(hudCatalog);
+        ArgumentNullException.ThrowIfNull(skinController);
+        ArgumentNullException.ThrowIfNull(window);
+        cancellationToken.ThrowIfCancellationRequested();
+        var snapshot = hudCatalog.Refresh();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!snapshot.Healthy.Any(descriptor => string.Equals(
+                descriptor.SelectionKey,
+                selectionKey,
+                StringComparison.Ordinal)) ||
+            !skinController.ReplaceCatalog(snapshot, out _))
+        {
+            return false;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return window.TryActivateSkinKey(selectionKey, cancellationToken);
     }
 
     internal static bool IsInteractiveLaunch(IReadOnlyList<string> arguments) =>

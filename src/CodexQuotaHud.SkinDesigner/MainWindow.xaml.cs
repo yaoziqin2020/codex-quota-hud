@@ -10,6 +10,7 @@ using CodexQuotaHud.App.UI;
 using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Images;
+using CodexQuotaHud.SkinDesigner.Output;
 using CodexQuotaHud.SkinDesigner.Preview;
 using CodexQuotaHud.SkinDesigner.UI;
 using CodexQuotaHud.Skins.Contracts;
@@ -28,6 +29,7 @@ public partial class MainWindow : Window, IDesignerWindow
     private readonly IUnsavedChangesDialog _dialog;
     private readonly DesignerDocumentService _documents;
     private readonly IDesignerDocumentRequestSource _documentRequests;
+    private readonly DesignerOutputServices? _outputServices;
     private readonly Func<DesignerDocumentResult, IDesignerWindow>
         _createReplacementWindow;
     private readonly IDesignerMonitorWorkAreaSource _monitorWorkArea;
@@ -89,7 +91,8 @@ public partial class MainWindow : Window, IDesignerWindow
         IDesignerMonitorWorkAreaSource? monitorWorkArea = null,
         DraftStore? draftStore = null,
         DraftRecoveryService? recovery = null,
-        Action<Action>? systemEventDispatcherPost = null)
+        Action<Action>? systemEventDispatcherPost = null,
+        DesignerOutputServices? outputServices = null)
     {
         Draft = draft ?? throw new ArgumentNullException(nameof(draft));
         ArgumentNullException.ThrowIfNull(assets);
@@ -98,6 +101,7 @@ public partial class MainWindow : Window, IDesignerWindow
         _documents = documents ?? throw new ArgumentNullException(nameof(documents));
         _documentRequests = documentRequests ??
             throw new ArgumentNullException(nameof(documentRequests));
+        _outputServices = outputServices;
         _paths = paths;
         _dialog = dialog;
         _createReplacementWindow = createReplacementWindow ?? (result =>
@@ -107,7 +111,8 @@ public partial class MainWindow : Window, IDesignerWindow
                 paths,
                 dialog,
                 documents,
-                documentRequests));
+                documentRequests,
+                outputServices: outputServices));
         _monitorWorkArea = monitorWorkArea ??
             new WindowsDesignerMonitorWorkAreaSource();
         _systemEventDispatcherPost = systemEventDispatcherPost ?? (action =>
@@ -124,6 +129,15 @@ public partial class MainWindow : Window, IDesignerWindow
             _session,
             assets,
             (current, assets) => _previewController.Update(current, assets));
+        if (outputServices is not null)
+        {
+            Editor.ConfigureOutput(new DesignerOutputCoordinator(
+                () => Editor.Current,
+                () => Editor.Assets,
+                outputServices.Apply,
+                outputServices.Export,
+                outputServices.Dialogs));
+        }
         var imageService = new DesignerImageService(paths, Editor);
         Editor.ConfigureImageWorkflow(new WindowsImagePicker(), imageService);
         Synthetic = new SyntheticPreviewViewModel(
@@ -137,6 +151,13 @@ public partial class MainWindow : Window, IDesignerWindow
 
         InitializeComponent();
         DataContext = this;
+        if (Editor.Output is not null)
+        {
+            ApplyToHudButton.Command = Editor.Output.ApplyCommand;
+            ExportPackageButton.Command = Editor.Output.ExportCommand;
+            ApplyToHudButton.IsEnabled = true;
+            ExportPackageButton.IsEnabled = true;
+        }
         SyncImageTransformControls();
         _editorControlsReady = true;
         _session.MeaningfulChange += OnMeaningfulChange;
@@ -724,6 +745,8 @@ public partial class MainWindow : Window, IDesignerWindow
         _recovery.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _operationGate.Dispose();
     }
+
+    public void Dispose() => DisposeOwnedResources();
 
     private void DisplayChoice_OnSelectionChanged(
         object sender,

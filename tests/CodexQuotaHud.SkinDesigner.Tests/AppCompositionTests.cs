@@ -111,6 +111,8 @@ public sealed class AppCompositionTests
     private sealed class RecordingWindow(List<string> calls) : IDesignerWindow
     {
         public void Show() => calls.Add("MainWindow.Show");
+
+        public void Dispose() => calls.Add("MainWindow.Dispose");
     }
 
     private static SkinDraftDocument CreateDraft() =>

@@ -2,6 +2,8 @@ using System.Windows;
 using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Infrastructure;
+using CodexQuotaHud.SkinDesigner.Output;
+using CodexQuotaHud.App.Infrastructure.LocalControl;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Packaging;
 using CodexQuotaHud.Skins.Storage;
@@ -18,28 +20,50 @@ public partial class App : System.Windows.Application
         ShutdownMode = ShutdownMode.OnLastWindowClose;
         var paths = new SkinStoragePaths(Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData));
-        var store = new DraftStore(paths);
-        var documents = new DesignerDocumentService(
-            paths,
-            store,
-            new InstalledSkinCatalog(
-                paths,
-                SemanticVersion.Parse("1.1.1")),
-            new SkinPackageReader());
         var dialog = new WindowsUnsavedChangesDialog();
         var requests = new WindowsDesignerDocumentRequestSource(paths);
+        var hudVersion = SemanticVersion.Parse("1.1.1");
 
         _composition = DesignerStartupComposition.TryCreate(
             new DesignerStartupFactories(
                 () => DesignerSingleInstanceGuard.TryAcquire(),
                 () =>
                 {
+                    var store = new DraftStore(paths);
+                    var reader = new SkinPackageReader();
+                    var writer = new SkinPackageWriter();
+                    var catalog = new InstalledSkinCatalog(paths, hudVersion);
+                    var documents = new DesignerDocumentService(
+                        paths,
+                        store,
+                        catalog,
+                        reader);
+                    var outputDialogs = new WindowsSkinOutputDialogs(
+                        () => Current?.MainWindow);
+                    var builder = new DraftPackageBuilder(hudVersion);
+                    var installer = new SkinPackageInstaller(paths, hudVersion);
+                    var apply = new SkinApplyService(
+                        paths,
+                        hudVersion,
+                        builder,
+                        writer,
+                        reader,
+                        installer,
+                        catalog,
+                        new HudActivationRequester(),
+                        outputDialogs);
                     var initial = documents.CreateNew(
                         Guid.NewGuid(),
                         Guid.NewGuid(),
                         DateTimeOffset.UtcNow,
-                        SemanticVersion.Parse("1.1.1"));
-                    return new DesignerDocumentWorkspace(initial, documents);
+                        hudVersion);
+                    return new DesignerDocumentWorkspace(
+                        initial,
+                        documents,
+                        new DesignerOutputServices(
+                            apply,
+                            new SkinExportService(builder, writer),
+                            outputDialogs));
                 },
                 workspace => new MainWindow(
                     workspace.Initial.Draft!,
@@ -47,7 +71,8 @@ public partial class App : System.Windows.Application
                     paths,
                     dialog,
                     workspace.Documents,
-                    requests)));
+                    requests,
+                    outputServices: workspace.OutputServices)));
         if (_composition is null)
         {
             Shutdown();
@@ -71,9 +96,10 @@ internal sealed record DesignerStartupFactories(
 
 internal sealed record DesignerDocumentWorkspace(
     DesignerDocumentResult Initial,
-    DesignerDocumentService Documents);
+    DesignerDocumentService Documents,
+    DesignerOutputServices? OutputServices = null);
 
-internal interface IDesignerWindow
+internal interface IDesignerWindow : IDisposable
 {
     void Show();
 }
@@ -123,5 +149,21 @@ internal sealed class DesignerStartupComposition : IDisposable
 
     internal void Show() => _window.Show();
 
-    public void Dispose() => Interlocked.Exchange(ref _lease, null)?.Dispose();
+    public void Dispose()
+    {
+        var lease = Interlocked.Exchange(ref _lease, null);
+        if (lease is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _window.Dispose();
+        }
+        finally
+        {
+            lease.Dispose();
+        }
+    }
 }

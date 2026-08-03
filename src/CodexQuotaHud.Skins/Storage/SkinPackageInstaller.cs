@@ -104,15 +104,47 @@ public sealed class SkinPackageInstaller
                 package.Errors);
         }
 
+        return CreatePreview(package.Value!, cancellationToken);
+    }
+
+    public SkinValidationResult<SkinInstallPreview> Inspect(
+        SkinPackageDocument package,
+        SemanticVersion hudVersion,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        if (hudVersion != _currentHudVersion)
+        {
+            return new SkinValidationResult<SkinInstallPreview>(
+                null,
+                [new SkinValidationError(
+                    "inspect.hud-version-mismatch",
+                    "$hudVersion",
+                    "The inspection HUD version does not match the installer.")]);
+        }
+
+        var validated = ValidateExternalPackage(package, cancellationToken);
+        return validated.IsValid
+            ? CreatePreview(validated.Value!, cancellationToken)
+            : new SkinValidationResult<SkinInstallPreview>(
+                null,
+                validated.Errors);
+    }
+
+    private SkinValidationResult<SkinInstallPreview> CreatePreview(
+        SkinPackageDocument package,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var existing = new InstalledSkinCatalog(
             _paths,
             _currentHudVersion,
-            _fileSystem).Find(package.Value!.Manifest.SkinId);
+            _fileSystem).Find(package.Manifest.SkinId);
         var isDowngrade = existing is not null &&
-            package.Value.Manifest.PackageVersion.CompareTo(existing.PackageVersion) < 0;
+            package.Manifest.PackageVersion.CompareTo(existing.PackageVersion) < 0;
         return new SkinValidationResult<SkinInstallPreview>(
             new SkinInstallPreview(
-                package.Value,
+                package,
                 existing,
                 isDowngrade,
                 existing is null || isDowngrade ? [] : CollisionDecisions),

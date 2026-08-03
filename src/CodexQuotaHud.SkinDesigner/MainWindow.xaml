@@ -499,17 +499,19 @@
             <Grid>
                 <TextBlock VerticalAlignment="Center"
                            Foreground="{DynamicResource DesignerMutedTextBrush}"
-                           Text="保存仅写设计器草稿；应用与导出将在下一阶段启用。" />
+                           Text="保存草稿、应用到 HUD，或导出可分享的皮肤包。" />
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                     <Button x:Name="SaveDraftButton" Content="保存草稿"
                             Click="SaveDraftButton_OnClick"
                             AutomationProperties.Name="保存草稿"
                             KeyboardNavigation.TabIndex="55" />
                     <Button x:Name="ApplyToHudButton" Margin="8,0,0,0" Content="应用到 HUD"
+                            Command="{Binding Editor.Output.ApplyCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="应用到 HUD"
                             KeyboardNavigation.TabIndex="56" />
                     <Button x:Name="ExportPackageButton" Margin="8,0,0,0" Content="导出皮肤包"
+                            Command="{Binding Editor.Output.ExportCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="导出皮肤包"
                             KeyboardNavigation.TabIndex="57" />
