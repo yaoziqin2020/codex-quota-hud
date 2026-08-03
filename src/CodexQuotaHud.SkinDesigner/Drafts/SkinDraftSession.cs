@@ -31,11 +31,20 @@ public sealed class SkinDraftSession
         ignoreBookkeeping: true);
 
     public bool Apply(Func<SkinDraftDocument, SkinDraftDocument> edit)
+        => ApplyCore(edit, requireStructuralChange: true);
+
+    internal bool ApplyMeaningful(
+        Func<SkinDraftDocument, SkinDraftDocument> edit)
+        => ApplyCore(edit, requireStructuralChange: false);
+
+    private bool ApplyCore(
+        Func<SkinDraftDocument, SkinDraftDocument> edit,
+        bool requireStructuralChange)
     {
         ArgumentNullException.ThrowIfNull(edit);
         var edited = edit(DraftSnapshot.Clone(_current)) ??
             throw new InvalidOperationException("A draft edit must return a document.");
-        if (DraftSnapshot.StructuralEquals(
+        if (requireStructuralChange && DraftSnapshot.StructuralEquals(
                 _current,
                 edited,
                 ignoreBookkeeping: true))

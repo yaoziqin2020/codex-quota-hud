@@ -1,7 +1,10 @@
 using System.Windows;
+using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Infrastructure;
 using CodexQuotaHud.Skins.Contracts;
+using CodexQuotaHud.Skins.Packaging;
+using CodexQuotaHud.Skins.Storage;
 
 namespace CodexQuotaHud.SkinDesigner;
 
@@ -13,16 +16,38 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnLastWindowClose;
+        var paths = new SkinStoragePaths(Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData));
+        var store = new DraftStore(paths);
+        var documents = new DesignerDocumentService(
+            paths,
+            store,
+            new InstalledSkinCatalog(
+                paths,
+                SemanticVersion.Parse("1.1.1")),
+            new SkinPackageReader());
+        var dialog = new WindowsUnsavedChangesDialog();
+        var requests = new WindowsDesignerDocumentRequestSource(paths);
 
         _composition = DesignerStartupComposition.TryCreate(
             new DesignerStartupFactories(
                 () => DesignerSingleInstanceGuard.TryAcquire(),
-                () => SkinDraftFactory.CreateNew(
-                    Guid.NewGuid(),
-                    Guid.NewGuid(),
-                    DateTimeOffset.UtcNow,
-                    SemanticVersion.Parse("1.1.1")),
-                draft => new MainWindow(draft)));
+                () =>
+                {
+                    var initial = documents.CreateNew(
+                        Guid.NewGuid(),
+                        Guid.NewGuid(),
+                        DateTimeOffset.UtcNow,
+                        SemanticVersion.Parse("1.1.1"));
+                    return new DesignerDocumentWorkspace(initial, documents);
+                },
+                workspace => new MainWindow(
+                    workspace.Initial.Draft!,
+                    workspace.Initial.Assets,
+                    paths,
+                    dialog,
+                    workspace.Documents,
+                    requests)));
         if (_composition is null)
         {
             Shutdown();
@@ -41,8 +66,12 @@ public partial class App : System.Windows.Application
 
 internal sealed record DesignerStartupFactories(
     Func<IDisposable?> TryAcquireDesignerGuard,
-    Func<SkinDraftDocument> CreateDraft,
-    Func<SkinDraftDocument, IDesignerWindow> CreateWindow);
+    Func<DesignerDocumentWorkspace> CreateDocumentWorkspace,
+    Func<DesignerDocumentWorkspace, IDesignerWindow> CreateWindow);
+
+internal sealed record DesignerDocumentWorkspace(
+    DesignerDocumentResult Initial,
+    DesignerDocumentService Documents);
 
 internal interface IDesignerWindow
 {
@@ -75,8 +104,14 @@ internal sealed class DesignerStartupComposition : IDisposable
 
         try
         {
-            var draft = factories.CreateDraft();
-            var window = factories.CreateWindow(draft);
+            var workspace = factories.CreateDocumentWorkspace();
+            if (workspace.Initial.Draft is null || workspace.Initial.Errors.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "The initial Designer document workspace is invalid.");
+            }
+
+            var window = factories.CreateWindow(workspace);
             return new DesignerStartupComposition(lease, window);
         }
         catch

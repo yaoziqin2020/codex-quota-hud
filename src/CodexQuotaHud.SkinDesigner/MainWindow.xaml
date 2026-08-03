@@ -1,16 +1,520 @@
 <Window x:Class="CodexQuotaHud.SkinDesigner.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Name="DesignerWindow"
         Title="Codex Quota HUD 皮肤设计器"
-        Width="960"
-        Height="640"
-        MinWidth="640"
+        Width="1280"
+        Height="760"
+        MinWidth="600"
         MinHeight="480"
-        WindowStartupLocation="CenterScreen">
-    <Grid>
-        <TextBlock HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   FontSize="20"
-                   Text="皮肤设计器" />
+        Background="{DynamicResource DesignerBackgroundBrush}"
+        Foreground="{DynamicResource DesignerTextBrush}"
+        WindowStartupLocation="Manual"
+        ShowActivated="True">
+    <Window.Resources>
+        <SolidColorBrush x:Key="DesignerBackgroundBrush" Color="#FF08111F" />
+        <SolidColorBrush x:Key="DesignerSurfaceBrush" Color="#FF111D2E" />
+        <SolidColorBrush x:Key="DesignerRaisedBrush" Color="#FF17263A" />
+        <SolidColorBrush x:Key="DesignerTextBrush" Color="#FFF1F5F9" />
+        <SolidColorBrush x:Key="DesignerMutedTextBrush" Color="#FFA9B8CC" />
+        <SolidColorBrush x:Key="DesignerBorderBrush" Color="#FF33445B" />
+        <SolidColorBrush x:Key="DesignerAccentBrush" Color="#FF38BDF8" />
+        <SolidColorBrush x:Key="DesignerAccentTextBrush" Color="#FF03121D" />
+
+        <Style x:Key="DesignerFocusVisualStyle" TargetType="Control">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Border BorderBrush="{DynamicResource DesignerAccentBrush}"
+                                BorderThickness="2"
+                                CornerRadius="5"
+                                Margin="-3" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="Control">
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FocusVisualStyle"
+                    Value="{StaticResource DesignerFocusVisualStyle}" />
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource DesignerTextBrush}" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="FocusVisualStyle"
+                    Value="{StaticResource DesignerFocusVisualStyle}" />
+            <Setter Property="Foreground" Value="{DynamicResource DesignerTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource DesignerRaisedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DesignerBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="FocusVisualStyle"
+                    Value="{StaticResource DesignerFocusVisualStyle}" />
+            <Setter Property="Foreground" Value="{DynamicResource DesignerTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource DesignerBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DesignerBorderBrush}" />
+            <Setter Property="Padding" Value="9,7" />
+            <Setter Property="MinHeight" Value="36" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="FocusVisualStyle"
+                    Value="{StaticResource DesignerFocusVisualStyle}" />
+            <Setter Property="Foreground" Value="#FF0B1220" />
+            <Setter Property="Background" Value="#FFF1F5F9" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="MinHeight" Value="36" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="FocusVisualStyle"
+                    Value="{StaticResource DesignerFocusVisualStyle}" />
+            <Setter Property="Foreground" Value="{DynamicResource DesignerTextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="Slider">
+            <Setter Property="FocusVisualStyle"
+                    Value="{StaticResource DesignerFocusVisualStyle}" />
+        </Style>
+        <Style TargetType="Expander">
+            <Setter Property="Foreground" Value="{DynamicResource DesignerTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource DesignerSurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DesignerBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource DesignerMutedTextBrush}" />
+            <Setter Property="Margin" Value="0,8,0,5" />
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="DesignerRoot">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="{DynamicResource DesignerSurfaceBrush}"
+                BorderBrush="{DynamicResource DesignerBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="22,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock FontSize="21" FontWeight="SemiBold"
+                               Text="Skin Studio" />
+                    <TextBlock Margin="0,3,0,0"
+                               Foreground="{DynamicResource DesignerMutedTextBrush}"
+                               Text="独立草稿 · 实时合成预览 · 不影响正在运行的 HUD" />
+                    <TextBlock x:Name="DocumentStatusText"
+                               Margin="0,3,0,0"
+                               Foreground="{DynamicResource DesignerMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button x:Name="NewDraftButton" Content="新建"
+                            Click="NewDraftButton_OnClick"
+                            AutomationProperties.Name="新建设计草稿"
+                            KeyboardNavigation.TabIndex="1" />
+                    <Button x:Name="OpenDraftButton" Margin="6,0,0,0" Content="打开草稿"
+                            Click="OpenDraftButton_OnClick"
+                            AutomationProperties.Name="打开设计草稿"
+                            KeyboardNavigation.TabIndex="2" />
+                    <Button x:Name="EditInstalledButton" Margin="6,0,0,0" Content="编辑已安装"
+                            Click="EditInstalledButton_OnClick"
+                            AutomationProperties.Name="编辑已安装自定义皮肤"
+                            KeyboardNavigation.TabIndex="3" />
+                    <Button x:Name="ImportForEditingButton" Margin="6,0,0,0" Content="导入编辑"
+                            Click="ImportForEditingButton_OnClick"
+                            AutomationProperties.Name="导入皮肤包以编辑"
+                            KeyboardNavigation.TabIndex="4" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="16,14,16,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="EditorColumn" Width="480" MinWidth="320" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition x:Name="PreviewColumn" Width="*" MinWidth="280" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer x:Name="EditorScrollViewer"
+                          Grid.Column="0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          AutomationProperties.Name="皮肤编辑器">
+                <StackPanel>
+                    <Expander x:Name="BasicInformationSection"
+                              Header="基本信息" IsExpanded="True">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="项目名称" />
+                            <TextBox x:Name="ProjectNameTextBox"
+                                     Text="{Binding Editor.Current.ProjectName, Mode=OneWay}"
+                                     TextWrapping="Wrap"
+                                     MaxLength="160"
+                                     LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
+                                     Tag="ProjectName"
+                                     AutomationProperties.Name="项目名称"
+                                     KeyboardNavigation.TabIndex="5" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="显示名称" />
+                            <TextBox x:Name="DisplayNameTextBox"
+                                     Text="{Binding Editor.Current.DisplayName, Mode=OneWay}"
+                                     TextWrapping="Wrap"
+                                     LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
+                                     Tag="DisplayName"
+                                     AutomationProperties.Name="皮肤显示名称"
+                                     KeyboardNavigation.TabIndex="6" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="作者" />
+                            <TextBox Text="{Binding Editor.Current.Author, Mode=OneWay}"
+                                     LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
+                                     Tag="Author"
+                                     AutomationProperties.Name="作者"
+                                     KeyboardNavigation.TabIndex="7" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="版本" />
+                            <TextBox Text="{Binding Editor.Current.PackageVersion, Mode=OneWay}"
+                                     LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
+                                     Tag="Version"
+                                     AutomationProperties.Name="包版本"
+                                     KeyboardNavigation.TabIndex="8" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="说明" />
+                            <TextBox Text="{Binding Editor.Current.Description, Mode=OneWay}"
+                                     TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70"
+                                     LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
+                                     Tag="Description"
+                                     AutomationProperties.Name="皮肤说明"
+                                     KeyboardNavigation.TabIndex="9" />
+                        </StackPanel>
+                    </Expander>
+
+                    <Expander x:Name="ImagesSection" Header="图片">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="背景" />
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="BackgroundReplaceButton" Content="选择 / 替换"
+                                        Command="{Binding Editor.Images.Background.ReplaceCommand}"
+                                        AutomationProperties.Name="选择或替换背景图片"
+                                        KeyboardNavigation.TabIndex="10" />
+                                <Button Margin="8,0,0,0" Content="移除"
+                                        Command="{Binding Editor.Images.Background.RemoveCommand}"
+                                        AutomationProperties.Name="移除背景图片"
+                                        KeyboardNavigation.TabIndex="11" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="中心" />
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="选择 / 替换"
+                                        Command="{Binding Editor.Images.Center.ReplaceCommand}"
+                                        AutomationProperties.Name="选择或替换中心图片"
+                                        KeyboardNavigation.TabIndex="12" />
+                                <Button Margin="8,0,0,0" Content="移除"
+                                        Command="{Binding Editor.Images.Center.RemoveCommand}"
+                                        AutomationProperties.Name="移除中心图片"
+                                        KeyboardNavigation.TabIndex="13" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="装饰（透明 PNG）" />
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="选择 / 替换"
+                                        Command="{Binding Editor.Images.Decoration.ReplaceCommand}"
+                                        AutomationProperties.Name="选择或替换装饰图片"
+                                        KeyboardNavigation.TabIndex="14" />
+                                <Button Margin="8,0,0,0" Content="移除"
+                                        Command="{Binding Editor.Images.Decoration.RemoveCommand}"
+                                        AutomationProperties.Name="移除装饰图片"
+                                        KeyboardNavigation.TabIndex="15" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="变换目标" />
+                            <ComboBox x:Name="ImageTransformSlotBox" SelectedIndex="0"
+                                      SelectionChanged="ImageTransformSlot_OnSelectionChanged"
+                                      AutomationProperties.Name="图片变换目标"
+                                      KeyboardNavigation.TabIndex="16">
+                                <ComboBoxItem Content="背景" />
+                                <ComboBoxItem Content="中心" />
+                                <ComboBoxItem Content="装饰" />
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="水平偏移 -50–50" />
+                            <Slider x:Name="ImageOffsetXSlider" Minimum="-50" Maximum="50" Tag="OffsetX"
+                                    ValueChanged="ImageTransform_OnValueChanged"
+                                    AutomationProperties.Name="图片水平偏移" KeyboardNavigation.TabIndex="17" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="垂直偏移 -50–50" />
+                            <Slider x:Name="ImageOffsetYSlider" Minimum="-50" Maximum="50" Tag="OffsetY"
+                                    ValueChanged="ImageTransform_OnValueChanged"
+                                    AutomationProperties.Name="图片垂直偏移" KeyboardNavigation.TabIndex="18" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="缩放 0.25–3" />
+                            <Slider x:Name="ImageScaleSlider" Minimum="0.25" Maximum="3" Value="1" Tag="Scale"
+                                    ValueChanged="ImageTransform_OnValueChanged"
+                                    AutomationProperties.Name="图片缩放" KeyboardNavigation.TabIndex="19" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="旋转 -180–180" />
+                            <Slider x:Name="ImageRotationSlider" Minimum="-180" Maximum="180" Tag="Rotation"
+                                    ValueChanged="ImageTransform_OnValueChanged"
+                                    AutomationProperties.Name="图片旋转" KeyboardNavigation.TabIndex="20" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="透明度 0–1" />
+                            <Slider x:Name="ImageOpacitySlider" Minimum="0" Maximum="1" Value="1" Tag="Opacity"
+                                    ValueChanged="ImageTransform_OnValueChanged"
+                                    AutomationProperties.Name="图片透明度" KeyboardNavigation.TabIndex="21" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="裁切焦点 X 0–1" />
+                            <Slider x:Name="ImageCropXSlider" Minimum="0" Maximum="1" Value="0.5" Tag="CropX"
+                                    ValueChanged="ImageTransform_OnValueChanged"
+                                    AutomationProperties.Name="图片裁切焦点 X" KeyboardNavigation.TabIndex="22" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="裁切焦点 Y 0–1" />
+                            <Slider x:Name="ImageCropYSlider" Minimum="0" Maximum="1" Value="0.5" Tag="CropY"
+                                    ValueChanged="ImageTransform_OnValueChanged"
+                                    AutomationProperties.Name="图片裁切焦点 Y" KeyboardNavigation.TabIndex="23" />
+                        </StackPanel>
+                    </Expander>
+
+                    <Expander x:Name="QuotaRingsSection" Header="额度环">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="直径 72–116" />
+                            <Slider Minimum="72" Maximum="116" Tag="RingDiameter"
+                                    Value="{Binding Editor.Current.Theme.RingDiameter, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="额度环直径" KeyboardNavigation.TabIndex="24" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="线宽 2–16" />
+                            <Slider Minimum="2" Maximum="16" Tag="RingThickness"
+                                    Value="{Binding Editor.Current.Theme.RingThickness, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="额度环线宽" KeyboardNavigation.TabIndex="25" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="间距 2–24" />
+                            <Slider Minimum="2" Maximum="24" Tag="RingGap"
+                                    Value="{Binding Editor.Current.Theme.RingGap, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="额度环间距" KeyboardNavigation.TabIndex="26" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="起始角度 0–359" />
+                            <Slider Minimum="0" Maximum="359" Tag="StartAngle"
+                                    Value="{Binding Editor.Current.Theme.StartAngle, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="额度环起始角度" KeyboardNavigation.TabIndex="27" />
+                        </StackPanel>
+                    </Expander>
+
+                    <Expander x:Name="ColorsEffectsSection" Header="颜色与效果">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="主环颜色" />
+                            <TextBox Text="{Binding Editor.Current.Theme.PrimaryRingColor, Mode=OneWay}"
+                                     Tag="PrimaryRingColor" LostKeyboardFocus="ColorText_OnLostKeyboardFocus"
+                                     AutomationProperties.Name="主环颜色" KeyboardNavigation.TabIndex="28" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="次环颜色" />
+                            <TextBox Text="{Binding Editor.Current.Theme.SecondaryRingColor, Mode=OneWay}"
+                                     Tag="SecondaryRingColor" LostKeyboardFocus="ColorText_OnLostKeyboardFocus"
+                                     AutomationProperties.Name="次环颜色" KeyboardNavigation.TabIndex="29" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="背景颜色" />
+                            <TextBox Text="{Binding Editor.Current.Theme.BaseBackgroundColor, Mode=OneWay}"
+                                     Tag="BaseBackgroundColor" LostKeyboardFocus="ColorText_OnLostKeyboardFocus"
+                                     AutomationProperties.Name="背景颜色" KeyboardNavigation.TabIndex="30" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="背景透明度 0–1" />
+                            <Slider Minimum="0" Maximum="1" Tag="BaseBackgroundOpacity"
+                                    Value="{Binding Editor.Current.Theme.BaseBackgroundOpacity, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="背景透明度" KeyboardNavigation.TabIndex="31" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="发光颜色" />
+                            <TextBox Text="{Binding Editor.Current.Theme.GlowColor, Mode=OneWay}"
+                                     Tag="GlowColor" LostKeyboardFocus="ColorText_OnLostKeyboardFocus"
+                                     AutomationProperties.Name="发光颜色" KeyboardNavigation.TabIndex="32" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="发光强度 0–1" />
+                            <Slider Minimum="0" Maximum="1" Tag="GlowIntensity"
+                                    Value="{Binding Editor.Current.Theme.GlowIntensity, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="发光强度" KeyboardNavigation.TabIndex="33" />
+                        </StackPanel>
+                    </Expander>
+
+                    <Expander x:Name="TextSection" Header="文字">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="数字字号" />
+                            <Slider Minimum="12" Maximum="34" Tag="NumberTextSize"
+                                    Value="{Binding Editor.Current.Theme.NumberTextSize, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="数字字号" KeyboardNavigation.TabIndex="34" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="标签字号" />
+                            <Slider Minimum="12" Maximum="34" Tag="LabelTextSize"
+                                    Value="{Binding Editor.Current.Theme.LabelTextSize, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="标签字号" KeyboardNavigation.TabIndex="35" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="字重" />
+                            <ComboBox x:Name="TextWeightBox" SelectedIndex="1"
+                                      SelectionChanged="TextWeight_OnSelectionChanged"
+                                      AutomationProperties.Name="文字字重" KeyboardNavigation.TabIndex="36">
+                                <ComboBoxItem Content="Regular" />
+                                <ComboBoxItem Content="SemiBold" />
+                                <ComboBoxItem Content="Bold" />
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="排列" />
+                            <ComboBox x:Name="TextPlacementBox" SelectedIndex="1"
+                                      SelectionChanged="TextPlacement_OnSelectionChanged"
+                                      AutomationProperties.Name="文字排列" KeyboardNavigation.TabIndex="37">
+                                <ComboBoxItem Content="居中" />
+                                <ComboBoxItem Content="数字在标签上方" />
+                                <ComboBoxItem Content="标签在数字上方" />
+                            </ComboBox>
+                        </StackPanel>
+                    </Expander>
+
+                    <Expander x:Name="AnimationSection" Header="动画">
+                        <StackPanel>
+                            <TextBlock Foreground="{DynamicResource DesignerMutedTextBrush}" TextWrapping="Wrap"
+                                       Text="关闭 Windows 动画时自动使用静态终态。" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="旋转强度 0–1" />
+                            <Slider Minimum="0" Maximum="1" Tag="RotationIntensity"
+                                    Value="{Binding Editor.Current.Theme.Animation.RotationIntensity, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="旋转动画强度" KeyboardNavigation.TabIndex="38" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="呼吸强度 0–1" />
+                            <Slider Minimum="0" Maximum="1" Tag="BreathingIntensity"
+                                    Value="{Binding Editor.Current.Theme.Animation.BreathingIntensity, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="呼吸动画强度" KeyboardNavigation.TabIndex="39" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="发光动画强度 0–1" />
+                            <Slider Minimum="0" Maximum="1" Tag="AnimationGlowIntensity"
+                                    Value="{Binding Editor.Current.Theme.Animation.GlowIntensity, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="发光动画强度" KeyboardNavigation.TabIndex="40" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="浮动强度 0–1" />
+                            <Slider Minimum="0" Maximum="1" Tag="FloatingIntensity"
+                                    Value="{Binding Editor.Current.Theme.Animation.FloatingIntensity, Mode=OneWay}"
+                                    ValueChanged="EditorSlider_OnValueChanged"
+                                    AutomationProperties.Name="浮动动画强度" KeyboardNavigation.TabIndex="41" />
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
+
+            <Border x:Name="PreviewStage"
+                    Grid.Column="2"
+                    MinWidth="280"
+                    Background="#FF050A12"
+                    BorderBrush="{DynamicResource DesignerBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    AutomationProperties.Name="实时 HUD 预览区域">
+                <Grid>
+                    <Border Margin="18" CornerRadius="12" BorderBrush="#3348C7FA"
+                            BorderThickness="1" />
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock FontSize="16" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Text="实时 HUD 预览" />
+                        <TextBlock Margin="0,7,0,0" Foreground="{DynamicResource DesignerMutedTextBrush}"
+                                   Text="预览窗只属于设计器，不写入正式设置" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border x:Name="SyntheticPreviewStrip"
+                Grid.Row="2"
+                Margin="16,0,16,10"
+                Padding="14,10"
+                Background="{DynamicResource DesignerSurfaceBrush}"
+                BorderBrush="{DynamicResource DesignerBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                AutomationProperties.Name="合成预览控制">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="130" />
+                    <ColumnDefinition Width="130" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox x:Name="DisplayChoiceBox" Width="128" SelectedIndex="0"
+                          SelectionChanged="DisplayChoice_OnSelectionChanged"
+                          AutomationProperties.Name="额度显示模式"
+                          KeyboardNavigation.TabIndex="42">
+                    <ComboBoxItem Content="Dual" />
+                    <ComboBoxItem Content="5h" />
+                    <ComboBoxItem Content="Week" />
+                    <ComboBoxItem Content="None" />
+                </ComboBox>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                    <TextBlock Text="5h %" />
+                    <Slider x:Name="FiveHourPercentSlider" Minimum="0" Maximum="100"
+                            Value="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
+                            AutomationProperties.Name="五小时额度百分比"
+                            KeyboardNavigation.TabIndex="43" />
+                    <ComboBox ItemsSource="{Binding Synthetic.PercentPresets}"
+                              SelectedItem="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
+                              AutomationProperties.Name="五小时额度预设"
+                              KeyboardNavigation.TabIndex="44" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Margin="12,0,0,0">
+                    <TextBlock Text="Week %" />
+                    <Slider x:Name="WeeklyPercentSlider" Minimum="0" Maximum="100"
+                            Value="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
+                            AutomationProperties.Name="每周额度百分比"
+                            KeyboardNavigation.TabIndex="45" />
+                    <ComboBox ItemsSource="{Binding Synthetic.PercentPresets}"
+                              SelectedItem="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
+                              AutomationProperties.Name="每周额度预设"
+                              KeyboardNavigation.TabIndex="46" />
+                </StackPanel>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="14,0">
+                    <CheckBox Content="详情" IsChecked="{Binding Synthetic.DetailsOpen, Mode=TwoWay}"
+                              AutomationProperties.Name="显示详情" KeyboardNavigation.TabIndex="47" />
+                    <CheckBox Margin="14,0,0,0" Content="动画"
+                              IsChecked="{Binding Synthetic.AnimationsEnabled, Mode=TwoWay}"
+                              AutomationProperties.Name="启用预览动画" KeyboardNavigation.TabIndex="48" />
+                    <CheckBox Margin="14,0,0,0" Content="刷新中"
+                              IsChecked="{Binding Synthetic.IsRefreshing, Mode=TwoWay}"
+                              AutomationProperties.Name="模拟刷新状态" KeyboardNavigation.TabIndex="49" />
+                </StackPanel>
+                <StackPanel Grid.Column="4" Orientation="Horizontal">
+                    <Button x:Name="PreviewLeftButton" Content="←" Padding="10,5"
+                            Command="{Binding Synthetic.PreviewLeftEdgeCommand}"
+                            AutomationProperties.Name="预览左边缘停靠" KeyboardNavigation.TabIndex="50" />
+                    <Button x:Name="PreviewRightButton" Content="→" Padding="10,5" Margin="5,0,0,0"
+                            Command="{Binding Synthetic.PreviewRightEdgeCommand}"
+                            AutomationProperties.Name="预览右边缘停靠" KeyboardNavigation.TabIndex="51" />
+                    <Button x:Name="PreviewTopButton" Content="↑" Padding="10,5" Margin="5,0,0,0"
+                            Command="{Binding Synthetic.PreviewTopEdgeCommand}"
+                            AutomationProperties.Name="预览上边缘停靠" KeyboardNavigation.TabIndex="52" />
+                    <Button x:Name="PreviewBottomButton" Content="↓" Padding="10,5" Margin="5,0,0,0"
+                            Command="{Binding Synthetic.PreviewBottomEdgeCommand}"
+                            AutomationProperties.Name="预览下边缘停靠" KeyboardNavigation.TabIndex="53" />
+                    <Button x:Name="ExpandPreviewButton" Content="展开" Margin="5,0,0,0"
+                            Command="{Binding Synthetic.ExpandCommand}"
+                            AutomationProperties.Name="展开预览 HUD" KeyboardNavigation.TabIndex="54" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border x:Name="PrimaryActionBar"
+                Grid.Row="3"
+                Padding="16,12"
+                Background="{DynamicResource DesignerSurfaceBrush}"
+                BorderBrush="{DynamicResource DesignerBorderBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <TextBlock VerticalAlignment="Center"
+                           Foreground="{DynamicResource DesignerMutedTextBrush}"
+                           Text="保存仅写设计器草稿；应用与导出将在下一阶段启用。" />
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Button x:Name="SaveDraftButton" Content="保存草稿"
+                            Click="SaveDraftButton_OnClick"
+                            AutomationProperties.Name="保存草稿"
+                            KeyboardNavigation.TabIndex="55" />
+                    <Button x:Name="ApplyToHudButton" Margin="8,0,0,0" Content="应用到 HUD"
+                            IsEnabled="False"
+                            AutomationProperties.Name="应用到 HUD"
+                            KeyboardNavigation.TabIndex="56" />
+                    <Button x:Name="ExportPackageButton" Margin="8,0,0,0" Content="导出皮肤包"
+                            IsEnabled="False"
+                            AutomationProperties.Name="导出皮肤包"
+                            KeyboardNavigation.TabIndex="57" />
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

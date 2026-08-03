@@ -61,9 +61,73 @@ internal interface IDraftProjectLease : IDisposable
     void DeleteFile(string fixedLeafName);
 }
 
+internal enum DesignerDraftProjectOpenMode
+{
+    OpenExisting,
+    OpenOrCreate,
+    CreateExclusive
+}
+
+internal interface IDesignerDraftStorageLeaseProvider
+{
+    IDesignerDraftProjectLease? OpenDesignerProject(
+        string draftsRoot,
+        Guid draftId,
+        DesignerDraftProjectOpenMode mode);
+
+    IDesignerSourceFileLease OpenDesignerSource(string absolutePath);
+}
+
+internal interface IDesignerDraftProjectLease : IDisposable
+{
+    bool WasCreated { get; }
+
+    IDesignerDraftAssetsLease OpenAssets(bool create);
+
+    void DeleteOwnedProjectIfEmpty();
+}
+
+internal interface IDesignerDraftAssetsLease : IDisposable
+{
+    bool FileExists(string canonicalLeafName);
+
+    byte[] ReadAllBytes(string canonicalLeafName);
+
+    void WriteAndFlushNew(
+        string operationLeafName,
+        ReadOnlySpan<byte> bytes,
+        CancellationToken cancellationToken);
+
+    byte[] ReadOperationBytes(string operationLeafName);
+
+    bool MoveCanonicalToOperation(
+        string canonicalLeafName,
+        string operationLeafName);
+
+    void MoveOperationToCanonical(
+        string operationLeafName,
+        string canonicalLeafName);
+
+    void DeleteCanonical(string canonicalLeafName);
+
+    void DeleteOperation(string operationLeafName);
+
+    void ReleaseOperation(string operationLeafName);
+
+    void DeleteDirectoryIfEmpty();
+}
+
+internal interface IDesignerSourceFileLease : IDisposable
+{
+    long Length { get; }
+
+    byte[] ReadAllBytes(CancellationToken cancellationToken);
+}
+
 internal sealed class PhysicalDraftFileOperations :
     IDraftFileOperations,
-    IDraftStorageLeaseProvider
+    IDraftStorageLeaseProvider,
+    IDesignerDraftStorageLeaseProvider
 {
     public static PhysicalDraftFileOperations Instance { get; } = new();
 
@@ -108,6 +172,15 @@ internal sealed class PhysicalDraftFileOperations :
 
     public IDraftCatalogLease? OpenCatalog(string draftsRoot, bool create) =>
         WindowsDraftCatalogLease.Open(draftsRoot, create);
+
+    public IDesignerDraftProjectLease? OpenDesignerProject(
+        string draftsRoot,
+        Guid draftId,
+        DesignerDraftProjectOpenMode mode) =>
+        WindowsDesignerDraftProjectLease.Open(draftsRoot, draftId, mode);
+
+    public IDesignerSourceFileLease OpenDesignerSource(string absolutePath) =>
+        WindowsDesignerSourceFileLease.Open(absolutePath);
 }
 
 internal sealed class WindowsDraftCatalogLease : IDraftCatalogLease
@@ -214,6 +287,21 @@ internal sealed class WindowsDraftCatalogLease : IDraftCatalogLease
         return project is null ? null : new WindowsDraftProjectLease(project);
     }
 
+    internal WindowsDraftProjectLease? TryCreateProjectExclusive(Guid draftId)
+    {
+        if (draftId == Guid.Empty)
+        {
+            throw new ArgumentOutOfRangeException(nameof(draftId));
+        }
+
+        var name = draftId.ToString("D").ToLowerInvariant();
+        var expectedPath = Path.Combine(_draftsRoot.ExpectedPath, name);
+        var project = _draftsRoot.TryCreateChildDirectoryExclusive(
+            name,
+            expectedPath);
+        return project is null ? null : new WindowsDraftProjectLease(project);
+    }
+
     public void Dispose()
     {
         _draftsRoot.Dispose();
@@ -239,6 +327,24 @@ internal sealed class WindowsDraftProjectLease : IDraftProjectLease
             Path.Combine(_project.ExpectedPath, "assets"),
             create: true) ?? throw new IOException(
                 "The draft assets directory could not be leased.");
+
+    internal WindowsDraftAssetsLease OpenDesignerAssets(bool create)
+    {
+        var expectedPath = Path.Combine(_project.ExpectedPath, "assets");
+        var assets = create
+            ? _project.TryCreateChildDirectoryExclusive("assets", expectedPath) ??
+                _project.OpenChildDirectory("assets", expectedPath, create: false)
+            : _project.OpenChildDirectory("assets", expectedPath, create: false);
+        if (assets is null)
+        {
+            throw new DirectoryNotFoundException(
+                "The draft assets directory does not exist.");
+        }
+
+        return new WindowsDraftAssetsLease(assets);
+    }
+
+    internal void DeleteOwnedProjectIfEmpty() => _project.DeleteIfEmpty();
 
     public bool FileExists(string fixedLeafName)
     {
@@ -349,6 +455,317 @@ internal sealed class WindowsDraftProjectLease : IDraftProjectLease
     }
 }
 
+internal sealed class WindowsDesignerDraftProjectLease :
+    IDesignerDraftProjectLease
+{
+    private readonly WindowsDraftCatalogLease _catalog;
+    private readonly WindowsDraftProjectLease _project;
+
+    private WindowsDesignerDraftProjectLease(
+        WindowsDraftCatalogLease catalog,
+        WindowsDraftProjectLease project,
+        bool wasCreated)
+    {
+        _catalog = catalog;
+        _project = project;
+        WasCreated = wasCreated;
+    }
+
+    public bool WasCreated { get; }
+
+    internal static WindowsDesignerDraftProjectLease? Open(
+        string draftsRoot,
+        Guid draftId,
+        DesignerDraftProjectOpenMode mode)
+    {
+        var catalog = WindowsDraftCatalogLease.Open(
+            draftsRoot,
+            create: mode != DesignerDraftProjectOpenMode.OpenExisting);
+        if (catalog is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var project = mode == DesignerDraftProjectOpenMode.CreateExclusive
+                ? catalog.TryCreateProjectExclusive(draftId)
+                : catalog.OpenProject(
+                    draftId,
+                    create: mode == DesignerDraftProjectOpenMode.OpenOrCreate)
+                    as WindowsDraftProjectLease;
+            if (project is null)
+            {
+                catalog.Dispose();
+                return null;
+            }
+
+            return new WindowsDesignerDraftProjectLease(
+                catalog,
+                project,
+                wasCreated: mode == DesignerDraftProjectOpenMode.CreateExclusive);
+        }
+        catch
+        {
+            catalog.Dispose();
+            throw;
+        }
+    }
+
+    public IDesignerDraftAssetsLease OpenAssets(bool create) =>
+        _project.OpenDesignerAssets(create);
+
+    public void DeleteOwnedProjectIfEmpty()
+    {
+        if (!WasCreated)
+        {
+            throw new InvalidOperationException(
+                "Only an exclusively claimed draft project can be deleted.");
+        }
+
+        _project.DeleteOwnedProjectIfEmpty();
+    }
+
+    public void Dispose()
+    {
+        _project.Dispose();
+        _catalog.Dispose();
+    }
+}
+
+internal sealed class WindowsDraftAssetsLease : IDesignerDraftAssetsLease
+{
+    private readonly WindowsDraftDirectoryLease _assets;
+    private readonly Dictionary<string, WindowsDraftFileLease> _operations =
+        new(StringComparer.Ordinal);
+
+    internal WindowsDraftAssetsLease(WindowsDraftDirectoryLease assets) =>
+        _assets = assets;
+
+    public bool FileExists(string canonicalLeafName)
+    {
+        DraftStorageName.ValidateAssetLeaf(canonicalLeafName);
+        using var file = _assets.OpenDesignerAssetFile(
+            canonicalLeafName,
+            create: false,
+            deleteAccess: false);
+        return file is not null;
+    }
+
+    public byte[] ReadAllBytes(string canonicalLeafName)
+    {
+        DraftStorageName.ValidateAssetLeaf(canonicalLeafName);
+        using var file = _assets.OpenDesignerAssetFile(
+            canonicalLeafName,
+            create: false,
+            deleteAccess: false) ?? throw new FileNotFoundException(
+                "The draft asset does not exist.",
+                canonicalLeafName);
+        return file.ReadAllBytes();
+    }
+
+    public void WriteAndFlushNew(
+        string operationLeafName,
+        ReadOnlySpan<byte> bytes,
+        CancellationToken cancellationToken)
+    {
+        DraftStorageName.ValidateAssetOperationLeaf(operationLeafName);
+        cancellationToken.ThrowIfCancellationRequested();
+        var file = _assets.OpenDesignerAssetFile(
+            operationLeafName,
+            create: true,
+            deleteAccess: false) ?? throw new IOException(
+                "The draft asset operation file could not be created.");
+        try
+        {
+            file.WriteAndFlush(bytes);
+            cancellationToken.ThrowIfCancellationRequested();
+            _operations.Add(operationLeafName, file);
+        }
+        catch
+        {
+            try
+            {
+                file.Delete();
+            }
+            finally
+            {
+                file.Dispose();
+            }
+
+            throw;
+        }
+    }
+
+    public byte[] ReadOperationBytes(string operationLeafName)
+    {
+        DraftStorageName.ValidateAssetOperationLeaf(operationLeafName);
+        if (!_operations.TryGetValue(operationLeafName, out var file))
+        {
+            throw new FileNotFoundException(
+                "The draft asset operation file does not exist.",
+                operationLeafName);
+        }
+
+        return file.ReadAllBytes();
+    }
+
+    public bool MoveCanonicalToOperation(
+        string canonicalLeafName,
+        string operationLeafName)
+    {
+        DraftStorageName.ValidateAssetLeaf(canonicalLeafName);
+        DraftStorageName.ValidateAssetOperationLeaf(operationLeafName);
+        var file = _assets.OpenDesignerAssetFile(
+            canonicalLeafName,
+            create: false,
+            deleteAccess: true);
+        if (file is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            file.RenameDesignerAssetTo(
+                _assets,
+                operationLeafName,
+                operationTarget: true);
+            _operations.Add(operationLeafName, file);
+            return true;
+        }
+        catch
+        {
+            file.Dispose();
+            throw;
+        }
+    }
+
+    public void MoveOperationToCanonical(
+        string operationLeafName,
+        string canonicalLeafName)
+    {
+        DraftStorageName.ValidateAssetOperationLeaf(operationLeafName);
+        DraftStorageName.ValidateAssetLeaf(canonicalLeafName);
+        if (!_operations.TryGetValue(operationLeafName, out var file))
+        {
+            throw new FileNotFoundException(
+                "The draft asset operation file does not exist.",
+                operationLeafName);
+        }
+
+        file.RenameDesignerAssetTo(
+            _assets,
+            canonicalLeafName,
+            operationTarget: false);
+    }
+
+    public void DeleteCanonical(string canonicalLeafName)
+    {
+        DraftStorageName.ValidateAssetLeaf(canonicalLeafName);
+        using var file = _assets.OpenDesignerAssetFile(
+            canonicalLeafName,
+            create: false,
+            deleteAccess: true);
+        file?.Delete();
+    }
+
+    public void DeleteOperation(string operationLeafName)
+    {
+        DraftStorageName.ValidateAssetOperationLeaf(operationLeafName);
+        if (_operations.Remove(operationLeafName, out var tracked))
+        {
+            try
+            {
+                tracked.Delete();
+            }
+            finally
+            {
+                tracked.Dispose();
+            }
+
+            return;
+        }
+
+        using var file = _assets.OpenDesignerOperationFileForDelete(
+            operationLeafName);
+        file?.Delete();
+    }
+
+    public void ReleaseOperation(string operationLeafName)
+    {
+        DraftStorageName.ValidateAssetOperationLeaf(operationLeafName);
+        if (_operations.Remove(operationLeafName, out var tracked))
+        {
+            tracked.Dispose();
+        }
+    }
+
+    public void DeleteDirectoryIfEmpty() => _assets.DeleteIfEmpty();
+
+    public void Dispose()
+    {
+        foreach (var operation in _operations.Values)
+        {
+            operation.Dispose();
+        }
+
+        _operations.Clear();
+        _assets.Dispose();
+    }
+}
+
+internal sealed class WindowsDesignerSourceFileLease : IDesignerSourceFileLease
+{
+    private readonly FileStream _stream;
+
+    private WindowsDesignerSourceFileLease(FileStream stream) => _stream = stream;
+
+    public long Length => _stream.Length;
+
+    internal static WindowsDesignerSourceFileLease Open(string absolutePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
+        if (!Path.IsPathFullyQualified(absolutePath))
+        {
+            throw new ArgumentException(
+                "The Designer source path must be absolute.",
+                nameof(absolutePath));
+        }
+
+        var fullPath = Path.GetFullPath(absolutePath);
+        var handle = DraftNative.OpenAbsoluteSourceFile(fullPath);
+        try
+        {
+            _ = DraftNative.ValidateFile(handle, fullPath);
+            return new WindowsDesignerSourceFileLease(
+                new FileStream(handle, FileAccess.Read));
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    public byte[] ReadAllBytes(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_stream.Length > int.MaxValue)
+        {
+            throw new InvalidDataException("The Designer source file is too large.");
+        }
+
+        var content = new byte[checked((int)_stream.Length)];
+        _stream.Position = 0;
+        _stream.ReadExactly(content);
+        cancellationToken.ThrowIfCancellationRequested();
+        return content;
+    }
+
+    public void Dispose() => _stream.Dispose();
+}
+
 internal sealed class WindowsDraftDirectoryLease : IDisposable
 {
     private readonly SafeFileHandle _handle;
@@ -396,6 +813,39 @@ internal sealed class WindowsDraftDirectoryLease : IDisposable
 
         var handle = UseValidatedHandle(parent =>
             DraftNative.OpenRelativeDirectory(parent, fixedName, create));
+        try
+        {
+            var identity = DraftNative.ValidateDirectory(handle, expectedPath, null);
+            if (identity.VolumeSerialNumber != _identity.VolumeSerialNumber)
+            {
+                throw new DraftUnsafePathException(
+                    "The draft directory moved to a different volume.");
+            }
+
+            return new WindowsDraftDirectoryLease(
+                handle,
+                Path.GetFullPath(expectedPath),
+                identity);
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    internal WindowsDraftDirectoryLease? TryCreateChildDirectoryExclusive(
+        string fixedName,
+        string expectedPath)
+    {
+        DraftStorageName.ValidateExpectedChild(ExpectedPath, fixedName, expectedPath);
+        var handle = UseValidatedHandle(parent =>
+            DraftNative.TryCreateRelativeDirectory(parent, fixedName));
+        if (handle is null)
+        {
+            return null;
+        }
+
         try
         {
             var identity = DraftNative.ValidateDirectory(handle, expectedPath, null);
@@ -481,6 +931,92 @@ internal sealed class WindowsDraftDirectoryLease : IDisposable
         }
     }
 
+    internal WindowsDraftFileLease? OpenDesignerAssetFile(
+        string fixedName,
+        bool create,
+        bool deleteAccess)
+    {
+        if (create)
+        {
+            DraftStorageName.ValidateAssetOperationLeaf(fixedName);
+        }
+        else
+        {
+            DraftStorageName.ValidateAssetLeaf(fixedName);
+        }
+
+        var expectedPath = Path.Combine(ExpectedPath, fixedName);
+        if (!create && !File.Exists(expectedPath))
+        {
+            return null;
+        }
+
+        var handle = UseValidatedHandle(parent =>
+            deleteAccess
+                ? DraftNative.OpenRelativeFileForDelete(parent, fixedName)
+                : DraftNative.OpenRelativeFile(parent, fixedName, create));
+        try
+        {
+            var identity = DraftNative.ValidateFile(handle, expectedPath);
+            if (identity.VolumeSerialNumber != _identity.VolumeSerialNumber)
+            {
+                throw new DraftUnsafePathException(
+                    "The draft asset moved to a different volume.");
+            }
+
+            return new WindowsDraftFileLease(
+                handle,
+                Path.GetFullPath(expectedPath),
+                create ? FileAccess.ReadWrite : FileAccess.Read);
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    internal WindowsDraftFileLease? OpenDesignerOperationFileForDelete(
+        string operationLeafName)
+    {
+        DraftStorageName.ValidateAssetOperationLeaf(operationLeafName);
+        var expectedPath = Path.Combine(ExpectedPath, operationLeafName);
+        if (!File.Exists(expectedPath))
+        {
+            return null;
+        }
+
+        var handle = UseValidatedHandle(parent =>
+            DraftNative.OpenRelativeFileForDelete(parent, operationLeafName));
+        try
+        {
+            _ = DraftNative.ValidateFile(handle, expectedPath);
+            return new WindowsDraftFileLease(
+                handle,
+                Path.GetFullPath(expectedPath),
+                FileAccess.Read);
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    internal void DeleteIfEmpty()
+    {
+        UseValidatedHandle(_ =>
+        {
+            if (Directory.EnumerateFileSystemEntries(ExpectedPath).Any())
+            {
+                throw new IOException("The owned draft directory is not empty.");
+            }
+
+            DraftNative.DeleteFile(_handle);
+            return true;
+        });
+    }
+
     internal TResult UseValidatedHandle<TResult>(Func<IntPtr, TResult> action)
     {
         var addedReference = false;
@@ -555,6 +1091,30 @@ internal sealed class WindowsDraftFileLease : IDisposable
         string destinationLeafName)
     {
         DraftStorageName.ValidateTargetLeaf(destinationLeafName);
+        RenameToCore(destinationParent, destinationLeafName);
+    }
+
+    internal void RenameDesignerAssetTo(
+        WindowsDraftDirectoryLease destinationParent,
+        string destinationLeafName,
+        bool operationTarget)
+    {
+        if (operationTarget)
+        {
+            DraftStorageName.ValidateAssetOperationLeaf(destinationLeafName);
+        }
+        else
+        {
+            DraftStorageName.ValidateAssetLeaf(destinationLeafName);
+        }
+
+        RenameToCore(destinationParent, destinationLeafName);
+    }
+
+    private void RenameToCore(
+        WindowsDraftDirectoryLease destinationParent,
+        string destinationLeafName)
+    {
         var destinationPath = Path.Combine(
             destinationParent.ExpectedPath,
             destinationLeafName);
@@ -700,6 +1260,50 @@ internal static class DraftStorageName
         }
     }
 
+    internal static void ValidateAssetLeaf(string leafName)
+    {
+        if (leafName is not (
+            "background.png" or "background.jpg" or
+            "center.png" or "center.jpg" or "decoration.png"))
+        {
+            throw new DraftUnsafePathException(
+                "The draft asset leaf name is not fixed by the schema.");
+        }
+    }
+
+    internal static void ValidateAssetOperationLeaf(string leafName)
+    {
+        ValidateSegment(leafName);
+        foreach (var canonical in new[]
+                 {
+                     "background.png", "background.jpg", "center.png",
+                     "center.jpg", "decoration.png"
+                 })
+        {
+            foreach (var kind in new[] { "tmp", "tomb", "rollback", "discard" })
+            {
+                var prefix = $".{canonical}.{kind}-";
+                if (!leafName.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var operationText = leafName[prefix.Length..];
+                if (Guid.TryParseExact(operationText, "D", out var operationId) &&
+                    string.Equals(
+                        operationText,
+                        operationId.ToString("D").ToLowerInvariant(),
+                        StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+        }
+
+        throw new DraftUnsafePathException(
+            "The draft asset operation leaf name is invalid.");
+    }
+
     private static void ValidateSegment(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -767,6 +1371,27 @@ internal static class DraftNative
         return handle;
     }
 
+    internal static SafeFileHandle OpenAbsoluteSourceFile(string fullPath)
+    {
+        var handle = CreateFileW(
+            fullPath,
+            GenericRead | FileReadAttributes,
+            FileShare.Read,
+            IntPtr.Zero,
+            OpenExisting,
+            FileFlagOpenReparsePoint,
+            IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            var exception = Win32Error(
+                "The Designer source file lease could not be opened.");
+            handle.Dispose();
+            throw exception;
+        }
+
+        return handle;
+    }
+
     internal static SafeFileHandle OpenRelativeDirectory(
         IntPtr parentHandle,
         string name,
@@ -779,7 +1404,21 @@ internal static class DraftNative
             FileShareRead | FileShareWrite,
             create ? FileOpenIf : FileOpen,
             FileDirectoryFile | FileSynchronousIoNonAlert | FileOpenReparsePoint,
-            fileAttributes: 0);
+            fileAttributes: 0)!;
+
+    internal static SafeFileHandle? TryCreateRelativeDirectory(
+        IntPtr parentHandle,
+        string name) =>
+        OpenRelative(
+            parentHandle,
+            name,
+            FileListDirectory | FileAddFile | FileAddSubdirectory |
+                FileTraverse | FileReadAttributes | DeleteAccess | Synchronize,
+            FileShareRead | FileShareWrite,
+            FileCreate,
+            FileDirectoryFile | FileSynchronousIoNonAlert | FileOpenReparsePoint,
+            fileAttributes: 0,
+            nullOnNameCollision: true);
 
     internal static SafeFileHandle OpenRelativeFile(
         IntPtr parentHandle,
@@ -795,7 +1434,7 @@ internal static class DraftNative
                 : FileShareRead | FileShareWrite | FileShareDelete,
             create ? FileCreate : FileOpen,
             FileNonDirectoryFile | FileSynchronousIoNonAlert | FileOpenReparsePoint,
-            FileAttributeNormal);
+            FileAttributeNormal)!;
 
     internal static SafeFileHandle OpenRelativeFileForDelete(
         IntPtr parentHandle,
@@ -807,7 +1446,7 @@ internal static class DraftNative
             FileShareRead,
             FileOpen,
             FileNonDirectoryFile | FileSynchronousIoNonAlert | FileOpenReparsePoint,
-            FileAttributeNormal);
+            FileAttributeNormal)!;
 
     internal static DraftDirectoryIdentity ValidateDirectory(
         SafeFileHandle handle,
@@ -902,14 +1541,15 @@ internal static class DraftNative
         }
     }
 
-    private static SafeFileHandle OpenRelative(
+    private static SafeFileHandle? OpenRelative(
         IntPtr parentHandle,
         string name,
         uint desiredAccess,
         uint shareAccess,
         uint createDisposition,
         uint createOptions,
-        uint fileAttributes)
+        uint fileAttributes,
+        bool nullOnNameCollision = false)
     {
         var nameBuffer = Marshal.StringToHGlobalUni(name);
         var unicodeStringPointer = IntPtr.Zero;
@@ -950,6 +1590,11 @@ internal static class DraftNative
                 {
                     new SafeFileHandle(rawHandle, ownsHandle: true).Dispose();
                     rawHandle = IntPtr.Zero;
+                }
+
+                if (nullOnNameCollision && status == unchecked((int)0xC0000035))
+                {
+                    return null!;
                 }
 
                 throw NtStatusError(

@@ -116,6 +116,12 @@ public sealed class SyntheticPreviewComposition : IDisposable
         HudWindow.SetPreviewWorkArea(workArea);
     }
 
+    public void RecenterHudInPreviewWorkArea(Rect workArea)
+    {
+        SetPreviewWorkArea(workArea);
+        HudWindow.CenterInPreviewWorkArea();
+    }
+
     public void ShowHud()
     {
         ObjectDisposedException.ThrowIf(

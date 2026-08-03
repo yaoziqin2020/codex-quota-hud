@@ -75,6 +75,67 @@ public sealed class DraftRecoveryService : IAsyncDisposable
         return completion.Task;
     }
 
+    public async Task DiscardAsync(
+        Guid draftId,
+        long maximumRevision,
+        CancellationToken cancellationToken = default)
+    {
+        Task pendingDelay;
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposing, this);
+            ThrowIfNewerRecoveryPending(draftId, maximumRevision);
+            pendingDelay = CancelPendingDelayLocked();
+            if (_latest?.DraftId == draftId &&
+                _latest.Revision <= maximumRevision)
+            {
+                _latest = null;
+            }
+        }
+
+        await AwaitSettledAsync(pendingDelay).ConfigureAwait(false);
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            lock (_sync)
+            {
+                ThrowIfNewerRecoveryPending(draftId, maximumRevision);
+            }
+
+            var removed = await _store.DiscardWorkingCopyAsync(
+                draftId,
+                maximumRevision,
+                cancellationToken).ConfigureAwait(false);
+            if (!removed)
+            {
+                throw new InvalidOperationException(
+                    "draft.discard-rejected: The recovery is corrupt, newer, or could not be deleted safely.");
+            }
+
+            lock (_sync)
+            {
+                if (_latest is null)
+                {
+                    _lastSavedRevision = -1;
+                }
+            }
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    private void ThrowIfNewerRecoveryPending(Guid draftId, long maximumRevision)
+    {
+        if (_latest?.DraftId == draftId &&
+            _latest.Revision > maximumRevision)
+        {
+            throw new InvalidOperationException(
+                "draft.discard-rejected: A newer in-memory recovery is pending and was preserved.");
+        }
+    }
+
     public ValueTask DisposeAsync()
     {
         TaskCompletionSource completion;

@@ -199,12 +199,18 @@ public sealed class DraftRecoveryServiceTests
         };
         await using var service = CreateService(files, delay);
         var failures = new List<DraftPersistenceFailure>();
-        service.SaveFailed += (_, failure) => failures.Add(failure);
+        var failureRaised = NewSignal();
+        service.SaveFailed += (_, failure) =>
+        {
+            failures.Add(failure);
+            failureRaised.TrySetResult();
+        };
 
         service.NotifyMeaningfulChange(Draft(7));
         await service.FlushAsync();
         service.NotifyMeaningfulChange(Draft(8));
         await service.FlushAsync();
+        await failureRaised.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         var failure = Assert.Single(failures);
         Assert.Equal(DraftId, failure.DraftId);
@@ -269,6 +275,40 @@ public sealed class DraftRecoveryServiceTests
 
         Assert.True(reentrantCompleted);
         Assert.Equal([10L], files.SavedRevisions);
+    }
+
+    [Fact]
+    public async Task Discard_WhenNewerInMemoryRevisionIsPending_PreservesDebounceAndDiskEvidence()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "CodexQuotaHud-Task14-recovery-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var paths = new SkinStoragePaths(root);
+        var store = new DraftStore(paths);
+        var delay = new ManualDelay();
+        var service = new DraftRecoveryService(store, delay.DelayAsync);
+        try
+        {
+            await store.SaveRecoveryAsync(Draft(1));
+            var recoveryPath = new DraftProjectPaths(
+                paths.DraftsRoot,
+                DraftId).RecoveryPath;
+            var evidence = await File.ReadAllBytesAsync(recoveryPath);
+            service.NotifyMeaningfulChange(Draft(2));
+            await delay.WaitForRequestCountAsync(1);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                service.DiscardAsync(DraftId, maximumRevision: 1));
+
+            Assert.False(delay.IsContinuationCompleted(0));
+            Assert.Equal(evidence, await File.ReadAllBytesAsync(recoveryPath));
+        }
+        finally
+        {
+            await service.DisposeAsync();
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     private static DraftRecoveryService CreateService(

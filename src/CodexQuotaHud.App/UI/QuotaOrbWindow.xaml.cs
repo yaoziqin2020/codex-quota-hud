@@ -336,6 +336,25 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         ClampToNearestWorkArea(save: false);
     }
 
+    internal void CenterInPreviewWorkArea()
+    {
+        if (_previewWorkArea is not { } workArea)
+        {
+            return;
+        }
+
+        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var position = WindowPositioning.Clamp(
+            workArea.Left + ((workArea.Width - width) / 2),
+            workArea.Top + ((workArea.Height - height) / 2),
+            width,
+            height,
+            workArea);
+        Left = position.Left;
+        Top = position.Top;
+    }
+
     internal void ShowSyntheticHud()
     {
         _suppressAutomaticShow = false;

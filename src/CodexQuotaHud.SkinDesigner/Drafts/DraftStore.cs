@@ -36,6 +36,22 @@ public sealed class DraftStore
         CancellationToken cancellationToken = default) =>
         SaveAsync(draft, RecoveryLeaf, cancellationToken);
 
+    public Task<bool> DiscardWorkingCopyAsync(
+        Guid draftId,
+        long maximumRevision,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (draftId == Guid.Empty || maximumRevision < 0)
+        {
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(_leaseProvider is null
+            ? DiscardWorkingCopyPhysical(draftId, maximumRevision)
+            : DiscardWorkingCopyLeased(draftId, maximumRevision));
+    }
+
     public DraftOpenResult LoadForOpen(Guid draftId)
     {
         if (_leaseProvider is not null)
@@ -254,6 +270,93 @@ public sealed class DraftStore
             System.Runtime.ExceptionServices.ExceptionDispatchInfo
                 .Capture(pending)
                 .Throw();
+        }
+    }
+
+    private bool DiscardWorkingCopyPhysical(
+        Guid draftId,
+        long maximumRevision)
+    {
+        try
+        {
+            var project = new DraftProjectPaths(_draftsRoot, draftId);
+            if (!_files.DirectoryExists(project.ProjectRoot))
+            {
+                return true;
+            }
+
+            EnsureNoExistingReparsePoint(project.ProjectRoot);
+            if (!_files.FileExists(project.RecoveryPath))
+            {
+                return true;
+            }
+
+            if ((_files.GetAttributes(project.RecoveryPath) &
+                    FileAttributes.ReparsePoint) != 0)
+            {
+                return false;
+            }
+
+            var parsed = DraftJsonCodec.Parse(
+                _files.ReadAllBytes(project.RecoveryPath));
+            if (!parsed.IsValid ||
+                parsed.Value is null ||
+                parsed.Value.DraftId != draftId ||
+                parsed.Value.Revision > maximumRevision)
+            {
+                return false;
+            }
+
+            _files.DeleteFile(project.RecoveryPath);
+            return !_files.FileExists(project.RecoveryPath);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+                ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private bool DiscardWorkingCopyLeased(
+        Guid draftId,
+        long maximumRevision)
+    {
+        try
+        {
+            _ = new DraftProjectPaths(_draftsRoot, draftId);
+            using var catalog = _leaseProvider!.OpenCatalog(
+                _draftsRoot,
+                create: false);
+            if (catalog is null)
+            {
+                return true;
+            }
+
+            using var project = catalog.OpenProject(draftId, create: false);
+            if (project is null || !project.FileExists(RecoveryLeaf))
+            {
+                return true;
+            }
+
+            var parsed = DraftJsonCodec.Parse(
+                project.ReadAllBytes(RecoveryLeaf));
+            if (!parsed.IsValid ||
+                parsed.Value is null ||
+                parsed.Value.DraftId != draftId ||
+                parsed.Value.Revision > maximumRevision)
+            {
+                return false;
+            }
+
+            project.DeleteFile(RecoveryLeaf);
+            return !project.FileExists(RecoveryLeaf);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+                ArgumentException)
+        {
+            return false;
         }
     }
 

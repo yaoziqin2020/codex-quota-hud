@@ -1,11 +1,26 @@
 using CodexQuotaHud.SkinDesigner;
+using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.Skins.Contracts;
+using CodexQuotaHud.Skins.Packaging;
+using CodexQuotaHud.Skins.Storage;
 
 namespace CodexQuotaHud.SkinDesigner.Tests;
 
 public sealed class AppCompositionTests
 {
+    [Fact]
+    public void StartupCompositionCarriesTheRealDocumentWorkspaceNotABareDraft()
+    {
+        var factoryProperties = typeof(DesignerStartupFactories)
+            .GetProperties()
+            .Select(property => property.Name)
+            .ToArray();
+
+        Assert.Contains("CreateDocumentWorkspace", factoryProperties);
+        Assert.DoesNotContain("CreateDraft", factoryProperties);
+    }
+
     private static readonly string[] ForbiddenServiceNames =
     [
         "RestartableQuotaClient",
@@ -21,6 +36,7 @@ public sealed class AppCompositionTests
         var calls = new List<string>();
         using var lease = new RecordingLease(calls);
         var window = new RecordingWindow(calls);
+        var workspace = CreateWorkspace();
         var factories = new DesignerStartupFactories(
             () =>
             {
@@ -29,12 +45,14 @@ public sealed class AppCompositionTests
             },
             () =>
             {
-                calls.Add("SkinDraftDocument");
-                return CreateDraft();
+                calls.Add("DesignerDocumentWorkspace");
+                return workspace;
             },
-            draft =>
+            actual =>
             {
-                Assert.NotNull(draft);
+                Assert.Same(workspace, actual);
+                Assert.NotNull(actual.Initial.Draft);
+                Assert.NotNull(actual.Documents);
                 calls.Add("MainWindow");
                 return window;
             });
@@ -47,7 +65,7 @@ public sealed class AppCompositionTests
         Assert.Equal(
             [
                 "DesignerSingleInstanceGuard",
-                "SkinDraftDocument",
+                "DesignerDocumentWorkspace",
                 "MainWindow",
                 "MainWindow.Show"
             ],
@@ -62,14 +80,14 @@ public sealed class AppCompositionTests
     [Fact]
     public void TryCreate_WhenDesignerLeaseIsUnavailableCreatesNothingElse()
     {
-        var draftCreated = false;
+        var workspaceCreated = false;
         var windowCreated = false;
         var factories = new DesignerStartupFactories(
             () => null,
             () =>
             {
-                draftCreated = true;
-                return CreateDraft();
+                workspaceCreated = true;
+                return CreateWorkspace();
             },
             _ =>
             {
@@ -81,7 +99,7 @@ public sealed class AppCompositionTests
             DesignerStartupComposition.TryCreate(factories);
 
         Assert.Null(composition);
-        Assert.False(draftCreated);
+        Assert.False(workspaceCreated);
         Assert.False(windowCreated);
     }
 
@@ -101,4 +119,24 @@ public sealed class AppCompositionTests
             Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
             DateTimeOffset.Parse("2026-08-02T00:00:00Z"),
             SemanticVersion.Parse("1.1.1"));
+
+    private static DesignerDocumentWorkspace CreateWorkspace()
+    {
+        var paths = new SkinStoragePaths(Path.Combine(
+            Path.GetTempPath(),
+            "CodexQuotaHud-Task14-composition-" + Guid.NewGuid().ToString("N")));
+        var documents = new DesignerDocumentService(
+            paths,
+            new DraftStore(paths),
+            new InstalledSkinCatalog(
+                paths,
+                SemanticVersion.Parse("1.1.1")),
+            new SkinPackageReader());
+        return new DesignerDocumentWorkspace(
+            new DesignerDocumentResult(
+                CreateDraft(),
+                new Dictionary<SkinAssetSlot, SkinAsset>(),
+                []),
+            documents);
+    }
 }
