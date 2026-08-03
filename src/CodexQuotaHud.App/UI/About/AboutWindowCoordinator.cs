@@ -6,6 +6,11 @@ internal sealed class AboutWindowCoordinator : IDisposable
     private IAboutWindow? _window;
     private int _disposed;
 
+    internal AboutWindowCoordinator()
+        : this(() => new AboutWindow(AboutInformation.Current))
+    {
+    }
+
     internal AboutWindowCoordinator(Func<IAboutWindow> createWindow)
     {
         _createWindow = createWindow ?? throw new ArgumentNullException(

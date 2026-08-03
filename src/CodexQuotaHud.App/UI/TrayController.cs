@@ -30,7 +30,8 @@ public sealed class TrayController : IDisposable
             catalog,
             skinController,
             tryActivateSkinKey,
-            skinManagement: null)
+            skinManagement: null,
+            showAbout: null)
     {
     }
 
@@ -39,7 +40,8 @@ public sealed class TrayController : IDisposable
         HudSkinCatalog catalog,
         SkinController skinController,
         Func<string, bool> tryActivateSkinKey,
-        SkinManagementController? skinManagement)
+        SkinManagementController? skinManagement,
+        Action? showAbout = null)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
@@ -73,6 +75,10 @@ public sealed class TrayController : IDisposable
         };
         menu.Items.Add(_statusItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
+
+        var aboutAction = showAbout ?? (() => { });
+        var aboutItem = menu.Items.Add("关于");
+        aboutItem.Click += (_, _) => aboutAction();
 
         var exitItem = menu.Items.Add("退出");
         exitItem.Click += (_, _) =>

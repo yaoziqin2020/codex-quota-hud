@@ -32,6 +32,7 @@
                 <Separator />
                 <MenuItem Header="{Binding StatusText}" IsEnabled="False" />
                 <Separator />
+                <MenuItem x:Name="AboutMenuItem" Header="关于" Click="OnAboutClick" />
                 <MenuItem Header="退出" Command="{Binding ExitCommand}" />
             </ContextMenu>
         </Grid.ContextMenu>

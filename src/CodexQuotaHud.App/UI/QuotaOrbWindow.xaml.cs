@@ -27,6 +27,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
     private readonly QuotaOrbViewModel _viewModel;
     private readonly SkinController _skinController;
     private readonly SkinManagementController? _skinManagement;
+    private readonly Action _showAbout;
     private readonly OrbAnimationController _animationController;
     private readonly EdgeAutoHideController _edgeAutoHideController;
     private readonly DetailsPopupTogglePolicy _detailsTogglePolicy = new();
@@ -45,7 +46,8 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             viewModel,
             new SkinController(),
             initializeSelection: true,
-            skinManagement: null)
+            skinManagement: null,
+            showAbout: null)
     {
     }
 
@@ -56,7 +58,21 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             viewModel,
             skinController,
             initializeSelection: false,
-            skinManagement: null)
+            skinManagement: null,
+            showAbout: null)
+    {
+    }
+
+    internal QuotaOrbWindow(
+        QuotaOrbViewModel viewModel,
+        SkinController skinController,
+        Action showAbout)
+        : this(
+            viewModel,
+            skinController,
+            initializeSelection: false,
+            skinManagement: null,
+            showAbout)
     {
     }
 
@@ -68,7 +84,22 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             viewModel,
             skinController,
             initializeSelection: false,
-            skinManagement)
+            skinManagement,
+            showAbout: null)
+    {
+    }
+
+    internal QuotaOrbWindow(
+        QuotaOrbViewModel viewModel,
+        SkinController skinController,
+        SkinManagementController skinManagement,
+        Action showAbout)
+        : this(
+            viewModel,
+            skinController,
+            initializeSelection: false,
+            skinManagement,
+            showAbout)
     {
     }
 
@@ -76,13 +107,15 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         QuotaOrbViewModel viewModel,
         SkinController skinController,
         bool initializeSelection,
-        SkinManagementController? skinManagement)
+        SkinManagementController? skinManagement,
+        Action? showAbout)
     {
         InitializeComponent();
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _skinController = skinController ?? throw new ArgumentNullException(
             nameof(skinController));
         _skinManagement = skinManagement;
+        _showAbout = showAbout ?? (() => { });
         DataContext = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _viewModel.SetSkinActivationHandler(TryActivateSkinKey);
@@ -683,6 +716,8 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         ApplyActiveSkin();
         RebuildOrbSkinMenu();
     }
+
+    private void OnAboutClick(object sender, RoutedEventArgs e) => _showAbout();
 
     private void OnManagedCatalogChanged(object? sender, EventArgs e) =>
         RebuildOrbSkinMenu();

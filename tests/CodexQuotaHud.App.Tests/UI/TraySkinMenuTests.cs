@@ -130,6 +130,54 @@ public sealed class TraySkinMenuTests
         });
 
     [Fact]
+    public void AboutEntries_PrecedeExitAndInvokeSharedAction() =>
+        RunSta(() =>
+        {
+            using var fixture = new CompositionFixture();
+            var aboutCalls = 0;
+            var window = new QuotaOrbWindow(
+                fixture.ViewModel,
+                fixture.SkinController,
+                fixture.Management,
+                () => aboutCalls++);
+            var tray = new TrayController(
+                fixture.ViewModel,
+                fixture.Catalog,
+                fixture.SkinController,
+                window.TryActivateSkinKey,
+                fixture.Management,
+                () => aboutCalls++);
+
+            try
+            {
+                var wpfItems = window.OrbContextMenu.Items
+                    .OfType<MenuItem>()
+                    .ToArray();
+                var trayItems = GetTrayContextMenu(tray).Items
+                    .OfType<Forms.ToolStripMenuItem>()
+                    .ToArray();
+
+                Assert.Equal(
+                    ["关于", "退出"],
+                    wpfItems.TakeLast(2).Select(item => item.Header));
+                Assert.Equal(
+                    ["关于", "退出"],
+                    trayItems.TakeLast(2).Select(item => item.Text));
+
+                wpfItems[^2].RaiseEvent(
+                    new RoutedEventArgs(MenuItem.ClickEvent));
+                trayItems[^2].PerformClick();
+
+                Assert.Equal(2, aboutCalls);
+            }
+            finally
+            {
+                window.CloseForExit();
+                tray.Dispose();
+            }
+        });
+
+    [Fact]
     public void RealWindowAndTrayShareControllerSynchronizeAndUnsubscribe() =>
         RunSta(() =>
         {
@@ -236,6 +284,12 @@ public sealed class TraySkinMenuTests
         Assert.IsType<Forms.ToolStripMenuItem>(typeof(TrayController)
             .GetField("_skinMenu", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(tray));
+
+    private static Forms.ContextMenuStrip GetTrayContextMenu(TrayController tray) =>
+        Assert.IsType<Forms.NotifyIcon>(typeof(TrayController)
+            .GetField("_notifyIcon", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(tray))
+            .ContextMenuStrip!;
 
     private static void RunSta(Action action)
     {
