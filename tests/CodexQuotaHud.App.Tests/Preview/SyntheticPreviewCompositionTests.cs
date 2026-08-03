@@ -124,6 +124,26 @@ public sealed class SyntheticPreviewCompositionTests
     }
 
     [Fact]
+    public void WorkAreaUpdate_DoesNotPreventQuotaReturningAfterNoQuota()
+    {
+        RunSta(() =>
+        {
+            using var composition = new SyntheticPreviewComposition(
+                Dispatcher.CurrentDispatcher,
+                () => { });
+            composition.ShowHud();
+            composition.SetPreviewWorkArea(new Rect(100, 100, 600, 500));
+
+            composition.Session.SetDisplayChoice(PreviewDisplayChoice.NoQuota);
+            Assert.False(composition.HudWindow.IsVisible);
+
+            composition.Session.SetDisplayChoice(PreviewDisplayChoice.Dual);
+
+            Assert.True(composition.HudWindow.IsVisible);
+        });
+    }
+
+    [Fact]
     public void SwitchingFromSyntheticToBuiltIn_RendersLatestQuotaState()
     {
         RunSta(() =>

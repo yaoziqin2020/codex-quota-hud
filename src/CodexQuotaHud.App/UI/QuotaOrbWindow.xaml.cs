@@ -38,7 +38,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
     private bool _contextMenuOpen;
     private SyntheticSkinCandidate? _activeSyntheticSkin;
     private WorkArea? _previewWorkArea;
-    private bool _suppressAutomaticShow;
+    private bool _suppressAutomaticShow = true;
 
     public QuotaOrbWindow(QuotaOrbViewModel viewModel)
         : this(
@@ -327,7 +327,6 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
 
     internal void SetPreviewWorkArea(Rect workArea)
     {
-        _suppressAutomaticShow = true;
         _previewWorkArea = new WorkArea(
             workArea.Left,
             workArea.Top,
