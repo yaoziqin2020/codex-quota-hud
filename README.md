@@ -72,15 +72,17 @@ application or its release assets.
 The current source after public `v1.1.1` adds safe data-only `.cqskin` import
 to the normal HUD, a shared `CodexQuotaHud.Skins` runtime library, and a
 separate Skin Designer application. The current branch also adds an About
-window and fixes Designer preview recovery after selecting `None`. These
-changes are **unreleased**: a local v1.2.0 acceptance candidate is installed on
-the maintainer machine, but no new public Setup, ZIP, tag, or GitHub Release is
+window, fixes Designer preview recovery after selecting `None`, and restores
+formal-HUD automatic display after quota arrives during startup. These changes
+are **unreleased**: a local v1.2.0 acceptance candidate is installed on the
+maintainer machine, but no new public Setup, ZIP, tag, or GitHub Release is
 claimed here.
 
 当前源码在公开版 `v1.1.1` 之后新增了正式 HUD 的安全 `.cqskin` 导入、共享的
-`CodexQuotaHud.Skins` 运行库、独立皮肤设计器、“关于”窗口，以及选择 `None` 后恢复
-预览的修复。这些变更**尚未公开发布**；维护者本机已安装 v1.2.0 验收候选，但本文不声称
-已有新的公开 Setup、ZIP、标签或 GitHub Release。
+`CodexQuotaHud.Skins` 运行库、独立皮肤设计器、“关于”窗口、选择 `None` 后恢复
+预览的修复，以及启动读取额度后正式 HUD 自动显示的修复。这些变更**尚未公开发布**；
+维护者本机已安装 v1.2.0 验收候选，但本文不声称已有新的公开 Setup、ZIP、标签或
+GitHub Release。
 
 The unreleased Setup definition shows an optional component named **Install
 Skin Designer**, with this description: “Optional visual editor for creating
@@ -312,7 +314,7 @@ dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
 自包含发布检查。
 
-最新完整解法测试为 `1341/1341`、跳过 `0`，Release build 为
+最新完整解法测试为 `1343/1343`、跳过 `0`，Release build 为
 `0` warnings / `0` errors；三套安全与回滚筛选分别为 `223/223`、`224/224`
 和 `116/116`。同一提交较早的一次完整测试曾出现 `1` 项未能复现、未能取得
 `result.Errors` 的存储删除失败，因此自动 gate 记录为带未解决异常的通过证据，

@@ -10,8 +10,14 @@
   later non-empty mode could not show it again. Preview-only work-area updates
   no longer re-arm the automatic-show suppression flag. Added the focused
   `WorkAreaUpdate_DoesNotPreventQuotaReturningAfterNoQuota` regression test.
-- Latest verification passed Core `75/75`, Skins `325/325`, App/UI `607/607`,
-  and Designer `334/334`, total `1341/1341` with `0` skipped. Release build
+- Fixed the formal-HUD startup regression introduced while repairing that
+  Designer transition. Automatic-show suppression is now selected explicitly
+  only by the synthetic Designer composition; normal windows never inherit it.
+  Formal windows also synchronize quota that arrived before construction
+  completed. Focused tests cover both quota-arrival orders and preserve the
+  preview's intentionally hidden initial window.
+- Latest verification passed Core `75/75`, Skins `325/325`, App/UI `609/609`,
+  and Designer `334/334`, total `1343/1343` with `0` skipped. Release build
   completed with `0` warnings and `0` errors.
 - Fixed the installed-host About crash reported during real GUI acceptance.
   Windows event evidence traced it to the unembedded `Assets/AppIcon.ico` WPF
@@ -19,10 +25,10 @@
   host failure, embedded the icon, and contained optional About-window failures
   so they are reported without terminating the HUD or Designer and can be
   retried. The corrected installed binaries identify commit `bf8e16d`.
-- Built the local v1.2.0 candidate. Setup SHA-256 is
-  `89EB326371EB5DB60C7A5CE72DE7FC93FDFE8339BCA262AC4FCDF3C3C5F3470B`;
+- Built the latest local v1.2.0 candidate from commit `c3d545e`. Setup SHA-256 is
+  `869D197E530053313E9EB54F41FB239551BBF35177A381C9A69C0E88A0C0E576`;
   normal-only ZIP SHA-256 is
-  `AA41000758934023ECB811AFED86E70E9C3C28377E9816373E6BD44CA34C0E8E`.
+  `A99DB908F700E446A36BAD58655C79D583D658E4250A956ED2C01095239C6452`.
   Setup, App, and Designer remain `NotSigned`.
 - Real local upgrade installation completed with exit code `0`. Installed App
   and Designer hashes match the packaged publish tree, the uninstall entry is
@@ -35,6 +41,16 @@
   pre-fix window crash was reproduced and corrected as described above; the
   corrected real window still needs one visual acceptance click, so that row
   remains `NOT RUN`.
+- A post-reboot report showed current tray quota while the formal HUD remained
+  hidden. Source history traced this to commit `07b73d5`, which accidentally
+  made Designer-only automatic-show suppression the default for every HUD
+  window. Red/green tests reproduced both quota-after-window and quota-before-
+  window startup orders. A temporary opt-in trace then observed a real formal
+  startup execute `Show()` with `IsVisible=True`, `Visibility=Visible`, and a
+  nonzero WPF handle. The trace code and local trace files were removed. The
+  final installed binary reports
+  `1.2.0+c3d545ea0cd709d291d22fa8486ca5f270695b20`; direct user visual
+  confirmation remains pending.
 - Distinguished two historical `0.0.0` candidates: the earlier isolated Task
   18 package was never run; a later production-structure candidate was
   mistakenly installed, then replaced by v1.2.0. Its obsolete Setup/ZIP were

@@ -395,8 +395,8 @@ promote this record to PASS or authorize release.
 This continuation supersedes only the local candidate evidence below; it does
 not convert the remaining manual matrix rows to PASS or authorize a release.
 
-- Automated regression gate: Core `75/75`, Skins `325/325`, App/UI `607/607`,
-  Designer `334/334`, total `1341/1341`, skipped `0`.
+- Automated regression gate: Core `75/75`, Skins `325/325`, App/UI `609/609`,
+  Designer `334/334`, total `1343/1343`, skipped `0`.
 - One preceding run intentionally overlapped the installed Designer GUI and
   produced three `DesignerSingleInstanceGuardTests` ownership failures because
   the real process held the production mutex. After closing that process, the
@@ -413,13 +413,26 @@ not convert the remaining manual matrix rows to PASS or authorize a release.
   About construction/show/activation failures so the optional window cannot
   terminate the HUD or Designer and remains retryable. Exact About tests pass
   `5/5`.
-- The corrected `v1.2.0` package installed with exit code `0`; installed App
-  and Designer hashes match the corrected publish outputs, and both report
-  product version `1.2.0+bf8e16dadae165e71ed025cf96369f3cae58873c`.
+- The latest corrected `v1.2.0` package installed with exit code `0`; installed
+  App and Designer hashes match the publish outputs. The App reports product
+  version `1.2.0+c3d545ea0cd709d291d22fa8486ca5f270695b20`.
 - Corrected Setup SHA-256:
-  `89EB326371EB5DB60C7A5CE72DE7FC93FDFE8339BCA262AC4FCDF3C3C5F3470B`.
+  `869D197E530053313E9EB54F41FB239551BBF35177A381C9A69C0E88A0C0E576`.
 - Corrected normal-only ZIP SHA-256:
-  `AA41000758934023ECB811AFED86E70E9C3C28377E9816373E6BD44CA34C0E8E`.
+  `A99DB908F700E446A36BAD58655C79D583D658E4250A956ED2C01095239C6452`.
 - The corrected real About window still requires one direct visual acceptance
   click. That row remains `NOT RUN`; the crash reproduction and automated
   installed-host resource path are PASS.
+- A post-reboot report established that the tray had current quota while the
+  formal HUD remained hidden. Git history traced the new regression to
+  `07b73d5`: Designer-only automatic-show suppression became the default for
+  every `QuotaOrbWindow`. Commit `950b4d2` makes that suppression explicit only
+  in `SyntheticPreviewComposition`; commit `c3d545e` also synchronizes quota
+  already present when formal-window construction completes.
+- Focused red/green tests cover quota arriving before and after formal-window
+  construction, plus the intentionally hidden initial Designer-preview window
+  and `None -> visible` recovery. A temporary opt-in runtime trace observed a
+  real transition from hidden quota to `model=True`, then `Show()`,
+  `IsVisible=True`, `Visibility=Visible`, and a nonzero WPF window handle. The
+  trace code, installed diagnostic executable, and trace log were removed.
+  Direct user visual confirmation after the final reinstall remains `NOT RUN`.

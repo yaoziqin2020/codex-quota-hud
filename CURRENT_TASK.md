@@ -3,9 +3,10 @@
 ## Unreleased v1.2.0 local candidate — PARTIAL
 
 The current branch now includes the optional Skin Designer, the shared custom-
-skin runtime, a compact About window, and the Designer preview recovery fix for
-`None -> Dual/5h/Week`. It is installed on the maintainer machine as a local
-`1.2.0` acceptance candidate, but it is not tagged, uploaded, or published.
+skin runtime, a compact About window, the Designer preview recovery fix for
+`None -> Dual/5h/Week`, and the formal-HUD startup visibility regression fix.
+It is installed on the maintainer machine as a local `1.2.0` acceptance
+candidate, but it is not tagged, uploaded, or published.
 
 Source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` adds the shared
 custom-skin runtime/import path and a separate optional Skin Designer. It is
@@ -15,14 +16,16 @@ unreleased and is not part of the installed or published `v1.1.1` build.
 
 Automated evidence is `PASS with unresolved historical anomaly`; overall
 feature acceptance is **PARTIAL — no public release is authorized**. The latest
-full-solution run passed Core `75/75`, Skins `325/325`, App/UI `607/607`, and
-Designer `334/334`, for `1341/1341` with `0` skipped. Release build passed with
+full-solution run passed Core `75/75`, Skins `325/325`, App/UI `609/609`, and
+Designer `334/334`, for `1343/1343` with `0` skipped. Release build passed with
 `0` warnings and `0` errors. The earlier exact security/rollback suites passed
 Skins `223/223`, App `224/224`, and Designer `116/116`.
 
 The local `v1.2.0` Setup upgrade completed with exit code `0`. Installed App
-and Designer binaries are version `1.2.0.0` and exactly match the packaged
-publish hashes. The uninstall entry reports `1.2.0`; formal startup remains
+and Designer binaries are version `1.2.0.0`; the App reports product version
+`1.2.0+c3d545ea0cd709d291d22fa8486ca5f270695b20`, and installed binaries
+exactly match the packaged publish hashes. The uninstall entry reports
+`1.2.0`; formal startup remains
 `CodexQuotaHud.App.exe --background`. Setup created only the ordinary-user
 normal desktop/Start-menu shortcuts and the optional Designer Start-menu
 shortcut. After that product acceptance, the maintainer desktop was separately
@@ -43,6 +46,20 @@ cover the installed-host resource construction, content, shared single-instance
 coordinator, HUD/tray action wiring, failure containment, retry, and disposal.
 The corrected real About window has not yet been visually accepted, so that
 manual row remains `NOT RUN`, not `PASS`.
+
+The user then reported that, after reboot, the tray had current quota data but
+the formal HUD was absent. This is a new regression from preview recovery work,
+not a historical startup race: commit `07b73d5` initialized automatic-show
+suppression for every `QuotaOrbWindow`, while only Designer preview cleared it.
+Commit `950b4d2` makes suppression an explicit Designer-preview-only choice.
+Commit `c3d545e` also synchronizes a quota state that is already present when a
+formal window finishes construction. Both arrival orders failed focused tests
+before their fixes and now pass. A temporary opt-in runtime trace recorded the
+real startup transition from hidden data to `model=True`, followed by
+`Show()`, `IsVisible=True`, `Visibility=Visible`, and a nonzero WPF handle.
+The temporary trace code and files were removed; the installed formal process
+is now running from the packaged `c3d545e` executable. Direct user visual
+confirmation after this reinstall is still required.
 
 One earlier full-solution run at the same commit remains an unresolved anomaly:
 `SkinPackageInstallerTests.Remove_DeletesExactlyOneCanonicalCustomDirectoryAndPreservesSiblings`
@@ -77,9 +94,9 @@ as evidence.
 The current local candidate artifacts are:
 
 - Setup: `CodexQuotaHud-Setup-v1.2.0.exe` — SHA-256
-  `89EB326371EB5DB60C7A5CE72DE7FC93FDFE8339BCA262AC4FCDF3C3C5F3470B`
+  `869D197E530053313E9EB54F41FB239551BBF35177A381C9A69C0E88A0C0E576`
 - ZIP: `CodexQuotaHud-v1.2.0-win-x64.zip` — SHA-256
-  `AA41000758934023ECB811AFED86E70E9C3C28377E9816373E6BD44CA34C0E8E`
+  `A99DB908F700E446A36BAD58655C79D583D658E4250A956ED2C01095239C6452`
 
 ### Next continuation point
 
