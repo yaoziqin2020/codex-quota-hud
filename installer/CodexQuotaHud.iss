@@ -10,6 +10,7 @@ AppId={#EffectiveAppId}
 AppName=Codex Quota HUD
 AppVersion={#AppVersion}
 AppPublisher=老姚
+UsePreviousSetupType=yes
 #ifdef InternalTestRoot
 DefaultDirName={#InternalTestRoot}\LocalAppData\Programs\CodexQuotaHud
 #else
@@ -36,6 +37,16 @@ english.StartupTask=Start Codex Quota HUD automatically when I sign in
 chinesesimp.StartupTask=登录 Windows 时自动启动 Codex Quota HUD
 english.DesktopTask=Create a desktop shortcut
 chinesesimp.DesktopTask=创建桌面快捷方式
+english.DesignerComponentName=Install Skin Designer
+chinesesimp.DesignerComponentName=安装皮肤设计器
+english.DesignerComponentDescription=Optional visual editor for creating and exporting Codex Quota HUD skins. It is not required to run or import skins.
+chinesesimp.DesignerComponentDescription=用于创建并导出 Codex Quota HUD 皮肤的可选可视化编辑器。运行主程序或导入皮肤无需安装此组件。
+english.NormalInstallType=Normal installation
+chinesesimp.NormalInstallType=标准安装
+english.CustomInstallType=Custom installation
+chinesesimp.CustomInstallType=自定义安装
+english.DesignerShortcutName=Codex Quota HUD 皮肤设计器
+chinesesimp.DesignerShortcutName=Codex Quota HUD 皮肤设计器
 english.PurgeSettingsTask=Also remove personal settings and preview window state
 chinesesimp.PurgeSettingsTask=同时删除个人设置和预览窗口状态
 english.UninstallOptionsTitle=Codex Quota HUD uninstall options
@@ -65,12 +76,20 @@ chinesesimp.HelperCopyFailure=无法将生命周期助手从 %1 复制到 %2。
 english.LaunchFailure=Codex Quota HUD could not be launched (code %1).
 chinesesimp.LaunchFailure=无法启动 Codex Quota HUD（代码 %1）。
 
+[Types]
+Name: "normal"; Description: "{cm:NormalInstallType}"
+Name: "custom"; Description: "{cm:CustomInstallType}"; Flags: iscustom
+
+[Components]
+Name: "designer"; Description: "{cm:DesignerComponentName}"; Types: custom
+
 [Tasks]
 Name: "startup"; Description: "{cm:StartupTask}"
 Name: "desktopicon"; Description: "{cm:DesktopTask}"
 
 [Files]
 Source: "{#PublishedDir}\CodexQuotaHud.App.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PublishedDir}\designer\CodexQuotaHud.SkinDesigner.exe"; DestDir: "{app}\designer"; Components: designer; Flags: ignoreversion
 #ifdef InternalTestRoot
 Source: "{#RepositoryRoot}\scripts\installer-lifecycle.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
 Source: "{#RepositoryRoot}\scripts\installer-lifecycle.ps1"; Flags: dontcopy
@@ -82,9 +101,11 @@ Source: "{#RepositoryRoot}\scripts\installer-lifecycle-production.ps1"; DestName
 [Icons]
 #ifdef InternalTestRoot
 Name: "{#InternalTestRoot}\Shell\StartMenu\Programs\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"
+Name: "{#InternalTestRoot}\Shell\StartMenu\Programs\{cm:DesignerShortcutName}"; Filename: "{app}\designer\CodexQuotaHud.SkinDesigner.exe"; Components: designer
 Name: "{#InternalTestRoot}\Shell\Desktop\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"; Tasks: desktopicon
 #else
 Name: "{autoprograms}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"
+Name: "{autoprograms}\{cm:DesignerShortcutName}"; Filename: "{app}\designer\CodexQuotaHud.SkinDesigner.exe"; Components: designer
 Name: "{autodesktop}\Codex Quota HUD"; Filename: "{app}\CodexQuotaHud.App.exe"; Tasks: desktopicon
 #endif
 
@@ -97,19 +118,20 @@ Type: files; Name: "{autodesktop}\Codex Quota HUD 开发预览.lnk"
 
 [Registry]
 #ifdef InternalTestRoot
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "CodexQuotaHud.InternalTest.{#InternalTestId}"; ValueData: """{app}\CodexQuotaHud.App.exe"" --background"; Tasks: startup; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\CodexQuotaHud.Tests\{#InternalTestId}\Run"; ValueType: string; ValueName: "CodexQuotaHud.InternalTest.{#InternalTestId}"; ValueData: """{app}\CodexQuotaHud.App.exe"" --background"; Tasks: startup; Flags: uninsdeletevalue
 #else
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "CodexQuotaHud"; ValueData: """{app}\CodexQuotaHud.App.exe"" --background"; Tasks: startup; Flags: uninsdeletevalue
 #endif
 
 [Code]
 const
-  RunRegistryKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
 #ifdef InternalTestRoot
+  RunRegistryKey = 'Software\CodexQuotaHud.Tests\{#InternalTestId}\Run';
   RunRegistryValueName = 'CodexQuotaHud.InternalTest.{#InternalTestId}';
   UninstallRegistryKey =
     'Software\Microsoft\Windows\CurrentVersion\Uninstall\CQH.Test.{#InternalTestId}_is1';
 #else
+  RunRegistryKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
   RunRegistryValueName = 'CodexQuotaHud';
   UninstallRegistryKey =
     'Software\Microsoft\Windows\CurrentVersion\Uninstall\{7F6E38C7-5928-4A18-9C9B-9B6D9B90D314}_is1';
@@ -120,9 +142,12 @@ var
   UninstallLifecyclePath: String;
   LegacyBackupPath: String;
   LegacyShellStatePath: String;
+  DesignerBackupPath: String;
   LegacyPrepared: Boolean;
+  DesignerRemovalAttempted: Boolean;
   InstallCompleted: Boolean;
   LaunchAfterInstallCheckBox: TNewCheckBox;
+  DesignerDescriptionLabel: TNewStaticText;
   PurgeSettingsRequested: Boolean;
   UninstallPrepareAttempted: Boolean;
   UninstallPurgeAttempted: Boolean;
@@ -136,6 +161,11 @@ function StringFromGUID2(
   GuidString: String;
   MaxCount: Integer): Integer;
   external 'StringFromGUID2@ole32.dll stdcall';
+
+#ifdef InternalTestRoot
+function GetFileAttributesW(FileName: String): Integer;
+  external 'GetFileAttributesW@kernel32.dll stdcall';
+#endif
 
 function NewGuidText(): String;
 var
@@ -155,6 +185,98 @@ begin
   Result := Copy(GuidString, 2, 36);
 end;
 
+#ifdef InternalTestRoot
+procedure RejectInternalDiagnosticReparsePoint(const Path: String);
+var
+  Attributes: Integer;
+begin
+  if not FileExists(Path) and not DirExists(Path) then
+    exit;
+
+  Attributes := GetFileAttributesW(Path);
+  if (Attributes <> -1) and ((Attributes and $400) <> 0) then
+    RaiseException('Refusing internal diagnostic reparse point: ' + Path);
+end;
+
+function RunInternalLifecycle(
+  const HelperPath: String;
+  const Action: String;
+  const Parameters: String;
+  var ResultCode: Integer;
+  var ErrorText: String): Boolean;
+var
+  DiagnosticRoot: String;
+  PersistentHelperPath: String;
+  WrapperPath: String;
+  ProcessLogPath: String;
+  PowerShellPath: String;
+  SourceHash: String;
+  PersistentHash: String;
+  InvocationRecord: String;
+  WrapperContent: String;
+begin
+  Result := False;
+  try
+    DiagnosticRoot := '{#InternalTestRoot}\diagnostics';
+    PersistentHelperPath := DiagnosticRoot + '\installer-lifecycle.ps1';
+    WrapperPath := DiagnosticRoot + '\lifecycle-run.cmd';
+    ProcessLogPath := DiagnosticRoot + '\lifecycle-process.log';
+    PowerShellPath := ExpandConstant(
+      '{sysnative}\WindowsPowerShell\v1.0\powershell.exe');
+
+    RejectInternalDiagnosticReparsePoint('{#InternalTestRoot}');
+    RejectInternalDiagnosticReparsePoint(DiagnosticRoot);
+    if not ForceDirectories(DiagnosticRoot) then
+      RaiseException(
+        'Could not create the fixed internal diagnostic directory.');
+    RejectInternalDiagnosticReparsePoint('{#InternalTestRoot}');
+    RejectInternalDiagnosticReparsePoint(DiagnosticRoot);
+    RejectInternalDiagnosticReparsePoint(PersistentHelperPath);
+    RejectInternalDiagnosticReparsePoint(WrapperPath);
+    RejectInternalDiagnosticReparsePoint(ProcessLogPath);
+
+    if not CopyFile(HelperPath, PersistentHelperPath, False) then
+      RaiseException('Could not persist the internal lifecycle helper.');
+    RejectInternalDiagnosticReparsePoint(PersistentHelperPath);
+    SourceHash := GetSHA256OfFile(HelperPath);
+    PersistentHash := GetSHA256OfFile(PersistentHelperPath);
+    if (SourceHash = '') or
+      (CompareText(SourceHash, PersistentHash) <> 0) then
+      RaiseException('Persisted internal lifecycle helper hash mismatch.');
+
+    InvocationRecord :=
+      'Action=' + Action + #13#10 +
+      'HelperPath=' + PersistentHelperPath + #13#10 +
+      'Parameters=' + Parameters + #13#10 +
+      'SourceHelperSHA256=' + SourceHash + #13#10 +
+      'PersistentHelperSHA256=' + PersistentHash + #13#10;
+    if not SaveStringToFile(ProcessLogPath, InvocationRecord, True) then
+      RaiseException('Could not append the internal lifecycle invocation.');
+    RejectInternalDiagnosticReparsePoint(ProcessLogPath);
+
+    WrapperContent :=
+      '@echo off' + #13#10 +
+      AddQuotes(PowerShellPath) + ' ' + Parameters + ' 1>>' +
+      AddQuotes(ProcessLogPath) + ' 2>&1' + #13#10 +
+      'set "LifecycleExit=%errorlevel%"' + #13#10 +
+      'exit /b %LifecycleExit%' + #13#10;
+    if not SaveStringToFile(WrapperPath, WrapperContent, False) then
+      RaiseException('Could not write the fixed internal lifecycle wrapper.');
+    RejectInternalDiagnosticReparsePoint(WrapperPath);
+
+    Result := Exec(
+      ExpandConstant('{cmd}'),
+      '/D /S /C ' + AddQuotes(WrapperPath),
+      '',
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode);
+  except
+    ErrorText := GetExceptionMessage;
+  end;
+end;
+#endif
+
 function RunLifecycle(
   const HelperPath: String;
   const Action: String;
@@ -164,25 +286,64 @@ function RunLifecycle(
 var
   Parameters: String;
   ResultCode: Integer;
+  ExecutionHelperPath: String;
 begin
+#ifdef InternalTestRoot
+  ExecutionHelperPath :=
+    '{#InternalTestRoot}\diagnostics\installer-lifecycle.ps1';
+#else
+  ExecutionHelperPath := HelperPath;
+#endif
   Parameters := '-ExecutionPolicy Bypass -NoProfile -NonInteractive -File ' +
-    AddQuotes(HelperPath) + ' -Action ' + Action + ' -InstallPath ' +
+    AddQuotes(ExecutionHelperPath) + ' -Action ' + Action + ' -InstallPath ' +
     AddQuotes(ExpandConstant('{app}'));
   if BackupPath <> '' then
-    Parameters := Parameters + ' -LegacyBackupPath ' + AddQuotes(BackupPath);
+  begin
+    if (Action = 'PrepareDesignerComponentRemoval') or
+      (Action = 'CommitDesignerComponentRemoval') or
+      (Action = 'RollbackDesignerComponentRemoval') then
+      Parameters := Parameters + ' -DesignerBackupPath ' +
+        AddQuotes(BackupPath)
+    else
+      Parameters := Parameters + ' -LegacyBackupPath ' +
+        AddQuotes(BackupPath);
+  end;
   if ShellStatePath <> '' then
     Parameters := Parameters + ' -LegacyShellStatePath ' +
       AddQuotes(ShellStatePath);
 #ifdef InternalTestRoot
   Parameters := Parameters + ' -InternalTestMode -LocalAppDataRoot ' +
-    AddQuotes('{#InternalTestRoot}\LocalAppData');
+    AddQuotes('{#InternalTestRoot}\LocalAppData') +
+    ' -InternalErrorDiagnosticPath ' +
+    AddQuotes('{#InternalTestRoot}\lifecycle-error.json');
   if (Action = 'SnapshotLegacyState') or
     (Action = 'DiscardLegacyState') or
-    (Action = 'CompensateLegacyInstall') then
+    (Action = 'CompensateLegacyInstall') or
+    (Action = 'PrepareDesignerComponentRemoval') or
+    (Action = 'CommitDesignerComponentRemoval') or
+    (Action = 'RollbackDesignerComponentRemoval') then
     Parameters := Parameters + ' -InternalShellRootPath ' +
       AddQuotes('{#InternalTestRoot}\Shell');
+#ifdef InternalCleanupFailureStage
+  if ((CompareText('{#InternalCleanupFailureStage}', 'LegacyCommit') = 0) and
+      (Action = 'CommitInstall')) or
+    ((CompareText(
+      '{#InternalCleanupFailureStage}',
+      'DesignerAfterPayloadDelete') = 0) and
+      (Action = 'CommitDesignerComponentRemoval')) then
+    Parameters := Parameters + ' -InternalCleanupFailureStage ' +
+      AddQuotes('{#InternalCleanupFailureStage}');
+#endif
 #endif
 
+#ifdef InternalTestRoot
+  Result := RunInternalLifecycle(
+    HelperPath,
+    Action,
+    Parameters,
+    ResultCode,
+    ErrorText);
+#else
   Result := Exec(
     ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
     Parameters,
@@ -190,6 +351,7 @@ begin
     SW_HIDE,
     ewWaitUntilTerminated,
     ResultCode);
+#endif
   if not Result then
   begin
     ErrorText := FmtMessage(
@@ -204,7 +366,26 @@ begin
 end;
 
 procedure InitializeWizard();
+var
+  DescriptionGap: Integer;
+  DescriptionHeight: Integer;
 begin
+  DescriptionGap := ScaleY(8);
+  DescriptionHeight := ScaleY(44);
+  WizardForm.ComponentsList.Height :=
+    WizardForm.ComponentsList.Height - DescriptionGap - DescriptionHeight;
+  DesignerDescriptionLabel := TNewStaticText.Create(WizardForm);
+  DesignerDescriptionLabel.Parent := WizardForm.SelectComponentsPage;
+  DesignerDescriptionLabel.Left := WizardForm.ComponentsList.Left;
+  DesignerDescriptionLabel.Top := WizardForm.ComponentsList.Top +
+    WizardForm.ComponentsList.Height + DescriptionGap;
+  DesignerDescriptionLabel.Width := WizardForm.ComponentsList.Width;
+  DesignerDescriptionLabel.Height := DescriptionHeight;
+  DesignerDescriptionLabel.AutoSize := False;
+  DesignerDescriptionLabel.WordWrap := True;
+  DesignerDescriptionLabel.Caption :=
+    CustomMessage('DesignerComponentDescription');
+
   LaunchAfterInstallCheckBox := TNewCheckBox.Create(WizardForm);
   LaunchAfterInstallCheckBox.Parent := WizardForm.FinishedPage;
   LaunchAfterInstallCheckBox.Left := WizardForm.RunList.Left;
@@ -277,6 +458,7 @@ begin
 
   LegacyBackupPath := '';
   LegacyShellStatePath := '';
+  DesignerBackupPath := '';
   if IsLegacyInstall then
   begin
     MigrationGuid := NewGuidText();
@@ -285,6 +467,14 @@ begin
       MigrationGuid;
     LegacyShellStatePath := ExtractFileDir(ExpandConstant('{app}')) +
       '\CodexQuotaHud.legacy-shell-state.' +
+      MigrationGuid;
+  end;
+
+  if not WizardIsComponentSelected('designer') then
+  begin
+    MigrationGuid := NewGuidText();
+    DesignerBackupPath := ExtractFileDir(ExpandConstant('{app}')) +
+      '\CodexQuotaHud.designer-removal-backup.' +
       MigrationGuid;
   end;
 
@@ -311,6 +501,21 @@ begin
     exit;
   end;
 
+  if DesignerBackupPath <> '' then
+  begin
+    DesignerRemovalAttempted := True;
+    if not RunLifecycle(
+      SetupLifecyclePath,
+      'PrepareDesignerComponentRemoval',
+      DesignerBackupPath,
+      '',
+      ErrorText) then
+    begin
+      Result := ErrorText;
+      exit;
+    end;
+  end;
+
   RemoveManagedSelections();
 end;
 
@@ -320,15 +525,23 @@ var
 begin
   if CurStep = ssDone then
   begin
+    InstallCompleted := True;
     if not RunLifecycle(
       SetupLifecyclePath,
       'CommitInstall',
       LegacyBackupPath,
       '',
       ErrorText) then
-      RaiseException(ErrorText);
+      Log('Legacy install backup cleanup failed: ' + ErrorText);
 
-    InstallCompleted := True;
+    if DesignerRemovalAttempted and (not RunLifecycle(
+      SetupLifecyclePath,
+      'CommitDesignerComponentRemoval',
+      DesignerBackupPath,
+      '',
+      ErrorText)) then
+      Log('Designer component cleanup failed: ' + ErrorText);
+
     if LegacyPrepared and (not RunLifecycle(
       SetupLifecyclePath,
       'DiscardLegacyState',
@@ -345,6 +558,17 @@ procedure DeinitializeSetup();
 var
   ErrorText: String;
 begin
+  if DesignerRemovalAttempted and (not InstallCompleted) then
+  begin
+    if not RunLifecycle(
+      SetupLifecyclePath,
+      'RollbackDesignerComponentRemoval',
+      DesignerBackupPath,
+      '',
+      ErrorText) then
+      Log('Designer component rollback failed: ' + ErrorText);
+  end;
+
   if LegacyPrepared and (not InstallCompleted) then
   begin
     if not RunLifecycle(

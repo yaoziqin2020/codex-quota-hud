@@ -1011,6 +1011,92 @@ public sealed class InstallerLifecycleTests
     }
 
     [Fact]
+    public async Task InternalFailure_WritesBoundedLifecycleDiagnostic()
+    {
+        using var temp = new TemporaryDirectory();
+        var localAppData = Directory.CreateDirectory(
+            Path.Combine(temp.Path, "LocalAppData")).FullName;
+        var installPath = Directory.CreateDirectory(
+            Path.Combine(
+                localAppData, "Programs", "CodexQuotaHud")).FullName;
+        var processSnapshot = Path.Combine(temp.Path, "processes.json");
+        await File.WriteAllTextAsync(processSnapshot, "[");
+        var diagnosticPath = Path.Combine(
+            temp.Path, "lifecycle-error.json");
+
+        var result = await RunLifecycleAsync(
+            "PrepareInstall",
+            installPath,
+            localAppData,
+            "-InternalProcessSnapshotPath", processSnapshot,
+            "-InternalErrorDiagnosticPath", diagnosticPath);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.True(File.Exists(diagnosticPath), result.CombinedOutput);
+        using var document = JsonDocument.Parse(
+            await File.ReadAllTextAsync(diagnosticPath));
+        var root = document.RootElement;
+        Assert.Equal("PrepareInstall", root.GetProperty("Action").GetString());
+        Assert.Equal(installPath, root.GetProperty("InstallPath").GetString());
+        Assert.Equal(
+            localAppData,
+            root.GetProperty("LocalAppDataRoot").GetString());
+        Assert.Equal(
+            string.Empty,
+            root.GetProperty("InternalShellRootPath").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(
+            root.GetProperty("ExceptionType").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(
+            root.GetProperty("ExceptionMessage").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(
+            root.GetProperty("ScriptStackTrace").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(
+            root.GetProperty("InvocationInfo").GetString()));
+    }
+
+    [Fact]
+    public async Task InternalSuccess_RemovesStaleLifecycleDiagnostic()
+    {
+        using var temp = new TemporaryDirectory();
+        var localAppData = Directory.CreateDirectory(
+            Path.Combine(temp.Path, "LocalAppData")).FullName;
+        var installPath = Directory.CreateDirectory(
+            Path.Combine(
+                localAppData, "Programs", "CodexQuotaHud")).FullName;
+        var diagnosticPath = Path.Combine(
+            temp.Path, "lifecycle-error.json");
+        await File.WriteAllTextAsync(diagnosticPath, "stale");
+
+        var result = await RunLifecycleAsync(
+            "PrepareInstall",
+            installPath,
+            localAppData,
+            "-InternalErrorDiagnosticPath", diagnosticPath);
+
+        Assert.True(result.ExitCode == 0, result.CombinedOutput);
+        Assert.False(File.Exists(diagnosticPath));
+    }
+
+    [Fact]
+    public async Task ProductionMode_RejectsInternalLifecycleDiagnostic()
+    {
+        using var temp = new TemporaryDirectory();
+        var installPath = Path.Combine(temp.Path, "CodexQuotaHud");
+        var diagnosticPath = Path.Combine(
+            temp.Path, "lifecycle-error.json");
+
+        var result = await RunLifecycleProductionAsync(
+            "PrepareInstall",
+            installPath,
+            "-InternalErrorDiagnosticPath", diagnosticPath);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Internal lifecycle hooks", result.CombinedOutput,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(diagnosticPath));
+    }
+
+    [Fact]
     public async Task InternalTestMode_RejectsTempPrefixLookalikeRoot()
     {
         var systemTemp = Path.GetFullPath(Path.GetTempPath())

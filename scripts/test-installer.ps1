@@ -3,7 +3,20 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string] $Version = '1.1.1',
     [Parameter(Mandatory = $true)]
-    [string] $InstallerPath
+    [string] $InstallerPath,
+    [ValidateSet(
+        '',
+        'fresh-default',
+        'fresh-designer',
+        'add-designer',
+        'remove-designer',
+        'upgrade-selected',
+        'uninstall-preserve',
+        'uninstall-purge',
+        'cleanup-legacy-failure',
+        'cleanup-designer-failure')]
+    [AllowEmptyString()]
+    [string] $InternalScenario = ''
 )
 
 Set-StrictMode -Version Latest
@@ -206,12 +219,35 @@ function Invoke-SetupProcess {
         -Wait `
         -PassThru
     if ($process.ExitCode -ne 0) {
-        if (Test-Path -LiteralPath $LogPath -PathType Leaf) {
-            Write-Host "Inno log tail for $Description`:"
-            Get-Content -LiteralPath $LogPath -Tail 80
+        $signedExitCode = [int]$process.ExitCode
+        $unsignedExitCode = [System.BitConverter]::ToUInt32(
+            [System.BitConverter]::GetBytes($signedExitCode), 0)
+        $exitCodeHex = $unsignedExitCode.ToString('X8')
+        $setupFullPath = Get-NormalizedPath $Path
+        $logFullPath = Get-NormalizedPath $LogPath
+        $logExists = Test-Path -LiteralPath $logFullPath -PathType Leaf
+        $logLength = if ($logExists) {
+            [int64](Get-Item -LiteralPath $logFullPath -Force).Length
         }
-        throw "$Description failed with exit code $($process.ExitCode)."
+        else {
+            [int64]-1
+        }
+        if ($logExists) {
+            Write-Host "Inno log tail for $Description`:"
+            Get-Content -LiteralPath $logFullPath -Tail 80
+        }
+        throw (
+            "$Description failed. " +
+            "ExitCodeSigned=$signedExitCode; " +
+            "ExitCodeUnsigned=$unsignedExitCode; " +
+            "ExitCodeHex=0x$exitCodeHex; " +
+            "SetupPath=$setupFullPath; " +
+            "InternalRoot=$internalRoot; " +
+            "LogPath=$logFullPath; " +
+            "LogExists=$logExists; " +
+            "LogLength=$logLength.")
     }
+    return $process.ExitCode
 }
 
 function Get-InternalDefine {
@@ -312,6 +348,32 @@ function Get-RegistryKeyPresenceChecked {
     }
 }
 
+function Remove-ExactInternalRegistryTree {
+    param(
+        [Parameter(Mandatory = $true)][string] $InternalTestId,
+        [Parameter(Mandatory = $true)][string] $RunRelativeKey)
+
+    $parsedId = [Guid]::Empty
+    if (-not [Guid]::TryParse($InternalTestId, [ref]$parsedId)) {
+        throw 'Internal registry cleanup ID is not a GUID.'
+    }
+    $testRoot = 'Software\CodexQuotaHud.Tests\' + $InternalTestId
+    $expectedRun = $testRoot + '\Run'
+    if (-not [string]::Equals(
+            $RunRelativeKey,
+            $expectedRun,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Internal registry cleanup path is not the exact GUID subtree.'
+    }
+
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree(
+        $testRoot,
+        $false)
+    if (Get-RegistryKeyPresenceChecked -RelativeKey $testRoot) {
+        throw 'Internal registry GUID subtree cleanup postcondition failed.'
+    }
+}
+
 function Get-PathPresenceChecked {
     param([Parameter(Mandatory = $true)][string] $Path)
     return [bool](Test-Path -LiteralPath $Path -ErrorAction Stop)
@@ -367,6 +429,268 @@ function Assert-InternalUninstallRegistration {
     }
 }
 
+function Assert-IsolatedScenarioBoundary {
+    param(
+        [Parameter(Mandatory = $true)][string] $Scenario,
+        [Parameter(Mandatory = $true)][string] $ScenarioRoot,
+        [Parameter(Mandatory = $true)][string] $InternalRoot,
+        [Parameter(Mandatory = $true)][string[]] $TestPaths,
+        [Parameter(Mandatory = $true)][string[]] $ProductionPaths,
+        [Parameter(Mandatory = $true)][string] $InternalRunRelativeKey,
+        [Parameter(Mandatory = $true)][string] $InternalRunValueName,
+        [Parameter(Mandatory = $true)][string] $InternalUninstallRelativeKey,
+        [Parameter(Mandatory = $true)][string] $ProductionRunValueName,
+        [Parameter(Mandatory = $true)][string] $ProductionUninstallRelativeKey)
+
+    if (-not (Test-StrictDescendant $InternalRoot $ScenarioRoot)) {
+        throw "Scenario $Scenario internal root escaped its generated root."
+    }
+    foreach ($path in $TestPaths) {
+        if (-not (Test-StrictDescendant $path $ScenarioRoot)) {
+            throw "Scenario $Scenario path escaped its generated root: $path"
+        }
+        Assert-NoProductionOverlap `
+            -TestPath $path `
+            -ProductionPaths $ProductionPaths
+    }
+    if ([string]::Equals(
+            $InternalRunRelativeKey,
+            'Software\Microsoft\Windows\CurrentVersion\Run',
+            [System.StringComparison]::OrdinalIgnoreCase) -or
+        -not $InternalRunRelativeKey.StartsWith(
+            'Software\CodexQuotaHud.Tests\',
+            [System.StringComparison]::OrdinalIgnoreCase) -or
+        [string]::Equals(
+            $InternalRunValueName,
+            $ProductionRunValueName,
+            [System.StringComparison]::OrdinalIgnoreCase) -or
+        [string]::Equals(
+            $InternalUninstallRelativeKey,
+            $ProductionUninstallRelativeKey,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Scenario $Scenario registry identity overlaps production."
+    }
+}
+
+function New-SentinelSnapshot {
+    param(
+        [Parameter(Mandatory = $true)][string] $SettingsRoot,
+        [Parameter(Mandatory = $true)][string] $LocalAppDataRoot)
+
+    $paths = [ordered]@{
+        Settings = Join-Path $SettingsRoot 'settings.json'
+        Skin = Join-Path $SettingsRoot (
+            'skins\11111111-1111-1111-1111-111111111111\skin.json')
+        Draft = Join-Path $SettingsRoot (
+            'designer\drafts\22222222-2222-2222-2222-222222222222\draft.json')
+        Recovery = Join-Path $SettingsRoot 'designer\recovery\recovery.json'
+        Import = Join-Path $SettingsRoot 'imports\import.cqskin'
+    }
+    foreach ($entry in $paths.GetEnumerator()) {
+        New-Item `
+            -ItemType Directory `
+            -Path (Split-Path -Path $entry.Value -Parent) `
+            -Force |
+            Out-Null
+        [System.IO.File]::WriteAllText(
+            $entry.Value,
+            "sentinel:$($entry.Key)",
+            [System.Text.UTF8Encoding]::new($false))
+    }
+    $unrelated = Join-Path $LocalAppDataRoot 'CodexQuotaHud.unrelated.keep'
+    [System.IO.File]::WriteAllText(
+        $unrelated,
+        'unrelated sentinel',
+        [System.Text.UTF8Encoding]::new($false))
+    $hashes = [ordered]@{}
+    foreach ($entry in $paths.GetEnumerator()) {
+        $hashes[$entry.Value] = (Get-FileHash `
+            -LiteralPath $entry.Value `
+            -Algorithm SHA256).Hash
+    }
+    return [pscustomobject]@{
+        Paths = $paths
+        Hashes = $hashes
+        Unrelated = $unrelated
+    }
+}
+
+function Assert-SentinelHashesUnchanged {
+    param([Parameter(Mandatory = $true)][psobject] $Snapshot)
+    foreach ($entry in $Snapshot.Hashes.GetEnumerator()) {
+        Assert-Exists -Path $entry.Key -Description 'User-data sentinel'
+        $actual = (Get-FileHash `
+            -LiteralPath $entry.Key `
+            -Algorithm SHA256).Hash
+        if (-not [string]::Equals(
+                $actual,
+                $entry.Value,
+                [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "User-data sentinel hash changed: $($entry.Key)"
+        }
+    }
+    Assert-Exists `
+        -Path $Snapshot.Unrelated `
+        -Description 'Unrelated Local App Data sentinel'
+}
+
+function Assert-FileMatchesPublished {
+    param(
+        [Parameter(Mandatory = $true)][string] $Installed,
+        [Parameter(Mandatory = $true)][string] $Published,
+        [Parameter(Mandatory = $true)][string] $Description)
+    Assert-Exists -Path $Installed -Description $Description
+    $installedHash = (Get-FileHash `
+        -LiteralPath $Installed `
+        -Algorithm SHA256).Hash
+    $publishedHash = (Get-FileHash `
+        -LiteralPath $Published `
+        -Algorithm SHA256).Hash
+    if (-not [string]::Equals(
+            $installedHash,
+            $publishedHash,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "$Description does not match the published payload."
+    }
+}
+
+function Assert-NoOperationResidue {
+    param(
+        [Parameter(Mandatory = $true)][string] $ProgramsRoot,
+        [Parameter(Mandatory = $true)][string] $InternalRoot)
+    if (Test-Path -LiteralPath $ProgramsRoot -PathType Container) {
+        $residue = @(Get-ChildItem -LiteralPath $ProgramsRoot -Force |
+            Where-Object {
+                $_.Name -like 'CodexQuotaHud.designer-removal-backup.*' -or
+                $_.Name -like 'CodexQuotaHud.designer-rollback-staging.*' -or
+                $_.Name -like 'CodexQuotaHud.legacy-backup.*' -or
+                $_.Name -like 'CodexQuotaHud.legacy-shell-state.*' -or
+                $_.Name -like 'CodexQuotaHud.rollback-*'
+            })
+        if ($residue.Count -ne 0) {
+            throw ('Operation residue remains: ' +
+                (($residue.FullName) -join ', '))
+        }
+    }
+    $running = @(Get-CimInstance Win32_Process -Filter (
+        "Name='CodexQuotaHud.App.exe' OR " +
+        "Name='CodexQuotaHud.SkinDesigner.exe'") |
+        Where-Object {
+            -not [string]::IsNullOrWhiteSpace([string]$_.ExecutablePath) -and
+            ([string]$_.ExecutablePath).StartsWith(
+                (Get-NormalizedPath $InternalRoot) +
+                    [System.IO.Path]::DirectorySeparatorChar,
+                [System.StringComparison]::OrdinalIgnoreCase)
+        })
+    if ($running.Count -ne 0) {
+        throw 'An isolated installer process is still running.'
+    }
+}
+
+function Assert-NormalInstalledState {
+    param(
+        [string] $InstalledExecutable,
+        [string] $PublishedExecutable,
+        [string] $NormalStartMenu,
+        [string] $NormalDesktop,
+        [string] $RunRegistryPath,
+        [string] $RunValueName)
+    Assert-FileMatchesPublished `
+        -Installed $InstalledExecutable `
+        -Published $PublishedExecutable `
+        -Description 'Installed normal executable'
+    Assert-Exists -Path $NormalStartMenu -Description 'Normal Start Menu link'
+    Assert-Exists -Path $NormalDesktop -Description 'Normal desktop link'
+    Assert-DesktopShortcut `
+        -ShortcutPath $NormalStartMenu `
+        -ExpectedTarget $InstalledExecutable `
+        -ExpectedArguments ''
+    Assert-DesktopShortcut `
+        -ShortcutPath $NormalDesktop `
+        -ExpectedTarget $InstalledExecutable `
+        -ExpectedArguments ''
+    $startup = Get-ItemPropertyValue `
+        -LiteralPath $RunRegistryPath `
+        -Name $RunValueName `
+        -ErrorAction Stop
+    $expected = "`"$InstalledExecutable`" --background"
+    if (-not [string]::Equals(
+            [string]$startup,
+            $expected,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Normal startup value has an unexpected target or arguments.'
+    }
+}
+
+function Assert-DesignerInstalledState {
+    param(
+        [string] $InstalledDesignerExecutable,
+        [string] $PublishedDesignerExecutable,
+        [string] $DesignerStartMenu,
+        [string] $DesignerDesktop,
+        [string] $DesignerRunValue,
+        [string] $RunRegistryPath,
+        [string] $PreviewDesktop,
+        [string] $PreviewStartMenu)
+    Assert-FileMatchesPublished `
+        -Installed $InstalledDesignerExecutable `
+        -Published $PublishedDesignerExecutable `
+        -Description 'Installed Designer executable'
+    Assert-Exists -Path $DesignerStartMenu -Description 'Designer Start link'
+    Assert-DesktopShortcut `
+        -ShortcutPath $DesignerStartMenu `
+        -ExpectedTarget $installedDesignerExecutable `
+        -ExpectedArguments ''
+    Assert-Missing -Path $DesignerDesktop -Description 'Designer desktop link'
+    Assert-Missing -Path $PreviewDesktop -Description 'Preview desktop link'
+    Assert-Missing -Path $PreviewStartMenu -Description 'Preview Start link'
+    if (Get-RegistryValuePresenceChecked `
+        -RelativeKey 'Software\Microsoft\Windows\CurrentVersion\Run' `
+        -ValueName $DesignerRunValue) {
+        throw 'DesignerRunValue unexpectedly exists.'
+    }
+}
+
+function Assert-DesignerMissingState {
+    param(
+        [string] $DesignerDirectory,
+        [string] $DesignerStartMenu,
+        [string] $DesignerDesktop,
+        [string] $DesignerRunValue,
+        [string] $PreviewDesktop,
+        [string] $PreviewStartMenu)
+    Assert-Missing -Path $DesignerDirectory -Description 'Designer directory'
+    Assert-Missing -Path $DesignerStartMenu -Description 'Designer Start link'
+    Assert-Missing -Path $DesignerDesktop -Description 'Designer desktop link'
+    Assert-Missing -Path $PreviewDesktop -Description 'Preview desktop link'
+    Assert-Missing -Path $PreviewStartMenu -Description 'Preview Start link'
+    if (Get-RegistryValuePresenceChecked `
+        -RelativeKey 'Software\Microsoft\Windows\CurrentVersion\Run' `
+        -ValueName $DesignerRunValue) {
+        throw 'DesignerRunValue unexpectedly exists.'
+    }
+}
+
+function Invoke-IsolatedScenario {
+    param([Parameter(Mandatory = $true)][string] $Name)
+    & powershell.exe `
+        -NoProfile `
+        -NonInteractive `
+        -ExecutionPolicy Bypass `
+        -File $PSCommandPath `
+        -Version $Version `
+        -InstallerPath $formalInstaller `
+        -InternalScenario $Name
+    if ($LASTEXITCODE -ne 0) {
+        throw "Isolated scenario $Name failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Invoke-CleanupFailureScenario {
+    param([Parameter(Mandatory = $true)][string] $Name)
+    Invoke-IsolatedScenario -Name $Name
+}
+
 $repositoryRoot = Get-NormalizedPath (Join-Path $PSScriptRoot '..')
 $expectedInstallerName = "CodexQuotaHud-Setup-v$Version.exe"
 $formalInstaller = Get-NormalizedPath $InstallerPath
@@ -420,15 +744,22 @@ $publishedExecutable = Join-Path $published 'CodexQuotaHud.App.exe'
 if (-not (Test-Path -LiteralPath $publishedExecutable -PathType Leaf)) {
     throw "Published payload does not exist: $publishedExecutable"
 }
+$publishedDesignerExecutable = Join-Path `
+    $published `
+    'designer\CodexQuotaHud.SkinDesigner.exe'
+if (-not (Test-Path -LiteralPath $publishedDesignerExecutable -PathType Leaf)) {
+    throw "Published Designer payload does not exist: $publishedDesignerExecutable"
+}
 
 $systemTemp = Get-NormalizedPath ([System.IO.Path]::GetTempPath())
 $smokeId = [Guid]::NewGuid().ToString('D')
 $smokeRoot = Get-NormalizedPath (
     (Join-Path $systemTemp "CodexQuotaHud.InstallerSmoke.$smokeId"))
 $cleanupAuthorized = $false
+$scenarioFailed = $false
 $internalTestId = $null
-$runRegistryPath =
-    'Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run'
+$runRegistryPath = $null
+$internalRunRelativeKey = $null
 $uninstallRegistryPath = $null
 $uninstallRegistryRelativeKey = $null
 $internalRoot = $null
@@ -438,14 +769,31 @@ $normalStartMenu = $null
 $isolatedShortcutPaths = [System.Collections.ArrayList]::new()
 $productionRunRelativeKey =
     'Software\Microsoft\Windows\CurrentVersion\Run'
+$productionRunValueName = 'CodexQuotaHud'
 $productionUninstallRelativeKey =
     'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
     '{7F6E38C7-5928-4A18-9C9B-9B6D9B90D314}_is1'
 $productionRunSnapshot = Get-RegistryValueSnapshot `
     -RelativeKey $productionRunRelativeKey `
-    -ValueName 'CodexQuotaHud'
+    -ValueName $productionRunValueName
 $productionUninstallSnapshot = Get-RegistryKeySnapshot `
     -RelativeKey $productionUninstallRelativeKey
+
+if ([string]::IsNullOrWhiteSpace($InternalScenario)) {
+    Invoke-IsolatedScenario -Name 'fresh-default'
+    Invoke-IsolatedScenario -Name 'fresh-designer'
+    Invoke-IsolatedScenario -Name 'add-designer'
+    Invoke-IsolatedScenario -Name 'remove-designer'
+    Invoke-IsolatedScenario -Name 'upgrade-selected'
+    Invoke-IsolatedScenario -Name 'uninstall-preserve'
+    Invoke-IsolatedScenario -Name 'uninstall-purge'
+    Write-Host 'All seven isolated installer scenarios passed.'
+    Invoke-CleanupFailureScenario -Name 'cleanup-legacy-failure'
+    Invoke-CleanupFailureScenario -Name 'cleanup-designer-failure'
+    Write-Host 'Both committed cleanup failure scenarios passed.'
+    return
+}
+$scenario = $InternalScenario
 
 try {
     if (-not (Test-StrictDescendant $smokeRoot $systemTemp)) {
@@ -457,12 +805,18 @@ try {
 
     $buildOutput = Join-Path $smokeRoot 'Build'
     $capture = Join-Path $smokeRoot 'build-arguments.json'
+    $cleanupFailureStage = switch ($scenario) {
+        'cleanup-legacy-failure' { 'LegacyCommit' }
+        'cleanup-designer-failure' { 'DesignerAfterPayloadDelete' }
+        default { '' }
+    }
     & (Join-Path $PSScriptRoot 'build-installer.ps1') `
         -Version $Version `
         -PublishedPath $published `
         -OutputPath $buildOutput `
         -InternalTestMode `
-        -InternalArgumentCapturePath $capture
+        -InternalArgumentCapturePath $capture `
+        -InternalCleanupFailureStage $cleanupFailureStage
 
     $isolatedInstaller = Join-Path $buildOutput $expectedInstallerName
     Assert-Exists -Path $isolatedInstaller -Description 'Isolated test Setup'
@@ -481,6 +835,10 @@ try {
     if (-not [Guid]::TryParse($internalTestId, [ref]$parsedGuid)) {
         throw 'Internal test ID is not a GUID.'
     }
+    $internalRunRelativeKey =
+        "Software\CodexQuotaHud.Tests\$internalTestId\Run"
+    $runRegistryPath =
+        'Registry::HKEY_CURRENT_USER\' + $internalRunRelativeKey
     $internalRoot = Get-NormalizedPath (Get-InternalDefine `
         -Arguments $compilerArguments `
         -Name 'InternalTestRoot')
@@ -495,11 +853,26 @@ try {
     $desktop = Join-Path $internalRoot 'Shell\Desktop'
     $startMenu = Join-Path $internalRoot 'Shell\StartMenu\Programs'
     $installedExecutable = Join-Path $install 'CodexQuotaHud.App.exe'
+    $designerDirectory = Join-Path $install 'designer'
+    $installedDesignerExecutable = Join-Path `
+        $designerDirectory `
+        'CodexQuotaHud.SkinDesigner.exe'
     $normalDesktop = Join-Path $desktop 'Codex Quota HUD.lnk'
     $previewShortcutName = 'Codex Quota HUD ' +
         [char]0x5f00 + [char]0x53d1 + [char]0x9884 + [char]0x89c8 + '.lnk'
     $previewDesktop = Join-Path $desktop $previewShortcutName
     $normalStartMenu = Join-Path $startMenu 'Codex Quota HUD.lnk'
+    $designerSuffix = -join @(
+        [char]0x76ae,
+        [char]0x80a4,
+        [char]0x8bbe,
+        [char]0x8ba1,
+        [char]0x5668)
+    $designerLinkName = "Codex Quota HUD $designerSuffix.lnk"
+    $DesignerStartMenu = Join-Path $startMenu $designerLinkName
+    $DesignerDesktop = Join-Path $desktop $designerLinkName
+    $DesignerRunValue = "CodexQuotaHud.SkinDesigner.InternalTest.$internalTestId"
+    $previewStartMenu = Join-Path $startMenu $previewShortcutName
     $runValueName = "CodexQuotaHud.InternalTest.$internalTestId"
     $uninstallRegistryRelativeKey =
         'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
@@ -509,6 +882,9 @@ try {
     [void]$isolatedShortcutPaths.Add($normalDesktop)
     [void]$isolatedShortcutPaths.Add($previewDesktop)
     [void]$isolatedShortcutPaths.Add($normalStartMenu)
+    [void]$isolatedShortcutPaths.Add($DesignerStartMenu)
+    [void]$isolatedShortcutPaths.Add($DesignerDesktop)
+    [void]$isolatedShortcutPaths.Add($previewStartMenu)
 
     $productionInstall = Join-Path `
         ([Environment]::GetFolderPath(
@@ -518,174 +894,543 @@ try {
         ([Environment]::GetFolderPath(
             [Environment+SpecialFolder]::LocalApplicationData)) `
         'CodexQuotaHud'
-    $productionPaths = @($productionInstall, $productionSettings)
-    foreach ($testTarget in @(
-        $smokeRoot,
+    $productionDesktop = Get-NormalizedPath (
+        [Environment]::GetFolderPath(
+            [Environment+SpecialFolder]::DesktopDirectory))
+    $productionStartMenu = Get-NormalizedPath (Join-Path (
+        [Environment]::GetFolderPath(
+            [Environment+SpecialFolder]::StartMenu)) 'Programs')
+    $productionPaths = @(
+        $productionInstall,
+        $productionSettings,
+        $productionDesktop,
+        $productionStartMenu)
+    $scenarioPaths = @(
         $internalRoot,
         $localAppData,
         $install,
         $settings,
         $desktop,
-        $startMenu)) {
-        Assert-NoProductionOverlap `
-            -TestPath $testTarget `
-            -ProductionPaths $productionPaths
+        $startMenu)
+    Assert-IsolatedScenarioBoundary -Scenario $scenario `
+        -ScenarioRoot $smokeRoot `
+        -InternalRoot $internalRoot `
+        -TestPaths $scenarioPaths `
+        -ProductionPaths $productionPaths `
+        -InternalRunRelativeKey $internalRunRelativeKey `
+        -InternalRunValueName $runValueName `
+        -InternalUninstallRelativeKey $uninstallRegistryRelativeKey `
+        -ProductionRunValueName $productionRunValueName `
+        -ProductionUninstallRelativeKey $productionUninstallRelativeKey
+
+    foreach ($shellDirectory in @($desktop, $startMenu)) {
+        if (-not (Test-StrictDescendant $shellDirectory $internalRoot)) {
+            throw "Internal shell directory escaped GUID root: $shellDirectory"
+        }
+        Assert-NoReparsePoint -Path $shellDirectory -Boundary $internalRoot
+        New-Item -ItemType Directory -Path $shellDirectory -Force | Out-Null
+        Assert-NoReparsePoint -Path $shellDirectory -Boundary $internalRoot
     }
 
-    Invoke-SetupProcess `
+    $quiet = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART ' +
+        '/TASKS="startup,desktopicon"'
+    $initialDesignerSelected = $scenario -notin @(
+        'fresh-default',
+        'add-designer',
+        'cleanup-legacy-failure')
+    $initialSelection = if ($scenario -in @(
+        'fresh-default',
+        'cleanup-legacy-failure')) {
+        $quiet
+    }
+    elseif ($initialDesignerSelected) {
+        "$quiet /TYPE=custom /COMPONENTS=designer"
+    }
+    else {
+        "$quiet /TYPE=normal"
+    }
+    $setupExitCodes = [System.Collections.ArrayList]::new()
+    if ($scenario -eq 'cleanup-legacy-failure') {
+        New-Item -ItemType Directory -Path $designerDirectory -Force |
+            Out-Null
+        [System.IO.File]::WriteAllText(
+            $installedExecutable,
+            'legacy executable before committed cleanup failure')
+        [System.IO.File]::WriteAllText(
+            $installedDesignerExecutable,
+            'legacy Designer before committed cleanup failure')
+        [System.IO.File]::WriteAllText(
+            (Join-Path $designerDirectory 'a-first-payload.bin'),
+            'legacy Designer payload')
+        [System.IO.File]::WriteAllText(
+            $DesignerStartMenu,
+            'legacy Designer shortcut')
+    }
+    [void]$setupExitCodes.Add((Invoke-SetupProcess `
         -Path $isolatedInstaller `
-        -Arguments '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' `
+        -Arguments $initialSelection `
         -Description 'Isolated clean install' `
-        -LogPath (Join-Path $smokeRoot 'clean-install.log')
-    Assert-Exists -Path $installedExecutable -Description 'Installed executable'
-    Assert-Exists -Path $normalStartMenu -Description 'Normal Start Menu link'
-    Assert-Exists -Path $normalDesktop -Description 'Normal desktop link'
-    Assert-Missing -Path $previewDesktop -Description 'Developer Preview desktop link'
-    $initialDesktopLinks = @(
-        Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' -File)
-    if ($initialDesktopLinks.Count -ne 1) {
-        throw 'Clean install did not create exactly one desktop link.'
+        -LogPath (Join-Path $smokeRoot 'clean-install.log')))
+    Assert-NormalInstalledState `
+        -InstalledExecutable $installedExecutable `
+        -PublishedExecutable $publishedExecutable `
+        -NormalStartMenu $normalStartMenu `
+        -NormalDesktop $normalDesktop `
+        -RunRegistryPath $runRegistryPath `
+        -RunValueName $runValueName
+    if ($initialDesignerSelected) {
+        Assert-DesignerInstalledState `
+            -InstalledDesignerExecutable $installedDesignerExecutable `
+            -PublishedDesignerExecutable $publishedDesignerExecutable `
+            -DesignerStartMenu $DesignerStartMenu `
+            -DesignerDesktop $DesignerDesktop `
+            -DesignerRunValue $DesignerRunValue `
+            -RunRegistryPath $runRegistryPath `
+            -PreviewDesktop $previewDesktop `
+            -PreviewStartMenu $previewStartMenu
     }
-    Assert-DesktopShortcut `
-        -ShortcutPath $normalDesktop `
-        -ExpectedTarget $installedExecutable `
-        -ExpectedArguments ''
-    $startupValue = Get-ItemPropertyValue `
-        -LiteralPath $runRegistryPath `
-        -Name $runValueName `
-        -ErrorAction Stop
-    $expectedStartupValue = "`"$installedExecutable`" --background"
-    if (-not [string]::Equals(
-        [string]$startupValue,
-        $expectedStartupValue,
-        [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Isolated startup value does not target the isolated executable.'
-    }
-    Assert-InternalUninstallRegistration `
-        -RegistryPath $uninstallRegistryPath `
-        -InstallPath $install `
-        -TestRoot $internalRoot
-    Write-Host 'Smoke scenario passed: clean isolated install.'
-
-    New-Item -ItemType Directory -Path $settings -Force | Out-Null
-    $settingsMarker = Join-Path $settings 'settings.json'
-    $previewMarker = Join-Path $settings 'preview-window.json'
-    [System.IO.File]::WriteAllText($settingsMarker, 'settings marker')
-    [System.IO.File]::WriteAllText($previewMarker, 'preview marker')
-    $legacyPdbMarker = Join-Path $install 'CodexQuotaHud.Core.pdb'
-    [System.IO.File]::WriteAllText($legacyPdbMarker, 'legacy pdb marker')
-    [System.IO.File]::WriteAllText(
-        $previewDesktop,
-        'legacy v1.1.0 preview shortcut')
-
-    Invoke-SetupProcess `
-        -Path $isolatedInstaller `
-        -Arguments (
-            '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART ' +
-            '/TASKS="desktopicon"') `
-        -Description 'Isolated upgrade' `
-        -LogPath (Join-Path $smokeRoot 'upgrade.log')
-    Assert-Exists -Path $normalStartMenu -Description 'Normal Start Menu link'
-    Assert-Exists -Path $normalDesktop -Description 'Normal desktop link'
-    Assert-Missing -Path $previewDesktop -Description 'Legacy Developer Preview link'
-    $desktopLinksAfterUpgrade = @(
-        Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' -File)
-    if ($desktopLinksAfterUpgrade.Count -ne 1) {
-        Write-Host 'Desktop contents after isolated upgrade:'
-        if (Test-Path -LiteralPath $desktop -PathType Container) {
-            Get-ChildItem -LiteralPath $desktop -Force |
-                Select-Object Name, FullName |
-                Format-List |
-                Out-String |
-                Write-Host
-        }
-        $upgradeLog = Join-Path $smokeRoot 'upgrade.log'
-        if (Test-Path -LiteralPath $upgradeLog -PathType Leaf) {
-            Write-Host 'Upgrade log tail:'
-            Get-Content -LiteralPath $upgradeLog -Tail 120
-        }
-        throw (
-            'Expected exactly one normal desktop link after upgrade; ' +
-            "found $($desktopLinksAfterUpgrade.Count).")
-    }
-    Assert-DesktopShortcut `
-        -ShortcutPath $normalDesktop `
-        -ExpectedTarget $installedExecutable `
-        -ExpectedArguments ''
-    if (Get-RegistryValuePresenceChecked `
-        -RelativeKey $productionRunRelativeKey `
-        -ValueName $runValueName) {
-        throw 'Isolated startup value still exists after task deselection.'
+    else {
+        Assert-DesignerMissingState `
+            -DesignerDirectory $designerDirectory `
+            -DesignerStartMenu $DesignerStartMenu `
+            -DesignerDesktop $DesignerDesktop `
+            -DesignerRunValue $DesignerRunValue `
+            -PreviewDesktop $previewDesktop `
+            -PreviewStartMenu $previewStartMenu
     }
     Assert-InternalUninstallRegistration `
         -RegistryPath $uninstallRegistryPath `
         -InstallPath $install `
         -TestRoot $internalRoot
-    Assert-Exists -Path $settingsMarker -Description 'Settings marker'
-    Assert-Exists -Path $previewMarker -Description 'Preview-state marker'
-    Write-Host 'Smoke scenario passed: isolated upgrade and task replacement.'
+    $sentinels = New-SentinelSnapshot `
+        -SettingsRoot $settings `
+        -LocalAppDataRoot $localAppData
 
-    $uninstaller = Join-Path $install 'unins000.exe'
-    Assert-Exists -Path $uninstaller -Description 'Isolated uninstaller'
-    Invoke-SetupProcess `
-        -Path $uninstaller `
-        -Arguments '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' `
-        -Description 'Isolated default uninstall' `
-        -LogPath (Join-Path $smokeRoot 'default-uninstall.log')
-    Assert-Missing -Path $install -Description 'Install directory'
-    Assert-Exists -Path $settingsMarker -Description 'Preserved settings marker'
-    Assert-Exists -Path $previewMarker -Description 'Preserved preview-state marker'
-    Assert-InternalArtifactsAbsent `
-        -RunRelativeKey $productionRunRelativeKey `
-        -RunValueName $runValueName `
-        -UninstallRelativeKey $uninstallRegistryRelativeKey `
-        -ShortcutPaths @($isolatedShortcutPaths) `
-        -Description 'Default uninstall'
-    Write-Host 'Smoke scenario passed: default uninstall preserves settings.'
+    switch ($scenario) {
+        'fresh-default' {
+            Assert-DesignerMissingState `
+                -DesignerDirectory $designerDirectory `
+                -DesignerStartMenu $DesignerStartMenu `
+                -DesignerDesktop $DesignerDesktop `
+                -DesignerRunValue $DesignerRunValue `
+                -PreviewDesktop $previewDesktop `
+                -PreviewStartMenu $previewStartMenu
+            Assert-SentinelHashesUnchanged -Snapshot $sentinels
+        }
+        'fresh-designer' {
+            Assert-DesignerInstalledState `
+                -InstalledDesignerExecutable $installedDesignerExecutable `
+                -PublishedDesignerExecutable $publishedDesignerExecutable `
+                -DesignerStartMenu $DesignerStartMenu `
+                -DesignerDesktop $DesignerDesktop `
+                -DesignerRunValue $DesignerRunValue `
+                -RunRegistryPath $runRegistryPath `
+                -PreviewDesktop $previewDesktop `
+                -PreviewStartMenu $previewStartMenu
+            Assert-SentinelHashesUnchanged -Snapshot $sentinels
+        }
+        'add-designer' {
+            foreach ($attempt in 1..2) {
+                [void]$setupExitCodes.Add((Invoke-SetupProcess `
+                    -Path $isolatedInstaller `
+                    -Arguments (
+                        "$quiet /TYPE=custom /COMPONENTS=designer") `
+                    -Description "Isolated add Designer pass $attempt" `
+                    -LogPath (Join-Path $smokeRoot "add-$attempt.log")))
+                Assert-DesignerInstalledState `
+                    -InstalledDesignerExecutable $installedDesignerExecutable `
+                    -PublishedDesignerExecutable $publishedDesignerExecutable `
+                    -DesignerStartMenu $DesignerStartMenu `
+                    -DesignerDesktop $DesignerDesktop `
+                    -DesignerRunValue $DesignerRunValue `
+                    -RunRegistryPath $runRegistryPath `
+                    -PreviewDesktop $previewDesktop `
+                    -PreviewStartMenu $previewStartMenu
+                Assert-SentinelHashesUnchanged -Snapshot $sentinels
+            }
+        }
+        'remove-designer' {
+            $removeSelection = $quiet + ' /TYPE=normal /COMPONENTS=""'
+            foreach ($attempt in 1..2) {
+                [void]$setupExitCodes.Add((Invoke-SetupProcess `
+                    -Path $isolatedInstaller `
+                    -Arguments $removeSelection `
+                    -Description "Isolated remove Designer pass $attempt" `
+                    -LogPath (Join-Path $smokeRoot "remove-$attempt.log")))
+                Assert-NormalInstalledState `
+                    -InstalledExecutable $installedExecutable `
+                    -PublishedExecutable $publishedExecutable `
+                    -NormalStartMenu $normalStartMenu `
+                    -NormalDesktop $normalDesktop `
+                    -RunRegistryPath $runRegistryPath `
+                    -RunValueName $runValueName
+                Assert-DesignerMissingState `
+                    -DesignerDirectory $designerDirectory `
+                    -DesignerStartMenu $DesignerStartMenu `
+                    -DesignerDesktop $DesignerDesktop `
+                    -DesignerRunValue $DesignerRunValue `
+                    -PreviewDesktop $previewDesktop `
+                    -PreviewStartMenu $previewStartMenu
+                Assert-SentinelHashesUnchanged -Snapshot $sentinels
+            }
+        }
+        'upgrade-selected' {
+            [System.IO.File]::WriteAllText(
+                $installedExecutable, 'older internal normal payload')
+            [System.IO.File]::WriteAllText(
+                $installedDesignerExecutable, 'older internal Designer payload')
+            foreach ($attempt in 1..2) {
+                [void]$setupExitCodes.Add((Invoke-SetupProcess `
+                    -Path $isolatedInstaller `
+                    -Arguments $quiet `
+                    -Description "Isolated selected upgrade pass $attempt" `
+                    -LogPath (Join-Path $smokeRoot "upgrade-$attempt.log")))
+                Assert-NormalInstalledState `
+                    -InstalledExecutable $installedExecutable `
+                    -PublishedExecutable $publishedExecutable `
+                    -NormalStartMenu $normalStartMenu `
+                    -NormalDesktop $normalDesktop `
+                    -RunRegistryPath $runRegistryPath `
+                    -RunValueName $runValueName
+                Assert-DesignerInstalledState `
+                    -InstalledDesignerExecutable $installedDesignerExecutable `
+                    -PublishedDesignerExecutable $publishedDesignerExecutable `
+                    -DesignerStartMenu $DesignerStartMenu `
+                    -DesignerDesktop $DesignerDesktop `
+                    -DesignerRunValue $DesignerRunValue `
+                    -RunRegistryPath $runRegistryPath `
+                    -PreviewDesktop $previewDesktop `
+                    -PreviewStartMenu $previewStartMenu
+                Assert-SentinelHashesUnchanged -Snapshot $sentinels
+            }
+        }
+        'cleanup-legacy-failure' {
+            $processLog = Join-Path `
+                $internalRoot `
+                'diagnostics\lifecycle-process.log'
+            $setupLog = Join-Path $smokeRoot 'clean-install.log'
+            Assert-Exists `
+                -Path $processLog `
+                -Description 'Legacy cleanup lifecycle process log'
+            Assert-Exists `
+                -Path $setupLog `
+                -Description 'Legacy cleanup Setup log'
+            $processText = Get-Content `
+                -LiteralPath $processLog `
+                -Raw `
+                -Encoding UTF8
+            $setupText = Get-Content `
+                -LiteralPath $setupLog `
+                -Raw `
+                -Encoding UTF8
+            foreach ($requiredAction in @(
+                'Action=CommitInstall',
+                'Action=CommitDesignerComponentRemoval',
+                'Action=DiscardLegacyState')) {
+                if (-not $processText.Contains($requiredAction)) {
+                    throw "Other cleanup was not attempted: $requiredAction"
+                }
+            }
+            if (-not $setupText.Contains(
+                'Legacy install backup cleanup failed:')) {
+                throw 'Setup did not log the legacy cleanup warning.'
+            }
+            foreach ($rollbackAction in @(
+                'Action=RollbackDesignerComponentRemoval',
+                'Action=CompensateLegacyInstall',
+                'Action=RollbackInstall')) {
+                if ($processText.Contains($rollbackAction)) {
+                    throw "Committed install invoked rollback: $rollbackAction"
+                }
+            }
 
-    Invoke-SetupProcess `
-        -Path $isolatedInstaller `
-        -Arguments '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' `
-        -Description 'Isolated reinstall' `
-        -LogPath (Join-Path $smokeRoot 'reinstall.log')
-    Assert-Exists -Path $settingsMarker -Description 'Reinstall settings marker'
-    Assert-Exists -Path $previewMarker -Description 'Reinstall preview-state marker'
-    $uninstaller = Join-Path $install 'unins000.exe'
-    Invoke-SetupProcess `
-        -Path $uninstaller `
-        -Arguments (
-            '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PURGESETTINGS') `
-        -Description 'Isolated purge uninstall' `
-        -LogPath (Join-Path $smokeRoot 'purge-uninstall.log')
-    Assert-Missing -Path $settings -Description 'Purged test settings directory'
-    Assert-InternalArtifactsAbsent `
-        -RunRelativeKey $productionRunRelativeKey `
-        -RunValueName $runValueName `
-        -UninstallRelativeKey $uninstallRegistryRelativeKey `
-        -ShortcutPaths @($isolatedShortcutPaths) `
-        -Description 'Purge uninstall'
-    Write-Host 'Smoke scenario passed: purge uninstall removes test settings.'
+            $programsRoot = Join-Path $localAppData 'Programs'
+            $legacyResidue = @(Get-ChildItem `
+                -LiteralPath $programsRoot `
+                -Directory `
+                -Force |
+                Where-Object {
+                    $_.Name -like 'CodexQuotaHud.legacy-backup.*'
+                })
+            if ($legacyResidue.Count -ne 1) {
+                throw 'Legacy cleanup failure must retain one exact backup.'
+            }
+            $legacyMarkerPath = Join-Path `
+                $legacyResidue[0].FullName `
+                'CodexQuotaHud.LegacyBackup.json'
+            Assert-Exists `
+                -Path $legacyMarkerPath `
+                -Description 'Identifiable legacy cleanup marker'
+            $legacyMarker = Get-Content `
+                -LiteralPath $legacyMarkerPath `
+                -Raw `
+                -Encoding UTF8 |
+                ConvertFrom-Json
+            if (-not (Test-PathEquals ([string]$legacyMarker.Source) $install) -or
+                -not (Test-PathEquals `
+                    ([string]$legacyMarker.Destination) `
+                    $legacyResidue[0].FullName)) {
+                throw 'Legacy cleanup marker paths are not identifiable.'
+            }
+            $designerResidue = @(Get-ChildItem `
+                -LiteralPath $programsRoot `
+                -Directory `
+                -Force |
+                Where-Object {
+                    $_.Name -like
+                        'CodexQuotaHud.designer-removal-backup.*'
+                })
+            if ($designerResidue.Count -ne 0) {
+                throw 'Designer cleanup did not continue after legacy failure.'
+            }
+            Assert-NormalInstalledState `
+                -InstalledExecutable $installedExecutable `
+                -PublishedExecutable $publishedExecutable `
+                -NormalStartMenu $normalStartMenu `
+                -NormalDesktop $normalDesktop `
+                -RunRegistryPath $runRegistryPath `
+                -RunValueName $runValueName
+            Assert-DesignerMissingState `
+                -DesignerDirectory $designerDirectory `
+                -DesignerStartMenu $DesignerStartMenu `
+                -DesignerDesktop $DesignerDesktop `
+                -DesignerRunValue $DesignerRunValue `
+                -PreviewDesktop $previewDesktop `
+                -PreviewStartMenu $previewStartMenu
+            Assert-SentinelHashesUnchanged -Snapshot $sentinels
+
+            [void]$setupExitCodes.Add((Invoke-SetupProcess `
+                -Path $isolatedInstaller `
+                -Arguments $initialSelection `
+                -Description 'Safe retry after legacy cleanup failure' `
+                -LogPath (Join-Path $smokeRoot 'legacy-safe-retry.log')))
+            Assert-NormalInstalledState `
+                -InstalledExecutable $installedExecutable `
+                -PublishedExecutable $publishedExecutable `
+                -NormalStartMenu $normalStartMenu `
+                -NormalDesktop $normalDesktop `
+                -RunRegistryPath $runRegistryPath `
+                -RunValueName $runValueName
+            Assert-DesignerMissingState `
+                -DesignerDirectory $designerDirectory `
+                -DesignerStartMenu $DesignerStartMenu `
+                -DesignerDesktop $DesignerDesktop `
+                -DesignerRunValue $DesignerRunValue `
+                -PreviewDesktop $previewDesktop `
+                -PreviewStartMenu $previewStartMenu
+            Assert-Exists `
+                -Path $legacyMarkerPath `
+                -Description 'Identifiable legacy residue after safe retry'
+            Assert-SentinelHashesUnchanged -Snapshot $sentinels
+            Write-Host (
+                'Smoke scenario passed: committed legacy cleanup failure ' +
+                'does not roll back the new install.')
+        }
+        'cleanup-designer-failure' {
+            $removeSelection = $quiet + ' /TYPE=normal /COMPONENTS=""'
+            $removeLog = Join-Path $smokeRoot 'designer-cleanup-failure.log'
+            [void]$setupExitCodes.Add((Invoke-SetupProcess `
+                -Path $isolatedInstaller `
+                -Arguments $removeSelection `
+                -Description 'Committed Designer cleanup failure' `
+                -LogPath $removeLog))
+            $processLog = Join-Path `
+                $internalRoot `
+                'diagnostics\lifecycle-process.log'
+            Assert-Exists `
+                -Path $processLog `
+                -Description 'Designer cleanup lifecycle process log'
+            Assert-Exists `
+                -Path $removeLog `
+                -Description 'Designer cleanup Setup log'
+            $processText = Get-Content `
+                -LiteralPath $processLog `
+                -Raw `
+                -Encoding UTF8
+            $setupText = Get-Content `
+                -LiteralPath $removeLog `
+                -Raw `
+                -Encoding UTF8
+            foreach ($requiredAction in @(
+                'Action=CommitInstall',
+                'Action=CommitDesignerComponentRemoval')) {
+                if (-not $processText.Contains($requiredAction)) {
+                    throw "Other cleanup was not attempted: $requiredAction"
+                }
+            }
+            if (-not $setupText.Contains(
+                'Designer component cleanup failed:')) {
+                throw 'Setup did not log the Designer cleanup warning.'
+            }
+            foreach ($rollbackAction in @(
+                'Action=RollbackDesignerComponentRemoval',
+                'Action=CompensateLegacyInstall',
+                'Action=RollbackInstall')) {
+                if ($processText.Contains($rollbackAction)) {
+                    throw "Committed install invoked rollback: $rollbackAction"
+                }
+            }
+
+            $programsRoot = Join-Path $localAppData 'Programs'
+            $designerResidue = @(Get-ChildItem `
+                -LiteralPath $programsRoot `
+                -Directory `
+                -Force |
+                Where-Object {
+                    $_.Name -like
+                        'CodexQuotaHud.designer-removal-backup.*'
+                })
+            if ($designerResidue.Count -ne 1) {
+                throw 'Designer cleanup failure must retain one exact backup.'
+            }
+            $designerMarkerPath = Join-Path `
+                $designerResidue[0].FullName `
+                'CodexQuotaHud.DesignerRemoval.json'
+            Assert-Exists `
+                -Path $designerMarkerPath `
+                -Description 'Identifiable Designer cleanup marker'
+            $designerMarker = Get-Content `
+                -LiteralPath $designerMarkerPath `
+                -Raw `
+                -Encoding UTF8 |
+                ConvertFrom-Json
+            if (-not (Test-PathEquals `
+                    ([string]$designerMarker.Source) `
+                    $designerDirectory) -or
+                -not (Test-PathEquals `
+                    ([string]$designerMarker.Destination) `
+                    $designerResidue[0].FullName) -or
+                -not [string]::Equals(
+                    [string]$designerMarker.State,
+                    'Prepared',
+                    [System.StringComparison]::Ordinal)) {
+                throw 'Designer cleanup marker is not identifiable.'
+            }
+            Assert-NormalInstalledState `
+                -InstalledExecutable $installedExecutable `
+                -PublishedExecutable $publishedExecutable `
+                -NormalStartMenu $normalStartMenu `
+                -NormalDesktop $normalDesktop `
+                -RunRegistryPath $runRegistryPath `
+                -RunValueName $runValueName
+            Assert-DesignerMissingState `
+                -DesignerDirectory $designerDirectory `
+                -DesignerStartMenu $DesignerStartMenu `
+                -DesignerDesktop $DesignerDesktop `
+                -DesignerRunValue $DesignerRunValue `
+                -PreviewDesktop $previewDesktop `
+                -PreviewStartMenu $previewStartMenu
+            Assert-SentinelHashesUnchanged -Snapshot $sentinels
+
+            [void]$setupExitCodes.Add((Invoke-SetupProcess `
+                -Path $isolatedInstaller `
+                -Arguments $removeSelection `
+                -Description 'Safe retry after Designer cleanup failure' `
+                -LogPath (Join-Path $smokeRoot 'designer-safe-retry.log')))
+            Assert-NormalInstalledState `
+                -InstalledExecutable $installedExecutable `
+                -PublishedExecutable $publishedExecutable `
+                -NormalStartMenu $normalStartMenu `
+                -NormalDesktop $normalDesktop `
+                -RunRegistryPath $runRegistryPath `
+                -RunValueName $runValueName
+            Assert-DesignerMissingState `
+                -DesignerDirectory $designerDirectory `
+                -DesignerStartMenu $DesignerStartMenu `
+                -DesignerDesktop $DesignerDesktop `
+                -DesignerRunValue $DesignerRunValue `
+                -PreviewDesktop $previewDesktop `
+                -PreviewStartMenu $previewStartMenu
+            Assert-Exists `
+                -Path $designerMarkerPath `
+                -Description 'Identifiable Designer residue after safe retry'
+            Assert-SentinelHashesUnchanged -Snapshot $sentinels
+            Write-Host (
+                'Smoke scenario passed: committed Designer cleanup failure ' +
+                'does not roll back the new install.')
+        }
+        'uninstall-preserve' {
+            $uninstaller = Join-Path $install 'unins000.exe'
+            Assert-Exists -Path $uninstaller -Description 'Isolated uninstaller'
+            [void]$setupExitCodes.Add((Invoke-SetupProcess `
+                -Path $uninstaller `
+                -Arguments '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' `
+                -Description 'Isolated default uninstall' `
+                -LogPath (Join-Path $smokeRoot 'default-uninstall.log')))
+            Assert-Missing -Path $install -Description 'Install directory'
+            Assert-SentinelHashesUnchanged -Snapshot $sentinels
+            Assert-InternalArtifactsAbsent `
+                -RunRelativeKey $internalRunRelativeKey `
+                -RunValueName $runValueName `
+                -UninstallRelativeKey $uninstallRegistryRelativeKey `
+                -ShortcutPaths @($isolatedShortcutPaths) `
+                -Description 'Default uninstall'
+            Write-Host 'Smoke scenario passed: default uninstall preserves settings.'
+        }
+        'uninstall-purge' {
+            $uninstaller = Join-Path $install 'unins000.exe'
+            Assert-Exists -Path $uninstaller -Description 'Isolated uninstaller'
+            [void]$setupExitCodes.Add((Invoke-SetupProcess `
+                -Path $uninstaller `
+                -Arguments (
+                    '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PURGESETTINGS') `
+                -Description 'Isolated purge uninstall' `
+                -LogPath (Join-Path $smokeRoot 'purge-uninstall.log')))
+            Assert-Missing `
+                -Path $settings `
+                -Description 'Purged test settings directory'
+            Assert-Exists `
+                -Path $sentinels.Unrelated `
+                -Description 'Unrelated Local App Data sentinel'
+            Assert-InternalArtifactsAbsent `
+                -RunRelativeKey $internalRunRelativeKey `
+                -RunValueName $runValueName `
+                -UninstallRelativeKey $uninstallRegistryRelativeKey `
+                -ShortcutPaths @($isolatedShortcutPaths) `
+                -Description 'Purge uninstall'
+            Write-Host 'Smoke scenario passed: purge uninstall removes test settings.'
+        }
+        default { throw "Unknown isolated scenario: $scenario" }
+    }
+
+    $desktopLinks = @(
+        Get-ChildItem `
+            -LiteralPath $desktop `
+            -Filter '*.lnk' `
+            -File `
+            -ErrorAction Stop)
+    $expectedDesktopCount = if ($scenario -like 'uninstall-*') { 0 } else { 1 }
+    if ($desktopLinks.Count -ne $expectedDesktopCount) {
+        throw "Scenario $scenario has an unexpected desktop link count."
+    }
+    if ($scenario -notlike 'cleanup-*-failure') {
+        Assert-NoOperationResidue `
+            -ProgramsRoot (Join-Path $localAppData 'Programs') `
+            -InternalRoot $internalRoot
+    }
+    Write-Host (
+        "Smoke scenario passed: $scenario; exit codes: " +
+        ($setupExitCodes -join ', '))
     Write-Host "Isolated installer root: $internalRoot"
     Write-Host "Isolated test ID: $internalTestId"
 }
 catch {
-    Write-Error ("Smoke failure stack: " + $_.ScriptStackTrace)
+    $scenarioFailed = $true
+    $primaryError = $_
+    [Console]::Error.WriteLine(
+        "Smoke primary error: " + $primaryError.Exception.Message)
+    [Console]::Error.WriteLine(
+        "Smoke failure stack: " + $primaryError.ScriptStackTrace)
     throw
 }
 finally {
     $cleanupErrors = [System.Collections.ArrayList]::new()
-    if (-not [string]::IsNullOrWhiteSpace($internalTestId)) {
+    if (-not [string]::IsNullOrWhiteSpace($internalTestId) -and
+        -not [string]::IsNullOrWhiteSpace($internalRunRelativeKey)) {
         try {
-            $testRunName = "CodexQuotaHud.InternalTest.$internalTestId"
-            if (Get-RegistryValuePresenceChecked `
-                -RelativeKey $productionRunRelativeKey `
-                -ValueName $testRunName) {
-                Remove-ItemProperty `
-                    -LiteralPath $runRegistryPath `
-                    -Name $testRunName `
-                    -Force `
-                    -ErrorAction Stop
-            }
+            Remove-ExactInternalRegistryTree `
+                -InternalTestId $internalTestId `
+                -RunRelativeKey $internalRunRelativeKey
         }
         catch { [void]$cleanupErrors.Add($_.Exception.Message) }
     }
@@ -702,7 +1447,7 @@ finally {
         }
         catch { [void]$cleanupErrors.Add($_.Exception.Message) }
     }
-    if ($cleanupAuthorized) {
+    if ($cleanupAuthorized -and -not $scenarioFailed) {
         try {
             if (Get-PathPresenceChecked -Path $smokeRoot) {
                 Assert-NoReparsePoint -Path $smokeRoot -Boundary $systemTemp
@@ -718,7 +1463,8 @@ finally {
 
     if ($cleanupAuthorized) {
         try {
-            if (Get-PathPresenceChecked -Path $smokeRoot) {
+            if (-not $scenarioFailed -and
+                (Get-PathPresenceChecked -Path $smokeRoot)) {
                 [void]$cleanupErrors.Add(
                     "Cleanup postcondition failed: temp root exists: $smokeRoot")
             }
@@ -726,11 +1472,12 @@ finally {
         catch { [void]$cleanupErrors.Add($_.Exception.Message) }
         try {
             if (-not [string]::IsNullOrWhiteSpace($internalTestId) -and
-                (Get-RegistryValuePresenceChecked `
-                    -RelativeKey $productionRunRelativeKey `
-                    -ValueName "CodexQuotaHud.InternalTest.$internalTestId")) {
+                -not [string]::IsNullOrWhiteSpace(
+                    $internalRunRelativeKey) -and
+                (Get-RegistryKeyPresenceChecked `
+                    -RelativeKey $internalRunRelativeKey)) {
                 [void]$cleanupErrors.Add(
-                    'Cleanup postcondition failed: internal Run value exists.')
+                    'Cleanup postcondition failed: internal Run key exists.')
             }
         }
         catch { [void]$cleanupErrors.Add($_.Exception.Message) }
@@ -775,7 +1522,10 @@ finally {
     if ($cleanupErrors.Count -gt 0) {
         throw ('Isolated cleanup failed: ' + ($cleanupErrors -join ' | '))
     }
-    if ($cleanupAuthorized) {
+    if ($cleanupAuthorized -and $scenarioFailed) {
+        Write-Host "Preserved failed scenario diagnostics: $smokeRoot"
+    }
+    elseif ($cleanupAuthorized) {
         Write-Host "Finally cleanup completed with checked postconditions: $smokeRoot"
     }
 }

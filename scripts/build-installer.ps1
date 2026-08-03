@@ -8,7 +8,9 @@ param(
     [switch] $InternalTestMode,
     [string] $InternalArgumentCapturePath,
     [int] $InternalCompilerExitCode,
-    [switch] $InternalSkipFakeSetup
+    [switch] $InternalSkipFakeSetup,
+    [ValidateSet('', 'LegacyCommit', 'DesignerAfterPayloadDelete')]
+    [string] $InternalCleanupFailureStage = ''
 )
 
 Set-StrictMode -Version Latest
@@ -42,6 +44,9 @@ $expectedProductionOutput = [System.IO.Path]::GetFullPath(
 $publishedExecutable = Join-Path `
     $publishedFullPath `
     'CodexQuotaHud.App.exe'
+$publishedDesignerExecutable = Join-Path `
+    $publishedFullPath `
+    'designer\CodexQuotaHud.SkinDesigner.exe'
 $expectedSetup = Join-Path `
     $outputFullPath `
     "CodexQuotaHud-Setup-v$Version.exe"
@@ -58,11 +63,18 @@ if (-not (Test-Path -LiteralPath $publishedExecutable -PathType Leaf)) {
     throw "Published executable does not exist: $publishedExecutable"
 }
 
+if (-not (Test-Path -LiteralPath $publishedDesignerExecutable -PathType Leaf)) {
+    throw (
+        'Published Designer executable does not exist: ' +
+        $publishedDesignerExecutable)
+}
+
 if (-not $InternalTestMode -and
     (-not [string]::IsNullOrWhiteSpace($InnoCompilerPath) -or
      -not [string]::IsNullOrWhiteSpace($InternalArgumentCapturePath) -or
      $InternalCompilerExitCode -ne 0 -or
-     $InternalSkipFakeSetup)) {
+     $InternalSkipFakeSetup -or
+     -not [string]::IsNullOrWhiteSpace($InternalCleanupFailureStage))) {
     throw 'Internal installer builder hooks require -InternalTestMode.'
 }
 
@@ -131,6 +143,14 @@ if ($InternalTestMode) {
         "/DInternalTestRoot=$internalTestRoot"
         $compilerArguments[4..($compilerArguments.Count - 1)]
     )
+    if (-not [string]::IsNullOrWhiteSpace(
+        $InternalCleanupFailureStage)) {
+        $compilerArguments = @(
+            $compilerArguments[0..5]
+            "/DInternalCleanupFailureStage=$InternalCleanupFailureStage"
+            $compilerArguments[6..($compilerArguments.Count - 1)]
+        )
+    }
 
     if (-not [string]::IsNullOrWhiteSpace(
         $InternalArgumentCapturePath)) {

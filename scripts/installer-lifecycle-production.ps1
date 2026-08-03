@@ -8,6 +8,9 @@ param(
         'DiscardLegacyState',
         'CompensateLegacyInstall',
         'RollbackInstall',
+        'PrepareDesignerComponentRemoval',
+        'CommitDesignerComponentRemoval',
+        'RollbackDesignerComponentRemoval',
         'PrepareUninstall',
         'FinalizeUninstall',
         'PurgeSettings')]
@@ -15,7 +18,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $InstallPath,
     [string] $LegacyBackupPath,
-    [string] $LegacyShellStatePath
+    [string] $LegacyShellStatePath,
+    [string] $DesignerBackupPath
 )
 
 Set-StrictMode -Version Latest
@@ -113,6 +117,8 @@ function Get-GuidSibling {
 function Get-ShellPaths {
     $previewTitle = 'Codex Quota HUD ' +
         [string]([char[]](0x5F00, 0x53D1, 0x9884, 0x89C8))
+    $designerTitle = 'Codex Quota HUD ' +
+        [string]([char[]](0x76AE, 0x80A4, 0x8BBE, 0x8BA1, 0x5668))
     $desktop = [Environment]::GetFolderPath(
         [Environment+SpecialFolder]::DesktopDirectory)
     $programsMenu = Join-Path ([Environment]::GetFolderPath(
@@ -121,6 +127,7 @@ function Get-ShellPaths {
         NormalDesktop = Join-Path $desktop 'Codex Quota HUD.lnk'
         PreviewDesktop = Join-Path $desktop "$previewTitle.lnk"
         StartMenu = Join-Path $programsMenu 'Codex Quota HUD.lnk'
+        DesignerStartMenu = Join-Path $programsMenu "$designerTitle.lnk"
     }
 }
 
@@ -159,6 +166,55 @@ function Stop-ExactProcess {
     finally { foreach ($process in @($matches)) { $process.Dispose() } }
 }
 
+function Close-ExactDesignerProcess {
+    param([string] $Executable)
+
+    $matches = [System.Collections.ArrayList]::new()
+    foreach ($process in @(Get-Process `
+        -Name 'CodexQuotaHud.SkinDesigner' `
+        -ErrorAction SilentlyContinue)) {
+        try {
+            $handle = $process.SafeHandle
+            if ($null -eq $handle -or $handle.IsInvalid -or $handle.IsClosed) {
+                throw 'Process handle is unavailable.'
+            }
+            $path = Get-NormalizedPath $process.MainModule.FileName
+        }
+        catch {
+            $process.Dispose()
+            throw (
+                'Executable path and stable handle cannot be inspected for ' +
+                "matching Designer process $($process.Id).")
+        }
+        if (Test-PathEquals $path $Executable) {
+            [void]$matches.Add($process)
+        }
+        else { $process.Dispose() }
+    }
+    try {
+        foreach ($process in @($matches)) {
+            [void]$process.CloseMainWindow()
+        }
+        $deadline = [DateTime]::UtcNow.AddSeconds(10)
+        $running = [System.Collections.ArrayList]::new()
+        foreach ($process in @($matches)) {
+            $remaining = [Math]::Max(
+                0,
+                [int][Math]::Ceiling(
+                    ($deadline - [DateTime]::UtcNow).TotalMilliseconds))
+            if (-not $process.WaitForExit($remaining)) {
+                [void]$running.Add($process.Id)
+            }
+        }
+        if ($running.Count -gt 0) {
+            throw (
+                'Exact Skin Designer process is still running after a ' +
+                'normal close request: ' + ($running -join ', '))
+        }
+    }
+    finally { foreach ($process in @($matches)) { $process.Dispose() } }
+}
+
 function Copy-Backup {
     param([string] $Install, [string] $Backup, [string] $Programs)
     if (-not (Test-Path -LiteralPath $Install -PathType Container)) { return }
@@ -173,6 +229,460 @@ function Copy-Backup {
         Assert-SafeTree -Path $Backup -Boundary $Programs
     }
     catch { Remove-SafeTree -Path $Backup -Boundary $Programs; throw }
+}
+
+function Assert-DesignerShortcutSafe {
+    param([string] $Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.PSIsContainer -or ($item.Attributes -band
+        [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing unsafe Designer shortcut: $Path"
+    }
+}
+
+function Get-DesignerMarker {
+    param(
+        [string] $Backup,
+        [string] $Designer,
+        [string] $Shortcut)
+    $path = Join-Path $Backup 'CodexQuotaHud.DesignerRemoval.json'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Designer removal marker is missing: $path"
+    }
+    $item = Get-Item -LiteralPath $path -Force
+    if (($item.Attributes -band
+        [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing reparse-point Designer removal marker: $path"
+    }
+    $marker = ConvertFrom-Json (Get-Content `
+        -LiteralPath $path -Raw -Encoding UTF8)
+    $properties = @($marker.PSObject.Properties.Name)
+    if ($properties.Count -ne 6 -or
+        $properties -notcontains 'Source' -or
+        $properties -notcontains 'Destination' -or
+        $properties -notcontains 'ShortcutSource' -or
+        $properties -notcontains 'ShortcutExisted' -or
+        $properties -notcontains 'DesignerExisted' -or
+        $properties -notcontains 'State' -or
+        -not ($marker.ShortcutExisted -is [bool]) -or
+        -not ($marker.DesignerExisted -is [bool]) -or
+        [string]$marker.State -notin @('Prepared', 'RestoreVerified') -or
+        -not (Test-PathEquals ([string]$marker.Source) $Designer) -or
+        -not (Test-PathEquals ([string]$marker.Destination) $Backup) -or
+        -not (Test-PathEquals ([string]$marker.ShortcutSource) $Shortcut)) {
+        throw 'Designer removal marker does not match the exact managed paths.'
+    }
+    return $marker
+}
+
+function Set-DesignerMarkerState {
+    param(
+        [string] $Backup,
+        $Marker,
+        [ValidateSet('Prepared', 'RestoreVerified')]
+        [string] $State)
+    $markerPath = Join-Path $Backup 'CodexQuotaHud.DesignerRemoval.json'
+    $temporaryPath = Join-Path `
+        $Backup `
+        'CodexQuotaHud.DesignerRemoval.json.pending'
+    $previousPath = Join-Path `
+        $Backup `
+        'CodexQuotaHud.DesignerRemoval.json.previous'
+    foreach ($transactionPath in @($temporaryPath, $previousPath)) {
+        if (Test-Path -LiteralPath $transactionPath) {
+            $transactionItem = Get-Item `
+                -LiteralPath $transactionPath `
+                -Force
+            if ($transactionItem.PSIsContainer -or
+                ($transactionItem.Attributes -band
+                    [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Refusing unsafe Designer marker transaction: $transactionPath"
+            }
+        }
+    }
+    if (Test-Path -LiteralPath $previousPath) {
+        throw 'Previous Designer removal marker transaction is unresolved.'
+    }
+    $Marker.State = $State
+    try {
+        [System.IO.File]::WriteAllText(
+            $temporaryPath,
+            (ConvertTo-Json $Marker -Compress),
+            [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::Replace(
+            $temporaryPath,
+            $markerPath,
+            $previousPath)
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryPath) {
+            Remove-Item -LiteralPath $temporaryPath -Force
+        }
+        if (Test-Path -LiteralPath $previousPath) {
+            Remove-Item -LiteralPath $previousPath -Force
+        }
+    }
+}
+
+function Remove-DesignerPayloadTree {
+    param([string] $Path, [string] $Boundary)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    Assert-SafeTree -Path $Path -Boundary $Boundary
+    foreach ($file in @(
+        Get-ChildItem -LiteralPath $Path -File -Force -Recurse |
+            Sort-Object -Property FullName)) {
+        Remove-Item -LiteralPath $file.FullName -Force
+    }
+    foreach ($directory in @(
+        Get-ChildItem -LiteralPath $Path -Directory -Force -Recurse |
+            Sort-Object `
+                -Property @{ Expression = { $_.FullName.Length } }, FullName `
+                -Descending)) {
+        Remove-Item -LiteralPath $directory.FullName -Force
+    }
+    Remove-Item -LiteralPath $Path -Force
+}
+
+function Remove-DesignerBackupPayloads {
+    param([string] $Backup, [string] $Programs)
+    Assert-SafeTree -Path $Backup -Boundary $Programs
+    $allowedNames = @(
+        'designer',
+        'DesignerStartMenu.lnk',
+        'CodexQuotaHud.DesignerRemoval.json',
+        'CodexQuotaHud.DesignerRemoval.json.pending',
+        'CodexQuotaHud.DesignerRemoval.json.previous')
+    foreach ($item in @(Get-ChildItem -LiteralPath $Backup -Force)) {
+        if ($item.Name -notin $allowedNames) {
+            throw "Unexpected Designer removal backup item: $($item.Name)"
+        }
+    }
+
+    $backupDesigner = Join-Path $Backup 'designer'
+    if (Test-Path -LiteralPath $backupDesigner) {
+        if (-not (Test-Path -LiteralPath $backupDesigner -PathType Container)) {
+            throw 'Designer backup payload is not a directory.'
+        }
+        Remove-DesignerPayloadTree `
+            -Path $backupDesigner `
+            -Boundary $Backup
+    }
+    if (Test-Path -LiteralPath $backupDesigner) {
+        throw 'Designer backup payload cleanup postcondition failed.'
+    }
+
+    $backupShortcut = Join-Path $Backup 'DesignerStartMenu.lnk'
+    if (Test-Path -LiteralPath $backupShortcut) {
+        Assert-DesignerShortcutSafe -Path $backupShortcut
+        Remove-Item -LiteralPath $backupShortcut -Force
+    }
+    if (Test-Path -LiteralPath $backupShortcut) {
+        throw 'Designer backup shortcut cleanup postcondition failed.'
+    }
+
+    foreach ($transactionLeaf in @(
+        'CodexQuotaHud.DesignerRemoval.json.pending',
+        'CodexQuotaHud.DesignerRemoval.json.previous')) {
+        $transactionPath = Join-Path $Backup $transactionLeaf
+        if (Test-Path -LiteralPath $transactionPath) {
+            $transactionItem = Get-Item `
+                -LiteralPath $transactionPath `
+                -Force
+            if ($transactionItem.PSIsContainer -or
+                ($transactionItem.Attributes -band
+                    [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Refusing unsafe Designer marker transaction: $transactionPath"
+            }
+            Remove-Item -LiteralPath $transactionPath -Force
+        }
+    }
+
+    $markerPath = Join-Path $Backup 'CodexQuotaHud.DesignerRemoval.json'
+    Remove-Item -LiteralPath $markerPath -Force
+    if (Test-Path -LiteralPath $markerPath) {
+        throw 'Designer removal marker cleanup postcondition failed.'
+    }
+    if (@(Get-ChildItem -LiteralPath $Backup -Force).Count -ne 0) {
+        throw 'Designer removal backup was not empty after payload cleanup.'
+    }
+    Remove-Item -LiteralPath $Backup -Force
+}
+
+function Assert-DesignerFileMatch {
+    param([string] $Source, [string] $Destination)
+    if (-not (Test-Path -LiteralPath $Source -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $Destination -PathType Leaf)) {
+        throw 'Designer restoration file is missing.'
+    }
+    $left = Get-Item -LiteralPath $Source -Force
+    $right = Get-Item -LiteralPath $Destination -Force
+    $leftHash = (Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash
+    $rightHash = (Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash
+    if ($left.Length -ne $right.Length -or
+        $left.LastWriteTimeUtc.Ticks -ne $right.LastWriteTimeUtc.Ticks -or
+        $left.Attributes -ne $right.Attributes -or
+        -not [string]::Equals($leftHash, $rightHash,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Designer restoration file bytes or metadata differ.'
+    }
+}
+
+function Assert-DesignerDirectoryMatch {
+    param([string] $Source, [string] $Destination)
+    Assert-SafeTree -Path $Source -Boundary (Split-Path $Source -Parent)
+    Assert-SafeTree `
+        -Path $Destination `
+        -Boundary (Split-Path $Destination -Parent)
+    $sourceRoot = Get-NormalizedPath $Source
+    $destinationRoot = Get-NormalizedPath $Destination
+    $sourceItems = @(Get-ChildItem -LiteralPath $sourceRoot -Force -Recurse)
+    $destinationItems = @(
+        Get-ChildItem -LiteralPath $destinationRoot -Force -Recurse)
+    if ($sourceItems.Count -ne $destinationItems.Count) {
+        throw 'Designer restoration item count differs.'
+    }
+    foreach ($sourceItem in $sourceItems) {
+        $relative = $sourceItem.FullName.Substring($sourceRoot.Length).TrimStart(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar)
+        $destinationPath = Join-Path $destinationRoot $relative
+        if (-not (Test-Path -LiteralPath $destinationPath)) {
+            throw "Designer restoration item is missing: $relative"
+        }
+        $destinationItem = Get-Item -LiteralPath $destinationPath -Force
+        if ([bool]$sourceItem.PSIsContainer -ne
+            [bool]$destinationItem.PSIsContainer) {
+            throw "Designer restoration item type differs: $relative"
+        }
+        if (-not $sourceItem.PSIsContainer) {
+            Assert-DesignerFileMatch `
+                -Source $sourceItem.FullName `
+                -Destination $destinationPath
+        }
+    }
+}
+
+function Prepare-DesignerRemoval {
+    param(
+        [string] $Install,
+        [string] $Backup,
+        [string] $Shortcut,
+        [string] $Programs)
+    $designer = Get-NormalizedPath (Join-Path $Install 'designer')
+    Assert-SafeTree -Path $designer -Boundary $Programs
+    Assert-DesignerShortcutSafe -Path $Shortcut
+    $sourceExists = Test-Path -LiteralPath $designer -PathType Container
+    $shortcutExists = Test-Path -LiteralPath $Shortcut -PathType Leaf
+    if (Test-Path -LiteralPath $Backup) {
+        $marker = Get-DesignerMarker `
+            -Backup $Backup -Designer $designer -Shortcut $Shortcut
+    }
+    else {
+        if (-not $sourceExists -and -not $shortcutExists) { return }
+        New-Item -ItemType Directory -Path $Backup | Out-Null
+        $marker = [ordered]@{
+            Source = $designer
+            Destination = $Backup
+            ShortcutSource = $Shortcut
+            ShortcutExisted = [bool]$shortcutExists
+            DesignerExisted = [bool]$sourceExists
+            State = 'Prepared'
+        }
+        [System.IO.File]::WriteAllText(
+            (Join-Path $Backup 'CodexQuotaHud.DesignerRemoval.json'),
+            (ConvertTo-Json $marker -Compress),
+            [System.Text.UTF8Encoding]::new($false))
+    }
+    $backupDesigner = Join-Path $Backup 'designer'
+    if ($sourceExists) {
+        if (-not [bool]$marker.DesignerExisted) {
+            throw 'Designer payload appeared after the removal snapshot.'
+        }
+        if (Test-Path -LiteralPath $backupDesigner) {
+            throw 'Designer removal found both source and backup payloads.'
+        }
+        Move-Item -LiteralPath $designer -Destination $backupDesigner
+    }
+    $backupShortcut = Join-Path $Backup 'DesignerStartMenu.lnk'
+    if ([bool]$marker.ShortcutExisted -and $shortcutExists) {
+        if (Test-Path -LiteralPath $backupShortcut) {
+            throw 'Designer removal found both source and backup shortcuts.'
+        }
+        Move-Item -LiteralPath $Shortcut -Destination $backupShortcut
+    }
+    elseif (-not [bool]$marker.ShortcutExisted -and $shortcutExists) {
+        throw 'Designer shortcut appeared after the removal snapshot.'
+    }
+    Assert-SafeTree -Path $Backup -Boundary $Programs
+    if ((Test-Path -LiteralPath $designer) -or
+        (Test-Path -LiteralPath $Shortcut)) {
+        throw 'Designer removal postcondition failed.'
+    }
+}
+
+function Restore-DesignerRemoval {
+    param(
+        [string] $Install,
+        [string] $Backup,
+        [string] $Shortcut,
+        [string] $Programs)
+    if (-not (Test-Path -LiteralPath $Backup)) { return }
+    $designer = Get-NormalizedPath (Join-Path $Install 'designer')
+    $marker = Get-DesignerMarker `
+        -Backup $Backup -Designer $designer -Shortcut $Shortcut
+    Assert-SafeTree -Path $Backup -Boundary $Programs
+    $backupDesigner = Join-Path $Backup 'designer'
+    $staging = $null
+    try {
+        if ([string]$marker.State -eq 'RestoreVerified') {
+            if ([bool]$marker.DesignerExisted -and
+                -not (Test-Path -LiteralPath $designer -PathType Container)) {
+                throw 'Verified Designer restoration payload is missing.'
+            }
+            if (-not [bool]$marker.DesignerExisted -and
+                (Test-Path -LiteralPath $designer)) {
+                throw 'Unexpected Designer payload appeared after restoration.'
+            }
+            if ([bool]$marker.ShortcutExisted -and
+                -not (Test-Path -LiteralPath $Shortcut -PathType Leaf)) {
+                throw 'Verified Designer restoration shortcut is missing.'
+            }
+            if (-not [bool]$marker.ShortcutExisted -and
+                (Test-Path -LiteralPath $Shortcut)) {
+                throw 'Unexpected Designer shortcut appeared after restoration.'
+            }
+            Assert-SafeTree -Path $designer -Boundary $Programs
+            Assert-DesignerShortcutSafe -Path $Shortcut
+            Remove-DesignerBackupPayloads `
+                -Backup $Backup `
+                -Programs $Programs
+            return
+        }
+
+        if ([bool]$marker.DesignerExisted -and
+            -not (Test-Path -LiteralPath $backupDesigner -PathType Container)) {
+            throw 'Designer backup payload is missing.'
+        }
+        if (-not [bool]$marker.DesignerExisted -and
+            (Test-Path -LiteralPath $backupDesigner)) {
+            throw 'Unexpected Designer backup payload was found.'
+        }
+        if (Test-Path -LiteralPath $backupDesigner -PathType Container) {
+            if (Test-Path -LiteralPath $designer) {
+                Assert-DesignerDirectoryMatch `
+                    -Source $backupDesigner -Destination $designer
+            }
+            else {
+                $staging = Get-GuidSibling `
+                    -Path (Join-Path $Programs (
+                        'CodexQuotaHud.designer-rollback-staging.' +
+                        [Guid]::NewGuid().ToString('N'))) `
+                    -Prefix 'CodexQuotaHud.designer-rollback-staging.' `
+                    -Programs $Programs
+                New-Item -ItemType Directory -Path $staging | Out-Null
+                foreach ($item in @(
+                    Get-ChildItem -LiteralPath $backupDesigner -Force)) {
+                    Copy-Item -LiteralPath $item.FullName `
+                        -Destination $staging -Recurse -Force
+                }
+                foreach ($sourceFile in @(
+                    Get-ChildItem -LiteralPath $backupDesigner `
+                        -File -Force -Recurse)) {
+                    $relative = $sourceFile.FullName.Substring(
+                        $backupDesigner.Length).TrimStart(
+                            [System.IO.Path]::DirectorySeparatorChar,
+                            [System.IO.Path]::AltDirectorySeparatorChar)
+                    $stagedFile = Join-Path $staging $relative
+                    [System.IO.File]::SetAttributes(
+                        $stagedFile, [System.IO.FileAttributes]::Normal)
+                    [System.IO.File]::SetLastWriteTimeUtc(
+                        $stagedFile, $sourceFile.LastWriteTimeUtc)
+                    [System.IO.File]::SetAttributes(
+                        $stagedFile, $sourceFile.Attributes)
+                }
+                Assert-DesignerDirectoryMatch `
+                    -Source $backupDesigner -Destination $staging
+                Move-Item -LiteralPath $staging -Destination $designer
+                $staging = $null
+            }
+        }
+        $backupShortcut = Join-Path $Backup 'DesignerStartMenu.lnk'
+        if ([bool]$marker.ShortcutExisted) {
+            if (-not (Test-Path -LiteralPath $backupShortcut -PathType Leaf)) {
+                if (-not (Test-Path -LiteralPath $Shortcut -PathType Leaf)) {
+                    throw 'Designer shortcut backup is missing.'
+                }
+                Assert-DesignerShortcutSafe -Path $Shortcut
+            }
+            elseif (Test-Path -LiteralPath $Shortcut) {
+                Assert-DesignerShortcutSafe -Path $backupShortcut
+                Assert-DesignerShortcutSafe -Path $Shortcut
+                Assert-DesignerFileMatch `
+                    -Source $backupShortcut -Destination $Shortcut
+            }
+            else {
+                Assert-DesignerShortcutSafe -Path $backupShortcut
+                New-Item -ItemType Directory `
+                    -Path (Split-Path $Shortcut -Parent) -Force | Out-Null
+                Copy-Item -LiteralPath $backupShortcut `
+                    -Destination $Shortcut -Force
+                $backupItem = Get-Item -LiteralPath $backupShortcut -Force
+                [System.IO.File]::SetAttributes(
+                    $Shortcut, [System.IO.FileAttributes]::Normal)
+                [System.IO.File]::SetLastWriteTimeUtc(
+                    $Shortcut, $backupItem.LastWriteTimeUtc)
+                [System.IO.File]::SetAttributes(
+                    $Shortcut, $backupItem.Attributes)
+                Assert-DesignerFileMatch `
+                    -Source $backupShortcut -Destination $Shortcut
+            }
+        }
+        elseif (Test-Path -LiteralPath $Shortcut) {
+            throw 'Unexpected Designer shortcut appeared during restoration.'
+        }
+
+        if ([bool]$marker.DesignerExisted -and
+            -not (Test-Path -LiteralPath $designer -PathType Container)) {
+            throw 'Designer restoration payload postcondition failed.'
+        }
+        if ([bool]$marker.ShortcutExisted -and
+            -not (Test-Path -LiteralPath $Shortcut -PathType Leaf)) {
+            throw 'Designer restoration shortcut postcondition failed.'
+        }
+        Set-DesignerMarkerState `
+            -Backup $Backup `
+            -Marker $marker `
+            -State 'RestoreVerified'
+        Remove-DesignerBackupPayloads `
+            -Backup $Backup `
+            -Programs $Programs
+    }
+    finally {
+        if ($null -ne $staging -and (Test-Path -LiteralPath $staging)) {
+            Remove-SafeTree -Path $staging -Boundary $Programs
+        }
+    }
+}
+
+function Commit-DesignerRemoval {
+    param(
+        [string] $Install,
+        [string] $Backup,
+        [string] $Shortcut,
+        [string] $Programs)
+    if (-not (Test-Path -LiteralPath $Backup)) { return }
+    $marker = Get-DesignerMarker `
+        -Backup $Backup `
+        -Designer (Join-Path $Install 'designer') `
+        -Shortcut $Shortcut
+    if (Test-Path -LiteralPath (Join-Path $Install 'designer')) {
+        throw 'Designer removal commit found a restored payload.'
+    }
+    if (Test-Path -LiteralPath $Shortcut) {
+        throw 'Designer removal commit found a restored shortcut.'
+    }
+    Remove-DesignerBackupPayloads -Backup $Backup -Programs $Programs
 }
 
 function Snapshot-Shell {
@@ -403,6 +913,9 @@ if (-not (Test-PathEquals $install $expectedInstall)) {
 }
 Assert-NoReparsePoint -Path $install -Boundary $localRoot
 $executable = Join-Path $install 'CodexQuotaHud.App.exe'
+$designerExecutable = Join-Path `
+    $install `
+    'designer\CodexQuotaHud.SkinDesigner.exe'
 
 $backup = $null
 if (-not [string]::IsNullOrWhiteSpace($LegacyBackupPath)) {
@@ -414,13 +927,55 @@ if (-not [string]::IsNullOrWhiteSpace($LegacyShellStatePath)) {
     $state = Get-GuidSibling -Path $LegacyShellStatePath `
         -Prefix 'CodexQuotaHud.legacy-shell-state.' -Programs $programs
 }
+$designerBackup = $null
+if (-not [string]::IsNullOrWhiteSpace($DesignerBackupPath)) {
+    $designerBackup = Get-GuidSibling `
+        -Path $DesignerBackupPath `
+        -Prefix 'CodexQuotaHud.designer-removal-backup.' `
+        -Programs $programs
+    Assert-SafeTree -Path $designerBackup -Boundary $localRoot
+}
+$designerActions = @(
+    'PrepareDesignerComponentRemoval',
+    'CommitDesignerComponentRemoval',
+    'RollbackDesignerComponentRemoval')
+if ($Action -in $designerActions -and $null -eq $designerBackup) {
+    throw "$Action requires -DesignerBackupPath."
+}
+$designerShortcut = if ($Action -in $designerActions) {
+    (Get-ShellPaths).DesignerStartMenu
+}
+else { $null }
 
 switch ($Action) {
     'PrepareInstall' {
         Stop-ExactProcess -Executable $executable
+        Close-ExactDesignerProcess -Executable $designerExecutable
         if ($null -ne $backup) {
             Copy-Backup -Install $install -Backup $backup -Programs $programs
         }
+    }
+    'PrepareDesignerComponentRemoval' {
+        Close-ExactDesignerProcess -Executable $designerExecutable
+        Prepare-DesignerRemoval `
+            -Install $install `
+            -Backup $designerBackup `
+            -Shortcut $designerShortcut `
+            -Programs $programs
+    }
+    'CommitDesignerComponentRemoval' {
+        Commit-DesignerRemoval `
+            -Install $install `
+            -Backup $designerBackup `
+            -Shortcut $designerShortcut `
+            -Programs $programs
+    }
+    'RollbackDesignerComponentRemoval' {
+        Restore-DesignerRemoval `
+            -Install $install `
+            -Backup $designerBackup `
+            -Shortcut $designerShortcut `
+            -Programs $programs
     }
     'SnapshotLegacyState' {
         if ($null -eq $state) { throw 'Shell state path is required.' }
@@ -452,7 +1007,10 @@ switch ($Action) {
             Move-Item -LiteralPath $backup -Destination $install
         }
     }
-    'PrepareUninstall' { Stop-ExactProcess -Executable $executable }
+    'PrepareUninstall' {
+        Stop-ExactProcess -Executable $executable
+        Close-ExactDesignerProcess -Executable $designerExecutable
+    }
     'FinalizeUninstall' {
         Remove-SafeTree -Path $install -Boundary $localRoot
     }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Xml.Linq;
 
@@ -459,6 +460,267 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
+    public void TestInstallerScript_PreservesExactSetupFailureDiagnostics()
+    {
+        var script = File.ReadAllText(TestInstallerScript);
+
+        foreach (var required in new[]
+        {
+            "ExitCodeSigned=",
+            "ExitCodeUnsigned=",
+            "ExitCodeHex=0x",
+            "SetupPath=",
+            "InternalRoot=",
+            "LogPath=",
+            "LogExists=",
+            "LogLength=",
+            "$scenarioFailed = $true",
+            "$primaryError = $_",
+            "[Console]::Error.WriteLine(",
+            "Smoke primary error:",
+            "Preserved failed scenario diagnostics",
+        })
+        {
+            Assert.Contains(required, script, StringComparison.Ordinal);
+        }
+
+        Assert.Contains(
+            "if ($cleanupAuthorized -and -not $scenarioFailed)",
+            script,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Write-Error (\"Smoke failure stack:",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains("throw\n", script.Replace("\r\n", "\n"),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TestInstallerScript_DefinesExactSevenDesignerComponentScenarios()
+    {
+        var script = File.ReadAllText(TestInstallerScript)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        var names = Regex.Matches(
+                script,
+                "Invoke-IsolatedScenario\\s+-Name '([^']+)'",
+                RegexOptions.CultureInvariant)
+            .Select(match => match.Groups[1].Value)
+            .ToArray();
+
+        Assert.Equal(
+            new[]
+            {
+                "fresh-default",
+                "fresh-designer",
+                "add-designer",
+                "remove-designer",
+                "upgrade-selected",
+                "uninstall-preserve",
+                "uninstall-purge",
+            },
+            names);
+        Assert.Matches(
+            @"\$initialSelection = if \(\$scenario -in @\(\s*" +
+            @"'fresh-default',\s*'cleanup-legacy-failure'\s*" +
+            @"\)\) \{\s*\$quiet\s*\}",
+            script);
+        Assert.Contains("/TYPE=normal", script, StringComparison.Ordinal);
+        Assert.Contains(
+            "/TYPE=custom /COMPONENTS=designer",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "/TYPE=normal /COMPONENTS=\"\"",
+            script,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TestInstallerScript_DefinesSeparateCommittedCleanupFailureScenarios()
+    {
+        var script = File.ReadAllText(TestInstallerScript)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        var normalNames = Regex.Matches(
+                script,
+                "Invoke-IsolatedScenario\\s+-Name '([^']+)'",
+                RegexOptions.CultureInvariant)
+            .Select(match => match.Groups[1].Value)
+            .ToArray();
+        var cleanupNames = Regex.Matches(
+                script,
+                "Invoke-CleanupFailureScenario\\s+-Name '([^']+)'",
+                RegexOptions.CultureInvariant)
+            .Select(match => match.Groups[1].Value)
+            .ToArray();
+
+        Assert.Equal(
+            new[]
+            {
+                "cleanup-legacy-failure",
+                "cleanup-designer-failure",
+            },
+            cleanupNames);
+        Assert.DoesNotContain("cleanup-legacy-failure", normalNames);
+        Assert.DoesNotContain("cleanup-designer-failure", normalNames);
+        var validateSet = Regex.Match(
+            script,
+            @"\[ValidateSet\((?<values>.*?)\)\]\s*" +
+            @"\[AllowEmptyString\(\)\]\s*" +
+            @"\[string\] \$InternalScenario",
+            RegexOptions.CultureInvariant | RegexOptions.Singleline);
+        Assert.True(validateSet.Success, "InternalScenario ValidateSet not found.");
+        Assert.Equal(
+            new[]
+            {
+                string.Empty,
+                "fresh-default",
+                "fresh-designer",
+                "add-designer",
+                "remove-designer",
+                "upgrade-selected",
+                "uninstall-preserve",
+                "uninstall-purge",
+                "cleanup-legacy-failure",
+                "cleanup-designer-failure",
+            },
+            Regex.Matches(validateSet.Groups["values"].Value, "'([^']*)'")
+                .Select(match => match.Groups[1].Value)
+                .ToArray());
+        Assert.Matches(
+            @"\$cleanupFailureStage = switch \(\$scenario\) \{\s*" +
+            @"'cleanup-legacy-failure' \{ 'LegacyCommit' \}\s*" +
+            @"'cleanup-designer-failure' \{ " +
+            @"'DesignerAfterPayloadDelete' \}\s*default \{ '' \}\s*\}",
+            script);
+        Assert.Contains(
+            "-InternalCleanupFailureStage $cleanupFailureStage",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains("RollbackDesignerComponentRemoval", script,
+            StringComparison.Ordinal);
+        Assert.Contains("RollbackInstall", script, StringComparison.Ordinal);
+        Assert.Contains("CompensateLegacyInstall", script,
+            StringComparison.Ordinal);
+        Assert.Contains("lifecycle-process.log", script,
+            StringComparison.Ordinal);
+        Assert.Contains("CodexQuotaHud.DesignerRemoval.json", script,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TestInstallerScript_VerifiesDesignerIsolationAndUserDataHashes()
+    {
+        var script = File.ReadAllText(TestInstallerScript)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        foreach (var required in new[]
+        {
+            "CodexQuotaHud.SkinDesigner.exe",
+            "DesignerStartMenu",
+            "DesignerDesktop",
+            "DesignerRunValue",
+            "settings.json",
+            "skin.json",
+            "draft.json",
+            "recovery.json",
+            "import.cqskin",
+            "Assert-SentinelHashesUnchanged",
+            "Assert-NoOperationResidue",
+        })
+        {
+            Assert.Contains(required, script, StringComparison.Ordinal);
+        }
+
+        Assert.Contains(
+            "-ExpectedTarget $installedDesignerExecutable",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains("-ExpectedArguments ''", script,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "$installedDesignerExecutable`\" --preview",
+            script,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            "$installedDesignerExecutable`\" --background",
+            script,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TestInstallerScript_PreflightsEveryScenarioAgainstProductionState()
+    {
+        var script = File.ReadAllText(TestInstallerScript)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        Assert.Contains("function Assert-IsolatedScenarioBoundary", script,
+            StringComparison.Ordinal);
+        Assert.Contains("$productionInstall", script, StringComparison.Ordinal);
+        Assert.Contains("$productionSettings", script, StringComparison.Ordinal);
+        Assert.Contains("$productionDesktop", script, StringComparison.Ordinal);
+        Assert.Contains("$productionStartMenu", script, StringComparison.Ordinal);
+        Assert.Contains("$productionRunValueName", script,
+            StringComparison.Ordinal);
+        Assert.Contains("$productionUninstallRelativeKey", script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Assert-IsolatedScenarioBoundary -Scenario $scenario",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "CodexQuotaHud.InternalTest.$internalTestId",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains("$internalRunRelativeKey", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Software\\CodexQuotaHud.Tests\\", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Remove-ExactInternalRegistryTree", script,
+            StringComparison.Ordinal);
+        Assert.Contains("CQH.Test.$internalTestId`_is1", script,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TestInstallerScript_PrecreatesOnlyCheckedInternalShellDirectories()
+    {
+        var script = File.ReadAllText(TestInstallerScript)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        Assert.Contains(
+            "foreach ($shellDirectory in @($desktop, $startMenu))",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Test-StrictDescendant $shellDirectory $internalRoot",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Assert-NoReparsePoint -Path $shellDirectory " +
+            "-Boundary $internalRoot",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "New-Item -ItemType Directory -Path $shellDirectory",
+            script,
+            StringComparison.Ordinal);
+
+        var boundaryIndex = script.IndexOf(
+            "Assert-IsolatedScenarioBoundary -Scenario $scenario",
+            StringComparison.Ordinal);
+        var creationIndex = script.IndexOf(
+            "foreach ($shellDirectory in @($desktop, $startMenu))",
+            StringComparison.Ordinal);
+        var setupIndex = script.IndexOf(
+            "-Description 'Isolated clean install'",
+            StringComparison.Ordinal);
+        Assert.True(
+            boundaryIndex >= 0 && creationIndex > boundaryIndex &&
+            setupIndex > creationIndex);
+    }
+
+    [Fact]
     public void TestInstallerScript_AssertsExactAbsenceBeforeBothUninstallPasses()
     {
         var script = File.ReadAllText(TestInstallerScript)
@@ -668,6 +930,36 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
+    public async Task BuildInstaller_RequiresExactDesignerExecutableBeforeCompiler()
+    {
+        using var temp = new TemporaryDirectory();
+        var published = CreatePublishedDirectory(temp.Path);
+        var designer = Path.Combine(
+            published,
+            "designer",
+            "CodexQuotaHud.SkinDesigner.exe");
+        File.Delete(designer);
+        var output = Path.Combine(temp.Path, "release");
+
+        var result = await RunPowerShellAsync(
+            BuildScript,
+            "-Version", "1.1.0",
+            "-PublishedPath", published,
+            "-OutputPath", output,
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalTestMode");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(
+            "Published Designer executable does not exist",
+            result.CombinedOutput,
+            StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(
+            output,
+            "CodexQuotaHud-Setup-v1.1.0.exe")));
+    }
+
+    [Fact]
     public async Task BuildInstaller_InternalTestDefinesAreUniquePerBuild()
     {
         using var temp = new TemporaryDirectory();
@@ -786,6 +1078,41 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
+    public async Task BuildInstaller_CleanupFailureDefineIsInternalOnly()
+    {
+        using var temp = new TemporaryDirectory();
+        var published = CreatePublishedDirectory(temp.Path);
+        var fakeIscc = CreateFakeIscc(temp.Path);
+        var capture = Path.Combine(temp.Path, "cleanup-arguments.json");
+
+        var internalBuild = await RunPowerShellAsync(
+            BuildScript,
+            "-Version", "1.1.0",
+            "-PublishedPath", published,
+            "-OutputPath", Path.Combine(temp.Path, "release"),
+            "-InnoCompilerPath", fakeIscc,
+            "-InternalTestMode",
+            "-InternalArgumentCapturePath", capture,
+            "-InternalCleanupFailureStage", "DesignerAfterPayloadDelete");
+
+        Assert.True(internalBuild.ExitCode == 0, internalBuild.CombinedOutput);
+        var arguments = JsonSerializer.Deserialize<string[]>(
+            await File.ReadAllTextAsync(capture))!;
+        Assert.Equal(
+            "DesignerAfterPayloadDelete",
+            GetDefine(arguments, "InternalCleanupFailureStage"));
+
+        var productionBuild = await RunPowerShellAsync(
+            BuildScript,
+            "-Version", "1.1.0",
+            "-PublishedPath", published,
+            "-InternalCleanupFailureStage", "DesignerAfterPayloadDelete");
+        Assert.NotEqual(0, productionBuild.ExitCode);
+        Assert.Contains("Internal installer builder hooks require",
+            productionBuild.CombinedOutput, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task BuildInstaller_ProductionRejectsNoncanonicalOutputPath()
     {
         using var temp = new TemporaryDirectory();
@@ -839,21 +1166,26 @@ public sealed class InstallerBuildTests
         Assert.True(curStepStart >= 0 && curStepEnd > curStepStart);
         var curStep = code[curStepStart..curStepEnd];
         var commit = curStep.IndexOf("'CommitInstall'", StringComparison.Ordinal);
-        var failureExit = curStep.IndexOf(
-            "RaiseException(ErrorText);",
-            commit,
-            StringComparison.Ordinal);
         var completed = curStep.IndexOf(
-            "InstallCompleted := True;",
-            commit,
-            StringComparison.Ordinal);
+            "InstallCompleted := True;", StringComparison.Ordinal);
+        var designerCleanup = curStep.IndexOf(
+            "'CommitDesignerComponentRemoval'", StringComparison.Ordinal);
+        var shellCleanup = curStep.IndexOf(
+            "'DiscardLegacyState'", StringComparison.Ordinal);
         var launch = curStep.IndexOf(
-            "LaunchInstalledApp();",
-            commit,
-            StringComparison.Ordinal);
+            "LaunchInstalledApp();", StringComparison.Ordinal);
         Assert.True(
-            commit >= 0 && failureExit > commit && completed > failureExit &&
-            launch > completed);
+            completed >= 0 && commit > completed &&
+            designerCleanup > commit && shellCleanup > designerCleanup &&
+            launch > shellCleanup);
+        Assert.DoesNotContain("RaiseException(ErrorText);", curStep,
+            StringComparison.Ordinal);
+        Assert.Contains("Legacy install backup cleanup failed:", curStep,
+            StringComparison.Ordinal);
+        Assert.Contains("Designer component cleanup failed:", curStep,
+            StringComparison.Ordinal);
+        Assert.Contains("Legacy shell state cleanup failed:", curStep,
+            StringComparison.Ordinal);
 
         var snapshot = code.IndexOf("'SnapshotLegacyState'", StringComparison.Ordinal);
         var removeSelections = code.IndexOf(
@@ -940,6 +1272,208 @@ public sealed class InstallerBuildTests
     }
 
     [Fact]
+    public void InnoDefinition_DesignerIsCustomOnlyAndPreviousSelectionIsRetained()
+    {
+        var definition = File.ReadAllText(InnoDefinition)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        var setup = InnoSection(definition, "Setup");
+        var types = InnoSection(definition, "Types");
+        var components = InnoSection(definition, "Components");
+        var files = InnoSection(definition, "Files");
+
+        Assert.DoesNotContain("DefaultSetupType", setup,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("UsePreviousComponents", setup,
+            StringComparison.Ordinal);
+        Assert.Contains("UsePreviousSetupType=yes\n", setup,
+            StringComparison.Ordinal);
+
+        var normalType = "Name: \"normal\"; Description: \"{cm:NormalInstallType}\"";
+        var customType =
+            "Name: \"custom\"; Description: \"{cm:CustomInstallType}\"; " +
+            "Flags: iscustom";
+        var typeLines = types.Split(
+            '\n',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Assert.NotEmpty(typeLines);
+        Assert.Equal(normalType, typeLines[0]);
+        Assert.DoesNotContain("iscustom", typeLines[0],
+            StringComparison.OrdinalIgnoreCase);
+        var normalIndex = types.IndexOf(normalType, StringComparison.Ordinal);
+        var customIndex = types.IndexOf(customType, StringComparison.Ordinal);
+        Assert.True(normalIndex >= 0 && customIndex > normalIndex);
+        Assert.Contains("Flags: iscustom", customType,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Name: \"designer\"; Description: \"{cm:DesignerComponentName}\"; " +
+            "Types: custom",
+            components,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("Types: normal", components,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Source: \"{#PublishedDir}\\designer\\CodexQuotaHud.SkinDesigner.exe\"; " +
+            "DestDir: \"{app}\\designer\"; Components: designer",
+            files,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InnoDefinition_DesignerIsLocalizedAndHasOnlyExactStartMenuEntry()
+    {
+        var definition = File.ReadAllText(InnoDefinition)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        var messages = InnoSection(definition, "CustomMessages");
+        var tasks = InnoSection(definition, "Tasks");
+        var icons = InnoSection(definition, "Icons");
+        var registry = InnoSection(definition, "Registry");
+        var code = InnoSection(definition, "Code");
+
+        foreach (var key in new[]
+        {
+            "DesignerComponentName",
+            "DesignerComponentDescription",
+            "NormalInstallType",
+            "CustomInstallType",
+            "DesignerShortcutName",
+        })
+        {
+            var english = CustomMessage(messages, "english", key);
+            var chinese = CustomMessage(messages, "chinesesimp", key);
+            Assert.False(string.IsNullOrWhiteSpace(english));
+            Assert.False(string.IsNullOrWhiteSpace(chinese));
+            if (!string.Equals(key, "DesignerShortcutName",
+                    StringComparison.Ordinal))
+            {
+                Assert.NotEqual(english, chinese);
+            }
+        }
+
+        Assert.Equal(
+            "Codex Quota HUD 皮肤设计器",
+            CustomMessage(messages, "english", "DesignerShortcutName"));
+        Assert.Equal(
+            "Codex Quota HUD 皮肤设计器",
+            CustomMessage(messages, "chinesesimp", "DesignerShortcutName"));
+        Assert.DoesNotContain("designer", tasks,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("designer", registry,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "DesignerDescriptionLabel.Parent := " +
+            "WizardForm.SelectComponentsPage;",
+            code,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectComponentsPage.Surface", code,
+            StringComparison.Ordinal);
+        Assert.Contains("DescriptionGap := ScaleY(8);", code,
+            StringComparison.Ordinal);
+        Assert.Contains("DescriptionHeight := ScaleY(44);", code,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "WizardForm.ComponentsList.Height - DescriptionGap - " +
+            "DescriptionHeight;",
+            code,
+            StringComparison.Ordinal);
+        Assert.Contains("DesignerDescriptionLabel.WordWrap := True;", code,
+            StringComparison.Ordinal);
+
+        var designerIcons = icons.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => line.Contains("SkinDesigner", StringComparison.Ordinal) ||
+                line.Contains("DesignerShortcutName", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(2, designerIcons.Length);
+        Assert.All(designerIcons, line =>
+        {
+            Assert.Contains("{cm:DesignerShortcutName}", line,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "Filename: \"{app}\\designer\\CodexQuotaHud.SkinDesigner.exe\"",
+                line,
+                StringComparison.Ordinal);
+            Assert.Contains("Components: designer", line,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain("{autodesktop}", line,
+                StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("--background", line,
+                StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("--preview", line,
+                StringComparison.OrdinalIgnoreCase);
+        });
+
+        var normalIcons = icons.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => line.Contains(
+                "Filename: \"{app}\\CodexQuotaHud.App.exe\"",
+                StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(4, normalIcons.Length);
+        Assert.All(normalIcons, line =>
+            Assert.DoesNotContain("Parameters:", line,
+                StringComparison.OrdinalIgnoreCase));
+
+        var startupEntries = registry.Split(
+                '\n', StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => line.StartsWith("Root:", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(2, startupEntries.Length);
+        Assert.All(startupEntries, line =>
+        {
+            Assert.Contains("CodexQuotaHud.App.exe", line,
+                StringComparison.Ordinal);
+            Assert.Contains("--background", line,
+                StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public void InnoDefinition_InternalBuildAloneWiresLifecycleErrorDiagnostic()
+    {
+        var definition = File.ReadAllText(InnoDefinition)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        var internalStart = definition.IndexOf(
+            "#ifdef InternalTestRoot\n  Parameters := Parameters + " +
+            "' -InternalTestMode",
+            StringComparison.Ordinal);
+        var internalEnd = definition.IndexOf(
+            "#endif",
+            internalStart,
+            StringComparison.Ordinal);
+
+        Assert.True(internalStart >= 0 && internalEnd > internalStart);
+        var internalBlock = definition[internalStart..internalEnd];
+        Assert.Contains("-InternalErrorDiagnosticPath", internalBlock,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "{#InternalTestRoot}\\lifecycle-error.json",
+            internalBlock,
+            StringComparison.Ordinal);
+        foreach (var required in new[]
+        {
+            "CopyFile(HelperPath, PersistentHelperPath, False)",
+            "GetSHA256OfFile(HelperPath)",
+            "GetSHA256OfFile(PersistentHelperPath)",
+            "lifecycle-run.cmd",
+            "lifecycle-process.log",
+            "HelperPath=",
+            "Parameters=",
+            "2>&1",
+            "set \"LifecycleExit=%errorlevel%\"",
+            "exit /b %LifecycleExit%",
+            "RejectInternalDiagnosticReparsePoint",
+        })
+        {
+            Assert.Contains(required, definition, StringComparison.Ordinal);
+        }
+        Assert.Contains("#else\n  Result := Exec(", definition,
+            StringComparison.Ordinal);
+        Assert.Single(
+            Regex.Matches(
+                definition,
+                "-InternalErrorDiagnosticPath",
+                RegexOptions.CultureInvariant).Cast<Match>());
+    }
+
+    [Fact]
     public void InnoDefinition_CollectsPurgeChoiceBeforeConfirmedUninstall()
     {
         var definition = File.ReadAllText(InnoDefinition)
@@ -1013,6 +1547,26 @@ public sealed class InstallerBuildTests
             definition,
             StringComparison.Ordinal);
         Assert.Contains(
+            "Subkey: \"Software\\CodexQuotaHud.Tests\\{#InternalTestId}\\Run\"",
+            definition,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RunRegistryKey = 'Software\\CodexQuotaHud.Tests\\" +
+            "{#InternalTestId}\\Run';",
+            definition,
+            StringComparison.Ordinal);
+        var internalRegistryStart = definition.IndexOf(
+            "#ifdef InternalTestRoot\nRoot: HKCU; Subkey:",
+            StringComparison.Ordinal);
+        var internalRegistryEnd = definition.IndexOf(
+            "#else", internalRegistryStart, StringComparison.Ordinal);
+        Assert.True(internalRegistryStart >= 0 &&
+            internalRegistryEnd > internalRegistryStart);
+        Assert.DoesNotContain(
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            definition[internalRegistryStart..internalRegistryEnd],
+            StringComparison.Ordinal);
+        Assert.Contains(
             "'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\CQH.Test.{#InternalTestId}_is1'",
             definition,
             StringComparison.Ordinal);
@@ -1039,6 +1593,28 @@ public sealed class InstallerBuildTests
             .Select(value => Path.GetFileNameWithoutExtension(value!))
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static string InnoSection(string definition, string sectionName)
+    {
+        var heading = $"[{sectionName}]\n";
+        var start = definition.IndexOf(heading, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Missing Inno section {heading.Trim()}.");
+        start += heading.Length;
+        var end = definition.IndexOf("\n[", start, StringComparison.Ordinal);
+        return end >= 0 ? definition[start..end] : definition[start..];
+    }
+
+    private static string CustomMessage(
+        string messages,
+        string language,
+        string key)
+    {
+        var prefix = $"{language}.{key}=";
+        var line = Assert.Single(messages.Split(
+            '\n', StringSplitOptions.RemoveEmptyEntries),
+            item => item.StartsWith(prefix, StringComparison.Ordinal));
+        return line[prefix.Length..].Trim();
     }
 
     private static void AssertNoReleaseOutputs(string output, string version)
