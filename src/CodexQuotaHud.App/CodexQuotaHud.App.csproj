@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CodexQuotaHud.Core\CodexQuotaHud.Core.csproj" />
     <ProjectReference Include="..\CodexQuotaHud.Skins\CodexQuotaHud.Skins.csproj" />
+    <Resource Include="Assets\AppIcon.ico" />
   </ItemGroup>
 
   <PropertyGroup>

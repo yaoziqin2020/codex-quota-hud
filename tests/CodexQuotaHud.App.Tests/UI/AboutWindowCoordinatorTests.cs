@@ -50,6 +50,30 @@ public sealed class AboutWindowCoordinatorTests
 
         Assert.Throws<ObjectDisposedException>(sut.Show);
     }
+
+    [Fact]
+    public void Show_WindowCreationFailureIsContainedReportedAndRetryable()
+    {
+        var attempts = 0;
+        var errors = new List<string>();
+        var recovered = new FakeAboutWindow();
+        using var sut = new AboutWindowCoordinator(
+            () => ++attempts == 1
+                ? throw new InvalidOperationException("missing resource")
+                : recovered,
+            errors.Add);
+
+        sut.Show();
+
+        Assert.Equal(1, attempts);
+        Assert.Single(errors);
+        Assert.Contains("missing resource", errors[0]);
+
+        sut.Show();
+
+        Assert.Equal(2, attempts);
+        Assert.Equal(1, recovered.ShowCalls);
+    }
 }
 
 internal sealed class FakeAboutWindow : IAboutWindow
