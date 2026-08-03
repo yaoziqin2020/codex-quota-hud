@@ -1,8 +1,15 @@
+using System.Reflection;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Threading;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.Core.Settings;
 using CodexQuotaHud.App.Infrastructure;
+using CodexQuotaHud.App.Tests.UI;
+using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.About;
 using CodexQuotaHud.Core.Models;
+using Forms = System.Windows.Forms;
 
 namespace CodexQuotaHud.App.Tests.Preview;
 
@@ -73,6 +80,47 @@ public sealed class PreviewCompositionTests
 
             Assert.Equal(1, requests);
         });
+    }
+
+    [Fact]
+    public void Composition_SharesAndDisposesOneAboutWindowCoordinator()
+    {
+        RunSta(() =>
+        {
+            var fake = new FakeAboutWindow();
+            using var about = new AboutWindowCoordinator(() => fake);
+            var composition = new PreviewComposition(
+                Dispatcher.CurrentDispatcher,
+                () => { },
+                new InstalledAppLauncher(
+                    @"C:\Missing",
+                    _ => false,
+                    _ => throw new InvalidOperationException()),
+                about);
+
+            composition.HudWindow.AboutMenuItem.RaiseEvent(
+                new RoutedEventArgs(MenuItem.ClickEvent));
+            FindTrayItem(composition.Tray, "关于").PerformClick();
+
+            Assert.Equal(1, fake.ShowCalls);
+            Assert.Equal(1, fake.ActivateCalls);
+
+            composition.Dispose();
+
+            Assert.Equal(1, fake.CloseCalls);
+        });
+    }
+
+    private static Forms.ToolStripMenuItem FindTrayItem(
+        TrayController tray,
+        string label)
+    {
+        var notifyIcon = Assert.IsType<Forms.NotifyIcon>(typeof(TrayController)
+            .GetField("_notifyIcon", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(tray));
+        return Assert.IsType<Forms.ToolStripMenuItem>(notifyIcon.ContextMenuStrip!
+            .Items.Cast<Forms.ToolStripItem>()
+            .Single(item => item.Text == label));
     }
 
     private static void RunSta(Action action)

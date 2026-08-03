@@ -6,6 +6,7 @@ using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.App.Infrastructure.LocalControl;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.About;
 using CodexQuotaHud.App.UI.SkinManagement;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Refresh;
@@ -31,6 +32,7 @@ public partial class App : System.Windows.Application
     private QuotaOrbViewModel? _viewModel;
     private QuotaOrbWindow? _window;
     private TrayController? _tray;
+    private AboutWindowCoordinator? _about;
     private PreviewComposition? _previewComposition;
     private InstalledAppLauncher? _installedAppLauncher;
     private int _openInstalledAfterExit;
@@ -176,16 +178,19 @@ public partial class App : System.Windows.Application
                 new SkinManagementDialogs(() => _window),
                 CurrentHudVersion(),
                 new WpfUiDispatcher(Dispatcher));
+            _about = new AboutWindowCoordinator();
             _window = new QuotaOrbWindow(
                 _viewModel,
                 skinController,
-                skinManagement);
+                skinManagement,
+                _about.Show);
             _tray = new TrayController(
                 _viewModel,
                 hudCatalog,
                 skinController,
                 _window.TryActivateSkinKey,
-                skinManagement);
+                skinManagement,
+                _about.Show);
 
             bool TryActivateInstalledSkin(
                 string selectionKey,
@@ -272,6 +277,7 @@ public partial class App : System.Windows.Application
                     .GetAwaiter().GetResult(),
                 () => _tray?.Dispose(),
                 () => _previewComposition?.Dispose(),
+                () => _about?.Dispose(),
                 () => _window?.CloseForExit(),
                 () => _viewModel?.Dispose(),
                 () => _shutdownListener?.Dispose(),

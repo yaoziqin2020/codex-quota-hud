@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.About;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Settings;
 using CodexQuotaHud.Skins.Contracts;
@@ -23,7 +24,8 @@ public sealed class SyntheticPreviewComposition : IDisposable
             dispatcher,
             requestExit,
             templates,
-            usePhysicalWorkArea: false)
+            usePhysicalWorkArea: false,
+            aboutWindowCoordinator: null)
     {
     }
 
@@ -31,7 +33,8 @@ public sealed class SyntheticPreviewComposition : IDisposable
         Dispatcher dispatcher,
         Action requestExit,
         SkinTemplateRegistry? templates,
-        bool usePhysicalWorkArea)
+        bool usePhysicalWorkArea,
+        AboutWindowCoordinator? aboutWindowCoordinator = null)
     {
         ArgumentNullException.ThrowIfNull(dispatcher);
         _requestExit = requestExit ?? throw new ArgumentNullException(
@@ -42,6 +45,7 @@ public sealed class SyntheticPreviewComposition : IDisposable
         SkinController = new SkinController(Catalog, _templates);
         SettingsStore = new InMemorySettingsStore(new AppSettings());
         RefreshController = new PreviewQuotaRefreshController();
+        About = aboutWindowCoordinator ?? new AboutWindowCoordinator();
         ViewModel = new QuotaOrbViewModel(
             RefreshController,
             SettingsStore,
@@ -49,7 +53,10 @@ public sealed class SyntheticPreviewComposition : IDisposable
             new WpfUiDispatcher(dispatcher),
             requestExit,
             key => Catalog.TryGet(key, out _));
-        HudWindow = new QuotaOrbWindow(ViewModel, SkinController);
+        HudWindow = new QuotaOrbWindow(
+            ViewModel,
+            SkinController,
+            About.Show);
         if (!usePhysicalWorkArea)
         {
             HudWindow.SetPreviewWorkArea(new Rect(0, 0, 520, 420));
@@ -77,6 +84,8 @@ public sealed class SyntheticPreviewComposition : IDisposable
     internal PreviewQuotaRefreshController RefreshController { get; }
 
     internal QuotaOrbViewModel ViewModel { get; }
+
+    internal AboutWindowCoordinator About { get; }
 
     public SkinValidationResult<SkinPackageDocument> SetCustomPackage(
         SkinPackageDocument package)
@@ -137,6 +146,7 @@ public sealed class SyntheticPreviewComposition : IDisposable
             return;
         }
 
+        About.Dispose();
         HudWindow.Closing -= OnHudClosing;
         HudWindow.CloseForExit();
         ViewModel.Dispose();

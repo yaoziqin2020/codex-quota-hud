@@ -1,6 +1,7 @@
 using System.Windows.Threading;
 using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.About;
 using CodexQuotaHud.App.UI.Skins;
 
 namespace CodexQuotaHud.App.Preview;
@@ -20,7 +21,8 @@ internal sealed class PreviewComposition : IDisposable
     internal PreviewComposition(
         Dispatcher dispatcher,
         Action requestExit,
-        InstalledAppLauncher installedAppLauncher)
+        InstalledAppLauncher installedAppLauncher,
+        AboutWindowCoordinator? aboutWindowCoordinator = null)
     {
         ArgumentNullException.ThrowIfNull(dispatcher);
         _requestExit = requestExit ?? throw new ArgumentNullException(
@@ -30,12 +32,15 @@ internal sealed class PreviewComposition : IDisposable
             dispatcher,
             requestExit,
             templates: null,
-            usePhysicalWorkArea: true);
+            usePhysicalWorkArea: true,
+            aboutWindowCoordinator);
         Tray = new TrayController(
             ViewModel,
             Catalog,
             SkinController,
-            HudWindow.TryActivateSkinKey);
+            HudWindow.TryActivateSkinKey,
+            skinManagement: null,
+            Synthetic.About.Show);
         WindowStateStore = new PreviewWindowStateStore();
         InstalledAppLauncher = installedAppLauncher ??
             throw new ArgumentNullException(nameof(installedAppLauncher));
