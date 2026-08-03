@@ -190,6 +190,9 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         {
             Top = top;
         }
+
+        ApplyVisibility();
+        ApplyAnimationState();
     }
 
     internal SkinController SkinController => _skinController;
