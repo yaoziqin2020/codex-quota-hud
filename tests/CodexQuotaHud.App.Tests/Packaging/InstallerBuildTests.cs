@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Xml.Linq;
 
 namespace CodexQuotaHud.App.Tests.Packaging;
 
@@ -31,6 +32,10 @@ public sealed class InstallerBuildTests
         Assert.True(File.Exists(setup));
         Assert.True(File.Exists(zip));
         Assert.True(File.Exists(checksums));
+        Assert.Equal(
+            "MZ fake designer",
+            (await File.ReadAllTextAsync(
+                Path.Combine(temp.Path, "designer-observed.txt"))).Trim());
 
         var lines = (await File.ReadAllLinesAsync(checksums))
             .Where(line => !string.IsNullOrWhiteSpace(line))
@@ -49,14 +54,20 @@ public sealed class InstallerBuildTests
         using var archive = ZipFile.OpenRead(zip);
         var entries = archive.Entries
             .Select(entry => entry.FullName.Replace('\\', '/'))
+            .OrderBy(entry => entry, StringComparer.Ordinal)
             .ToArray();
-        Assert.Contains(
-            "artifacts/CodexQuotaHud-win-x64/CodexQuotaHud.App.exe",
+        Assert.Equal(
+            new[]
+            {
+                "LICENSE",
+                "README.md",
+                "artifacts/CodexQuotaHud-win-x64/CodexQuotaHud.App.exe",
+                "scripts/install.ps1",
+                "scripts/uninstall.ps1",
+            },
             entries);
-        Assert.Contains("scripts/install.ps1", entries);
-        Assert.Contains("scripts/uninstall.ps1", entries);
-        Assert.Contains("README.md", entries);
-        Assert.Contains("LICENSE", entries);
+        Assert.DoesNotContain(entries, entry => entry.Contains(
+            "SkinDesigner", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(
             entries,
             entry => entry.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
@@ -75,6 +86,74 @@ public sealed class InstallerBuildTests
             Assert.DoesNotContain("InternalShellRootPath", script,
                 StringComparison.OrdinalIgnoreCase);
         }
+
+        AssertPackagingTransientsRemoved(output, "1.1.0");
+    }
+
+    [Fact]
+    public void ProjectReferences_KeepRuntimeIndependentFromSkinDesigner()
+    {
+        var app = ProjectReferences("CodexQuotaHud.App");
+        var designer = ProjectReferences("CodexQuotaHud.SkinDesigner");
+        var skins = ProjectReferences("CodexQuotaHud.Skins");
+
+        Assert.Contains("CodexQuotaHud.Skins", app);
+        Assert.DoesNotContain("CodexQuotaHud.SkinDesigner", app);
+        Assert.Contains("CodexQuotaHud.Skins", designer);
+        Assert.Contains("CodexQuotaHud.App", designer);
+        Assert.DoesNotContain("CodexQuotaHud.App", skins);
+        Assert.DoesNotContain("CodexQuotaHud.SkinDesigner", skins);
+    }
+
+    [Theory]
+    [InlineData("-InternalRemovePublishedAppBeforeZip", "CodexQuotaHud.App.exe")]
+    [InlineData("-InternalRemovePublishedDesignerBeforeSetup",
+        "CodexQuotaHud.SkinDesigner.exe")]
+    public async Task PackageRelease_MissingEitherPublishedApplicationCleansAllOutputs(
+        string injection,
+        string expectedExecutable)
+    {
+        using var temp = new TemporaryDirectory();
+        var output = Path.Combine(temp.Path, "release");
+
+        var result = await RunPowerShellAsync(
+            PackageScript,
+            "-Version", "1.1.0",
+            "-OutputPath", output,
+            "-DotNetExecutable", CreateFakeDotNet(temp.Path),
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalTestMode",
+            injection);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(expectedExecutable, result.CombinedOutput,
+            StringComparison.Ordinal);
+        AssertNoReleaseOutputs(output, "1.1.0");
+        AssertPackagingTransientsRemoved(output, "1.1.0");
+    }
+
+    [Fact]
+    public async Task PackageRelease_SecondPublisherFailureCleansAllOutputs()
+    {
+        using var temp = new TemporaryDirectory();
+        var output = Path.Combine(temp.Path, "release");
+        File.WriteAllText(
+            Path.Combine(temp.Path, "fail-CodexQuotaHud.SkinDesigner.csproj"),
+            "37");
+
+        var result = await RunPowerShellAsync(
+            PackageScript,
+            "-Version", "1.1.0",
+            "-OutputPath", output,
+            "-DotNetExecutable", CreateFakeDotNet(temp.Path),
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalTestMode");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("CodexQuotaHud.SkinDesigner.csproj",
+            result.CombinedOutput, StringComparison.Ordinal);
+        AssertNoReleaseOutputs(output, "1.1.0");
+        AssertPackagingTransientsRemoved(output, "1.1.0");
     }
 
     [Fact]
@@ -123,7 +202,8 @@ public sealed class InstallerBuildTests
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains("ISCC.exe failed with exit code 17", result.CombinedOutput);
-        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
+        AssertNoReleaseOutputs(output, "1.1.0");
+        AssertPackagingTransientsRemoved(output, "1.1.0");
     }
 
     [Fact]
@@ -146,7 +226,8 @@ public sealed class InstallerBuildTests
             "Expected installer was not created",
             result.CombinedOutput,
             StringComparison.Ordinal);
-        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
+        AssertNoReleaseOutputs(output, "1.1.0");
+        AssertPackagingTransientsRemoved(output, "1.1.0");
     }
 
     [Fact]
@@ -164,11 +245,8 @@ public sealed class InstallerBuildTests
             "-InternalTestMode");
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.True(File.Exists(
-            Path.Combine(output, "CodexQuotaHud-Setup-v1.1.0.exe")));
-        Assert.False(File.Exists(
-            Path.Combine(output, "CodexQuotaHud-v1.1.0-win-x64.zip")));
-        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
+        AssertNoReleaseOutputs(output, "1.1.0");
+        AssertPackagingTransientsRemoved(output, "1.1.0");
     }
 
     [Fact]
@@ -189,10 +267,51 @@ public sealed class InstallerBuildTests
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains("stage cleanup", result.CombinedOutput,
             StringComparison.OrdinalIgnoreCase);
+        AssertNoReleaseOutputs(output, "1.1.0");
+        AssertPackagingTransientsRemoved(output, "1.1.0");
+    }
+
+    [Fact]
+    public async Task PackageRelease_PartialStageCleanupFailureStillCleansOtherTargets()
+    {
+        using var temp = new TemporaryDirectory();
+        var output = Path.Combine(temp.Path, "release");
+        var stage = Path.Combine(output, "CodexQuotaHud-v1.1.0-win-x64");
+
+        var result = await RunPowerShellAsync(
+            PackageScript,
+            "-Version", "1.1.0",
+            "-OutputPath", output,
+            "-DotNetExecutable", CreateFakeDotNet(temp.Path),
+            "-InnoCompilerPath", CreateFakeIscc(temp.Path),
+            "-InternalTestMode",
+            "-InternalFailStageCleanup",
+            "-InternalFailFailureCleanupStageAfterFirstFile");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(
+            "Release packaging failed during stage cleanup. " +
+            "Simulated stage cleanup failure.",
+            result.CombinedOutput,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Simulated partial stage removal failure",
+            result.CombinedOutput,
+            StringComparison.Ordinal);
+
+        Assert.True(Directory.Exists(stage));
+        Assert.Equal(4, Directory.GetFiles(
+            stage, "*", SearchOption.AllDirectories).Length);
+        Assert.False(Directory.Exists(Path.Combine(
+            output, ".internal-published-v1.1.0")));
+        Assert.False(File.Exists(Path.Combine(
+            output, "CodexQuotaHud-v1.1.0-win-x64.zip")));
+        Assert.False(File.Exists(Path.Combine(
+            output, "CodexQuotaHud-Setup-v1.1.0.exe")));
         Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
-        Assert.Empty(Directory.Exists(output)
-            ? Directory.GetFiles(output, "*SHA256SUMS*.tmp")
-            : Array.Empty<string>());
+        Assert.Empty(Directory.GetFileSystemEntries(
+            output, ".SHA256SUMS-v1.1.0.*.tmp",
+            SearchOption.TopDirectoryOnly));
     }
 
     [Fact]
@@ -218,10 +337,8 @@ public sealed class InstallerBuildTests
             result.CombinedOutput, StringComparison.Ordinal);
         Assert.Contains("Simulated manifest deletion failure",
             result.CombinedOutput, StringComparison.Ordinal);
-        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
-        Assert.Empty(Directory.Exists(output)
-            ? Directory.GetFiles(output, "*SHA256SUMS*.tmp")
-            : Array.Empty<string>());
+        AssertNoReleaseOutputs(output, "1.1.0");
+        AssertPackagingTransientsRemoved(output, "1.1.0");
     }
 
     [Fact]
@@ -911,6 +1028,46 @@ public sealed class InstallerBuildTests
             StringComparison.Ordinal);
     }
 
+    private static string[] ProjectReferences(string projectName)
+    {
+        var path = Path.Combine(
+            RepositoryRoot, "src", projectName, $"{projectName}.csproj");
+        var document = XDocument.Load(path);
+        return document.Descendants("ProjectReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => Path.GetFileNameWithoutExtension(value!))
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static void AssertNoReleaseOutputs(string output, string version)
+    {
+        Assert.False(File.Exists(Path.Combine(
+            output, $"CodexQuotaHud-Setup-v{version}.exe")));
+        Assert.False(File.Exists(Path.Combine(
+            output, $"CodexQuotaHud-v{version}-win-x64.zip")));
+        Assert.False(File.Exists(Path.Combine(output, "SHA256SUMS.txt")));
+    }
+
+    private static void AssertPackagingTransientsRemoved(
+        string output,
+        string version)
+    {
+        if (!Directory.Exists(output))
+        {
+            return;
+        }
+
+        Assert.False(Directory.Exists(Path.Combine(
+            output, $"CodexQuotaHud-v{version}-win-x64")));
+        Assert.False(Directory.Exists(Path.Combine(
+            output, $".internal-published-v{version}")));
+        Assert.Empty(Directory.GetFileSystemEntries(
+            output, $".SHA256SUMS-v{version}.*.tmp",
+            SearchOption.TopDirectoryOnly));
+    }
+
     private static string CreatePublishedDirectory(string tempRoot)
     {
         var path = Directory.CreateDirectory(
@@ -918,6 +1075,11 @@ public sealed class InstallerBuildTests
         File.WriteAllText(
             Path.Combine(path, "CodexQuotaHud.App.exe"),
             "MZ fake");
+        var designer = Directory.CreateDirectory(
+            Path.Combine(path, "designer")).FullName;
+        File.WriteAllText(
+            Path.Combine(designer, "CodexQuotaHud.SkinDesigner.exe"),
+            "MZ fake designer");
         return path;
     }
 
@@ -942,6 +1104,19 @@ public sealed class InstallerBuildTests
             if ($env:CODEX_HUD_INSTALLER_FAKE_EXIT_CODE) {
                 exit [int]$env:CODEX_HUD_INSTALLER_FAKE_EXIT_CODE
             }
+
+            $publishedArgument = $RemainingArguments |
+                Where-Object { $_.StartsWith('/DPublishedDir=') } |
+                Select-Object -First 1
+            $published = $publishedArgument.Substring('/DPublishedDir='.Length)
+            $designer = Join-Path $published `
+                'designer\CodexQuotaHud.SkinDesigner.exe'
+            if (-not (Test-Path -LiteralPath $designer -PathType Leaf)) {
+                Write-Error "Designer was missing before installer build: $designer"
+                exit 41
+            }
+            Copy-Item -LiteralPath $designer -Destination (
+                Join-Path $PSScriptRoot 'designer-observed.txt') -Force
 
             if ($env:CODEX_HUD_INSTALLER_SKIP_FAKE_SETUP -ne '1') {
                 $outputArgument = $RemainingArguments |
@@ -1005,7 +1180,7 @@ public sealed class InstallerBuildTests
             if ($env:CODEX_HUD_CAPTURE_PATH) {
                 $RemainingArguments |
                     ConvertTo-Json -Compress |
-                    Set-Content -LiteralPath `
+                    Add-Content -LiteralPath `
                         $env:CODEX_HUD_CAPTURE_PATH -Encoding UTF8
             }
 
@@ -1013,13 +1188,31 @@ public sealed class InstallerBuildTests
                 exit [int]$env:CODEX_HUD_FAKE_EXIT_CODE
             }
 
+            $project = $RemainingArguments[1]
+            $projectFile = [System.IO.Path]::GetFileName($project)
+            $failMarker = Join-Path $PSScriptRoot "fail-$projectFile"
+            if (Test-Path -LiteralPath $failMarker) {
+                exit [int](Get-Content -LiteralPath $failMarker -Raw)
+            }
+
             if ($env:CODEX_HUD_SKIP_FAKE_EXE -ne '1') {
                 $outputIndex = [Array]::IndexOf($RemainingArguments, '-o')
                 $output = $RemainingArguments[$outputIndex + 1]
                 New-Item -ItemType Directory -Path $output -Force | Out-Null
+                $executable = if ($projectFile -eq
+                    'CodexQuotaHud.SkinDesigner.csproj') {
+                    'CodexQuotaHud.SkinDesigner.exe'
+                } else {
+                    'CodexQuotaHud.App.exe'
+                }
                 Set-Content -LiteralPath (
-                    Join-Path $output 'CodexQuotaHud.App.exe'
-                ) -Value 'MZ fake app' -Encoding Ascii
+                    Join-Path $output $executable
+                ) -Value $(if ($projectFile -eq
+                    'CodexQuotaHud.SkinDesigner.csproj') {
+                    'MZ fake designer'
+                } else {
+                    'MZ fake app'
+                }) -Encoding Ascii
             }
             """);
         return path;

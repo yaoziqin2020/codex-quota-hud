@@ -10,7 +10,10 @@ param(
     [int] $InternalCompilerExitCode,
     [switch] $InternalSkipFakeSetup,
     [switch] $InternalFailStageCleanup,
-    [switch] $InternalFailManifestDeleteOnce
+    [switch] $InternalFailFailureCleanupStageAfterFirstFile,
+    [switch] $InternalFailManifestDeleteOnce,
+    [switch] $InternalRemovePublishedAppBeforeZip,
+    [switch] $InternalRemovePublishedDesignerBeforeSetup
 )
 
 Set-StrictMode -Version Latest
@@ -64,7 +67,10 @@ else {
         $InternalCompilerExitCode -ne 0 -or
         $InternalSkipFakeSetup -or
         $InternalFailStageCleanup -or
-        $InternalFailManifestDeleteOnce) {
+        $InternalFailFailureCleanupStageAfterFirstFile -or
+        $InternalFailManifestDeleteOnce -or
+        $InternalRemovePublishedAppBeforeZip -or
+        $InternalRemovePublishedDesignerBeforeSetup) {
         throw 'Internal packaging hooks require -InternalTestMode.'
     }
 
@@ -88,7 +94,10 @@ else {
 }
 
 function Remove-ExactPath {
-    param([Parameter(Mandatory = $true)][string] $Path)
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [switch] $FailAfterFirstFile
+    )
 
     if (-not (Test-Path -LiteralPath $Path)) {
         return
@@ -100,11 +109,110 @@ function Remove-ExactPath {
         throw "Refusing to remove a reparse-point packaging path: $Path"
     }
 
+    if ($FailAfterFirstFile) {
+        if (-not $item.PSIsContainer) {
+            throw "Partial removal injection requires a directory: $Path"
+        }
+        $firstFile = @(Get-ChildItem `
+            -LiteralPath $Path `
+            -Recurse `
+            -File `
+            -Force | Sort-Object -Property FullName)[0]
+        if ($null -eq $firstFile) {
+            throw "Partial removal injection found no file: $Path"
+        }
+        Remove-Item -LiteralPath $firstFile.FullName -Force -ErrorAction Stop
+        if (Test-Path -LiteralPath $firstFile.FullName -ErrorAction Stop) {
+            throw "Partial removal injection postcondition failed: $($firstFile.FullName)"
+        }
+        throw "Simulated partial stage removal failure after deleting: $($firstFile.FullName)"
+    }
+
     if ($item.PSIsContainer) {
         Remove-Item -LiteralPath $Path -Recurse -Force
     }
     else {
         Remove-Item -LiteralPath $Path -Force
+    }
+}
+
+function Assert-RegularPackagingFile {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $Description
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "$Description is missing: $Path"
+    }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.PSIsContainer -or ($item.Attributes -band
+        [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "$Description must be a regular file: $Path"
+    }
+}
+
+function Get-RelativeChildPath {
+    param(
+        [Parameter(Mandatory = $true)][string] $Root,
+        [Parameter(Mandatory = $true)][string] $Child
+    )
+
+    $rootPrefix = [System.IO.Path]::GetFullPath($Root).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar) +
+        [System.IO.Path]::DirectorySeparatorChar
+    $childFullPath = [System.IO.Path]::GetFullPath($Child)
+    if (-not $childFullPath.StartsWith(
+        $rootPrefix,
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Path is outside the expected root: $childFullPath"
+    }
+    return $childFullPath.Substring($rootPrefix.Length)
+}
+
+function Assert-ExactZipStage {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    $rootItem = Get-Item -LiteralPath $Path -Force
+    if (-not $rootItem.PSIsContainer -or ($rootItem.Attributes -band
+        [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "ZIP stage must be a regular directory: $Path"
+    }
+
+    $allowedFiles = @(
+        'artifacts\CodexQuotaHud-win-x64\CodexQuotaHud.App.exe',
+        'scripts\install.ps1',
+        'scripts\uninstall.ps1',
+        'README.md',
+        'LICENSE'
+    )
+    $actualFiles = @()
+    foreach ($item in @(Get-ChildItem `
+        -LiteralPath $Path `
+        -Recurse `
+        -Force)) {
+        if (($item.Attributes -band
+            [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "ZIP stage contains a reparse point: $($item.FullName)"
+        }
+        if (-not $item.PSIsContainer) {
+            $relative = Get-RelativeChildPath `
+                -Root $Path `
+                -Child $item.FullName
+            $actualFiles += $relative
+            if ($allowedFiles -notcontains $relative) {
+                throw "Unexpected ZIP stage entry: $relative"
+            }
+        }
+    }
+    foreach ($expected in $allowedFiles) {
+        if ($actualFiles -notcontains $expected) {
+            throw "Required ZIP stage entry is missing: $expected"
+        }
+    }
+    if ($actualFiles.Count -ne $allowedFiles.Count) {
+        throw 'ZIP stage entry count does not match the release contract.'
     }
 }
 
@@ -143,6 +251,12 @@ function Invoke-ManifestCleanupChecked {
 $packagingStage = 'initial cleanup'
 try {
     New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
+    $releaseRootItem = Get-Item -LiteralPath $releaseRoot -Force
+    if (-not $releaseRootItem.PSIsContainer -or
+        ($releaseRootItem.Attributes -band
+        [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Release root must be a regular directory: $releaseRoot"
+    }
     Remove-ExactPath -Path $stage
     Remove-ExactPath -Path $archive
     Remove-ExactPath -Path $setup
@@ -172,12 +286,19 @@ try {
     }
 
     $packagingStage = 'ZIP staging'
+    $publishedApp = Join-Path $published 'CodexQuotaHud.App.exe'
+    if ($InternalTestMode -and $InternalRemovePublishedAppBeforeZip) {
+        Remove-Item -LiteralPath $publishedApp -Force -ErrorAction Stop
+    }
+    Assert-RegularPackagingFile `
+        -Path $publishedApp `
+        -Description 'Published App executable'
     $payload = Join-Path $stage 'artifacts\CodexQuotaHud-win-x64'
     $scripts = Join-Path $stage 'scripts'
     New-Item -ItemType Directory -Path $payload -Force | Out-Null
     New-Item -ItemType Directory -Path $scripts -Force | Out-Null
     Copy-Item `
-        -LiteralPath (Join-Path $published 'CodexQuotaHud.App.exe') `
+        -LiteralPath $publishedApp `
         -Destination $payload
     Copy-Item `
         -LiteralPath (Join-Path $PSScriptRoot 'install-production.ps1') `
@@ -191,6 +312,7 @@ try {
     Copy-Item `
         -LiteralPath (Join-Path $repositoryRoot 'LICENSE') `
         -Destination $stage
+    Assert-ExactZipStage -Path $stage
 
     $packagingStage = 'ZIP creation'
     Compress-Archive `
@@ -199,6 +321,16 @@ try {
         -CompressionLevel Optimal
 
     $packagingStage = 'Setup creation'
+    $publishedDesigner = Join-Path `
+        $published `
+        'designer\CodexQuotaHud.SkinDesigner.exe'
+    if ($InternalTestMode -and
+        $InternalRemovePublishedDesignerBeforeSetup) {
+        Remove-Item -LiteralPath $publishedDesigner -Force -ErrorAction Stop
+    }
+    Assert-RegularPackagingFile `
+        -Path $publishedDesigner `
+        -Description 'Published Designer executable'
     if ($InternalTestMode) {
         & (Join-Path $PSScriptRoot 'build-installer.ps1') `
             -Version $Version `
@@ -279,14 +411,50 @@ catch {
                 'succeeded: ' + ($manifestCleanupErrors -join ' | ')
         }
     }
-    try {
-        Remove-ExactPath -Path $stage
-        if ($InternalTestMode) {
-            Remove-ExactPath -Path $published
+    $cleanupTargets = @(
+        [PSCustomObject]@{
+            Description = 'ZIP stage'
+            Path = $stage
+            FailAfterFirstFile = [bool](
+                $InternalTestMode -and
+                $InternalFailFailureCleanupStageAfterFirstFile)
+        }
+    )
+    if ($InternalTestMode) {
+        $cleanupTargets += [PSCustomObject]@{
+            Description = 'internal publish output'
+            Path = $published
+            FailAfterFirstFile = $false
         }
     }
-    catch {
-        $failureMessage += " Cleanup also failed: $($_.Exception.Message)"
+    $cleanupTargets += @(
+        [PSCustomObject]@{
+            Description = 'ZIP archive'
+            Path = $archive
+            FailAfterFirstFile = $false
+        },
+        [PSCustomObject]@{
+            Description = 'Setup executable'
+            Path = $setup
+            FailAfterFirstFile = $false
+        }
+    )
+
+    $cleanupErrors = [System.Collections.ArrayList]::new()
+    foreach ($cleanupTarget in $cleanupTargets) {
+        try {
+            Remove-ExactPath `
+                -Path $cleanupTarget.Path `
+                -FailAfterFirstFile:([bool] $cleanupTarget.FailAfterFirstFile)
+        }
+        catch {
+            [void]$cleanupErrors.Add(
+                "$($cleanupTarget.Description): $($_.Exception.Message)")
+        }
+    }
+    if ($cleanupErrors.Count -gt 0) {
+        $failureMessage += ' Cleanup also failed: ' +
+            ($cleanupErrors -join ' | ')
     }
     throw $failureMessage
 }
