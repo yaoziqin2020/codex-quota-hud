@@ -1,6 +1,11 @@
 # Current Task
 
-## Unreleased optional Skin Designer — PARTIAL
+## Unreleased v1.2.0 local candidate — PARTIAL
+
+The current branch now includes the optional Skin Designer, the shared custom-
+skin runtime, a compact About window, and the Designer preview recovery fix for
+`None -> Dual/5h/Week`. It is installed on the maintainer machine as a local
+`1.2.0` acceptance candidate, but it is not tagged, uploaded, or published.
 
 Source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` adds the shared
 custom-skin runtime/import path and a separate optional Skin Designer. It is
@@ -8,12 +13,36 @@ unreleased and is not part of the installed or published `v1.1.1` build.
 
 ### Current status
 
-Automated evidence is `PASS with unresolved anomaly`; overall feature
-acceptance is **PARTIAL — no release is authorized**. Two trustworthy current
-full-solution reruns passed Core `75/75`, Skins `325/325`, App/UI `590/590`,
-and Designer `334/334`, for `1324/1324` with `0` skipped. Release build passed
-with `0` warnings and `0` errors. The exact security/rollback suites passed
+Automated evidence is `PASS with unresolved historical anomaly`; overall
+feature acceptance is **PARTIAL — no public release is authorized**. The latest
+full-solution run passed Core `75/75`, Skins `325/325`, App/UI `607/607`, and
+Designer `334/334`, for `1341/1341` with `0` skipped. Release build passed with
+`0` warnings and `0` errors. The earlier exact security/rollback suites passed
 Skins `223/223`, App `224/224`, and Designer `116/116`.
+
+The local `v1.2.0` Setup upgrade completed with exit code `0`. Installed App
+and Designer binaries are version `1.2.0.0` and exactly match the packaged
+publish hashes. The uninstall entry reports `1.2.0`; formal startup remains
+`CodexQuotaHud.App.exe --background`. Setup created only the ordinary-user
+normal desktop/Start-menu shortcuts and the optional Designer Start-menu
+shortcut. After that product acceptance, the maintainer desktop was separately
+restored to only `Codex Quota HUD 开发预览` with `--preview`; this is local state,
+not Setup behavior.
+
+Installed-Designer GUI acceptance passed the user-reported regression paths:
+selecting `None` hid the preview and each direct return to `Dual`, `5h`, and
+`Week` made it visible again. The HUD context menu visibly contains `关于`.
+The first packaged About build crashed at window construction because
+`Assets/AppIcon.ico` had not been embedded as a WPF resource. Windows event
+evidence identified the exact missing resource; a host-independent WPF
+reproduction test failed before the fix and passes afterward. Commit `bf8e16d`
+embeds the icon and also contains optional-window failures so they cannot crash
+the HUD or Designer. The corrected package was rebuilt and reinstalled, and
+its installed binaries match the corrected publish tree. Automated WPF tests
+cover the installed-host resource construction, content, shared single-instance
+coordinator, HUD/tray action wiring, failure containment, retry, and disposal.
+The corrected real About window has not yet been visually accepted, so that
+manual row remains `NOT RUN`, not `PASS`.
 
 One earlier full-solution run at the same commit remains an unresolved anomaly:
 `SkinPackageInstallerTests.Remove_DeletesExactlyOneCanonicalCustomDirectoryAndPreservesSiblings`
@@ -26,8 +55,8 @@ generated restore assets had been polluted by a diagnostic restore were
 excluded rather than counted as passes; a forced canonical restore preceded
 the final TRX-backed `1324/1324` run.
 
-An internal-only `0.0.0` package was compiled in a unique system-temp root and
-was never run or installed. It contained exactly Setup, normal-only ZIP, and
+An earlier internal-only `0.0.0` package was compiled in a unique system-temp
+root and was never run or installed. It contained exactly Setup, normal-only ZIP, and
 `SHA256SUMS.txt`; the ZIP had exactly five approved entries and no Designer.
 The Setup publish manifest contained exactly the normal HUD executable and
 `designer/CodexQuotaHud.SkinDesigner.exe`. All three executables were
@@ -39,16 +68,28 @@ hashes:
 - ZIP: `ca3ab3959633b241d2b4f709e2111a5e8e69cdfa64437f412df86933dea5d33d`
 - `SHA256SUMS.txt`: `2db5e0053df13bedab36fec1e0b3de24b383c1b052df0775e20e6107f3a831b3`
 
+Later, a separate production-structure `0.0.0` candidate was mistakenly
+installed on the maintainer machine during package acceptance. It has now been
+replaced by the verified local `1.2.0` candidate. Its obsolete Setup and ZIP
+were removed; its install log and the pre-install rollback backup were retained
+as evidence.
+
+The current local candidate artifacts are:
+
+- Setup: `CodexQuotaHud-Setup-v1.2.0.exe` — SHA-256
+  `89EB326371EB5DB60C7A5CE72DE7FC93FDFE8339BCA262AC4FCDF3C3C5F3470B`
+- ZIP: `CodexQuotaHud-v1.2.0-win-x64.zip` — SHA-256
+  `AA41000758934023ECB811AFED86E70E9C3C28377E9816373E6BD44CA34C0E8E`
+
 ### Next continuation point
 
 Continue from the manual matrix in
 `docs/verification/2026-08-02-optional-skin-designer-acceptance.md`. Every
-Designer layout/DPI/image/slot row, simultaneous HUD/Designer and persistence
-row, real Setup add/remove/upgrade/uninstall row, and sign-out/restart row is
-still `NOT RUN`. Before any separately authorized real Setup run, preflight the
-exact candidate version/path/hash, settings and custom-data backup/hash set,
-and rollback route. Manual acceptance still does not authorize a version bump,
-tag, upload, release publication, replacement of `v1.1.1` assets, or push.
+Designer layout/DPI/image/slot rows, fresh install without Designer, component
+removal, uninstall, sign-out, restart, and the real About-window visual row are
+still `NOT RUN`. The authorized local version bump/package/install work is now
+complete. It does not authorize a tag, upload, GitHub Release, replacement of
+`v1.1.1` assets, or push.
 
 If the storage Remove anomaly recurs, first preserve and expose the returned
 error code/location/message and failing temp-root evidence; do not add retries,

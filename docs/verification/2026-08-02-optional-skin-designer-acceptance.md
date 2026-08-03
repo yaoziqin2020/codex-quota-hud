@@ -389,3 +389,37 @@ Every manual Designer/HUD/real Setup/preservation/sign-out/restart row remains
 `NOT RUN`. No public version, tag, Setup, ZIP, GitHub Release, upload, push,
 installed state, or user data was changed. Automated evidence alone cannot
 promote this record to PASS or authorize release.
+
+## 2026-08-04 local v1.2.0 continuation
+
+This continuation supersedes only the local candidate evidence below; it does
+not convert the remaining manual matrix rows to PASS or authorize a release.
+
+- Automated regression gate: Core `75/75`, Skins `325/325`, App/UI `607/607`,
+  Designer `334/334`, total `1341/1341`, skipped `0`.
+- One preceding run intentionally overlapped the installed Designer GUI and
+  produced three `DesignerSingleInstanceGuardTests` ownership failures because
+  the real process held the production mutex. After closing that process, the
+  clean full-solution rerun above passed. The overlapped run is retained as
+  environmental evidence and is not counted as a green run.
+- Release build: `0` warnings and `0` errors; `git diff --check` passed.
+- Installed Designer regression: `None -> Dual`, `None -> 5h`, and
+  `None -> Week` each restored the synthetic preview.
+- The first local About candidate failed in the installed Designer with a WPF
+  `XamlParseException`. Windows `.NET Runtime` event `1026` exposed the inner
+  `IOException`: resource `assets/appicon.ico` was missing. A WPF constructor
+  regression test reproduced the failure outside the App executable.
+- Commit `bf8e16d` embeds `Assets/AppIcon.ico` as a WPF resource and contains
+  About construction/show/activation failures so the optional window cannot
+  terminate the HUD or Designer and remains retryable. Exact About tests pass
+  `5/5`.
+- The corrected `v1.2.0` package installed with exit code `0`; installed App
+  and Designer hashes match the corrected publish outputs, and both report
+  product version `1.2.0+bf8e16dadae165e71ed025cf96369f3cae58873c`.
+- Corrected Setup SHA-256:
+  `89EB326371EB5DB60C7A5CE72DE7FC93FDFE8339BCA262AC4FCDF3C3C5F3470B`.
+- Corrected normal-only ZIP SHA-256:
+  `AA41000758934023ECB811AFED86E70E9C3C28377E9816373E6BD44CA34C0E8E`.
+- The corrected real About window still requires one direct visual acceptance
+  click. That row remains `NOT RUN`; the crash reproduction and automated
+  installed-host resource path are PASS.
