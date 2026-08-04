@@ -147,6 +147,29 @@ public sealed class ProjectBoundaryTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DesignerMessagePaths_UseThemedDialogsWhileKeepingNativeFilePickers()
+    {
+        var root = FindRepositoryRoot();
+        var designerRoot = Path.Combine(root, "src", "CodexQuotaHud.SkinDesigner");
+        var source = Directory.EnumerateFiles(
+                designerRoot,
+                "*.cs",
+                SearchOption.AllDirectories)
+            .Select(File.ReadAllText)
+            .ToArray();
+
+        Assert.DoesNotContain(
+            source,
+            file => file.Contains("MessageBox.Show", StringComparison.Ordinal));
+        Assert.Contains(
+            source,
+            file => file.Contains("OpenFileDialog", StringComparison.Ordinal));
+        Assert.Contains(
+            source,
+            file => file.Contains("SaveFileDialog", StringComparison.Ordinal));
+    }
+
     private static IReadOnlyList<string> EvaluatedReferences(
         string root,
         string project)

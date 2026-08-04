@@ -3,6 +3,7 @@ using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Infrastructure;
 using CodexQuotaHud.SkinDesigner.Output;
+using CodexQuotaHud.SkinDesigner.UI.Dialogs;
 using CodexQuotaHud.App.Infrastructure.LocalControl;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Packaging;
@@ -20,10 +21,13 @@ public partial class App : System.Windows.Application
         ShutdownMode = ShutdownMode.OnLastWindowClose;
         var paths = new SkinStoragePaths(Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData));
-        var dialog = new WindowsUnsavedChangesDialog();
         var requests = new WindowsDesignerDocumentRequestSource(paths);
         var hudVersion = DesignerHudVersion.Current();
         var outputWindowOwner = new DesignerWindowOwner();
+        var designerDialogs = new DesignerDialogService();
+        var dialog = new WindowsUnsavedChangesDialog(
+            designerDialogs,
+            () => outputWindowOwner.Current);
 
         _composition = DesignerStartupComposition.TryCreate(
             new DesignerStartupFactories(
@@ -40,7 +44,8 @@ public partial class App : System.Windows.Application
                         catalog,
                         reader);
                     var outputDialogs = new WindowsSkinOutputDialogs(
-                        () => outputWindowOwner.Current);
+                        () => outputWindowOwner.Current,
+                        designerDialogs);
                     var builder = new DraftPackageBuilder(hudVersion);
                     var installer = new SkinPackageInstaller(paths, hudVersion);
                     var apply = new SkinApplyService(

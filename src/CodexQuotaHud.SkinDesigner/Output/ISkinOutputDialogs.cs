@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using CodexQuotaHud.SkinDesigner.UI.Dialogs;
 using CodexQuotaHud.Skins.Storage;
 using Microsoft.Win32;
 
@@ -16,39 +17,77 @@ public interface ISkinOutputDialogs
     void ShowResult(DesignerOutputResult result);
 }
 
-internal sealed class WindowsSkinOutputDialogs(Func<Window?> owner) :
-    ISkinOutputDialogs
+internal sealed class WindowsSkinOutputDialogs : ISkinOutputDialogs
 {
-    private readonly Func<Window?> _owner = owner ??
-        throw new ArgumentNullException(nameof(owner));
-    private readonly WindowsSkinOutputDialogActions _actions =
-        WindowsSkinOutputDialogActions.CreateDefault();
+    private readonly Func<Window?> _owner;
+    private readonly IDesignerDialogService _dialogs;
+    private readonly Func<Window?, string, string?> _chooseExportPath;
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
 
     internal WindowsSkinOutputDialogs(
         Func<Window?> owner,
-        WindowsSkinOutputDialogActions actions)
-        : this(owner)
+        IDesignerDialogService dialogs)
+        : this(owner, dialogs, ChooseExportPath)
     {
-        _actions = actions ?? throw new ArgumentNullException(nameof(actions));
+    }
+
+    internal WindowsSkinOutputDialogs(
+        Func<Window?> owner,
+        IDesignerDialogService dialogs,
+        Func<Window?, string, string?> chooseExportPath)
+    {
+        _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
+        _chooseExportPath = chooseExportPath ??
+            throw new ArgumentNullException(nameof(chooseExportPath));
     }
 
     public string? ChooseExportPath(string suggestedFileName) =>
         InvokeOnDesigner(ownerWindow =>
-            _actions.ChooseExportPath(
+            _chooseExportPath(
                 ownerWindow,
                 SkinPackageExchangeDirectory.SuggestedExportPath(
                     suggestedFileName)));
 
     public bool ConfirmExportReplace(string destinationPath) =>
-        InvokeOnDesigner(ownerWindow =>
-            _actions.ConfirmExportReplace(ownerWindow, destinationPath));
+        _dialogs.Show(
+            _owner(),
+            new DesignerDialogRequest(
+                "Export skin package",
+                $"Replace the existing package '{System.IO.Path.GetFileName(destinationPath)}'?",
+                DesignerDialogIcon.Warning,
+                [
+                    new DesignerDialogAction("replace", "Replace"),
+                    new DesignerDialogAction(
+                        "cancel",
+                        "Cancel",
+                        IsDefault: true,
+                        IsCancel: true)
+                ])) == "replace";
 
     public SkinCollisionDecision ChooseApplyCollision(SkinInstallPreview preview)
     {
         ArgumentNullException.ThrowIfNull(preview);
-        return InvokeOnDesigner(ownerWindow =>
-            _actions.ChooseApplyCollision(ownerWindow, preview));
+        return _dialogs.Show(
+            _owner(),
+            new DesignerDialogRequest(
+                "Apply skin",
+                "A skin with this ID is already installed.\n\nYes: Replace   No: Keep a copy   Cancel: Stop",
+                DesignerDialogIcon.Question,
+                [
+                    new DesignerDialogAction("replace", "Replace"),
+                    new DesignerDialogAction("keep-copy", "Keep a copy"),
+                    new DesignerDialogAction(
+                        "cancel",
+                        "Stop",
+                        IsDefault: true,
+                        IsCancel: true)
+                ])) switch
+        {
+            "replace" => SkinCollisionDecision.Replace,
+            "keep-copy" => SkinCollisionDecision.KeepCopy,
+            _ => SkinCollisionDecision.Cancel
+        };
     }
 
     public void ShowResult(DesignerOutputResult result)
@@ -57,14 +96,21 @@ internal sealed class WindowsSkinOutputDialogs(Func<Window?> owner) :
         var isWarning = result.Errors.Count > 0 || result.Disposition is
             DesignerOutputDisposition.Failed or
             DesignerOutputDisposition.InstalledNotActivated;
-        InvokeOnDesigner(ownerWindow =>
-        {
-            _actions.ShowResult(
-                ownerWindow,
-                result,
-                isWarning ? MessageBoxImage.Warning : MessageBoxImage.Information);
-            return true;
-        });
+        _ = _dialogs.Show(
+            _owner(),
+            new DesignerDialogRequest(
+                "Skin Designer",
+                result.Message ?? (isWarning
+                    ? "The output operation did not complete cleanly."
+                    : "The output operation completed."),
+                isWarning
+                    ? DesignerDialogIcon.Warning
+                    : DesignerDialogIcon.Information,
+                [new DesignerDialogAction(
+                    "ok",
+                    "OK",
+                    IsDefault: true,
+                    IsCancel: true)]));
     }
 
     private T InvokeOnDesigner<T>(Func<Window?, T> action)
@@ -87,53 +133,20 @@ internal sealed class WindowsSkinOutputDialogs(Func<Window?> owner) :
 
         return action(ownerWindow);
     }
-}
 
-internal sealed record WindowsSkinOutputDialogActions(
-    Func<Window?, string, string?> ChooseExportPath,
-    Func<Window?, string, bool> ConfirmExportReplace,
-    Func<Window?, SkinInstallPreview, SkinCollisionDecision> ChooseApplyCollision,
-    Action<Window?, DesignerOutputResult, MessageBoxImage> ShowResult)
-{
-    internal static WindowsSkinOutputDialogActions CreateDefault() => new(
-        (owner, suggestedFileName) =>
+    private static string? ChooseExportPath(
+        Window? owner,
+        string suggestedFileName)
+    {
+        var dialog = new SaveFileDialog
         {
-            var dialog = new SaveFileDialog
-            {
-                Title = "Export skin package",
-                Filter = "Codex Quota skin package (*.cqskin)|*.cqskin",
-                AddExtension = true,
-                DefaultExt = ".cqskin",
-                FileName = suggestedFileName,
-                OverwritePrompt = false
-            };
-            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
-        },
-        (owner, destinationPath) => MessageBox.Show(
-            owner,
-            $"Replace the existing package '{System.IO.Path.GetFileName(destinationPath)}'?",
-            "Export skin package",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No) == MessageBoxResult.Yes,
-        (owner, _) => MessageBox.Show(
-            owner,
-            "A skin with this ID is already installed.\n\nYes: Replace   No: Keep a copy   Cancel: Stop",
-            "Apply skin",
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question,
-            MessageBoxResult.Cancel) switch
-        {
-            MessageBoxResult.Yes => SkinCollisionDecision.Replace,
-            MessageBoxResult.No => SkinCollisionDecision.KeepCopy,
-            _ => SkinCollisionDecision.Cancel
-        },
-        (owner, result, image) => MessageBox.Show(
-            owner,
-            result.Message ?? (image == MessageBoxImage.Warning
-                ? "The output operation did not complete cleanly."
-                : "The output operation completed."),
-            "Skin Designer",
-            MessageBoxButton.OK,
-            image));
+            Title = "Export skin package",
+            Filter = "Codex Quota skin package (*.cqskin)|*.cqskin",
+            AddExtension = true,
+            DefaultExt = ".cqskin",
+            FileName = suggestedFileName,
+            OverwritePrompt = false
+        };
+        return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+    }
 }

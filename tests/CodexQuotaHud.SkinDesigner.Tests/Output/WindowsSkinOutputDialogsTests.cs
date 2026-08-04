@@ -1,110 +1,164 @@
 using System.Windows;
-using System.Windows.Threading;
 using CodexQuotaHud.SkinDesigner.Output;
+using CodexQuotaHud.SkinDesigner.Tests.Preview;
+using CodexQuotaHud.SkinDesigner.UI.Dialogs;
+using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Packaging;
 using CodexQuotaHud.Skins.Storage;
 
 namespace CodexQuotaHud.SkinDesigner.Tests.Output;
 
+[Collection(DesignerPreviewWpfCollection.Name)]
 public sealed class WindowsSkinOutputDialogsTests
 {
     [Fact]
-    public async Task ChooseExportPath_RunsOnExactDesignerOwnerDispatcherFromWorkerThread()
+    public void ChooseExportPath_KeepsNativePickerOnTheDesignerDispatcher()
     {
         const string suggested = "Ocean Ring.cqskin";
         var expectedSuggestion = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             "Codex Quota HUD Skins",
             suggested);
-        var selected = expectedSuggestion;
-        var ready = new TaskCompletionSource<DialogFixture>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
+
+        RunSta(() =>
         {
             var owner = new Window();
-            var dispatcher = owner.Dispatcher;
-            var actions = new WindowsSkinOutputDialogActions(
+            var service = new RecordingDesignerDialogService("ok");
+            var dialogs = new WindowsSkinOutputDialogs(
+                () => owner,
+                service,
                 (actualOwner, actualSuggested) =>
                 {
                     Assert.Same(owner, actualOwner);
-                    Assert.True(dispatcher.CheckAccess());
+                    Assert.True(owner.Dispatcher.CheckAccess());
                     Assert.Equal(expectedSuggestion, actualSuggested);
-                    return selected;
-                },
-                (_, _) => throw new InvalidOperationException(),
-                (_, _) => throw new InvalidOperationException(),
-                (_, _, _) => throw new InvalidOperationException());
-            ready.SetResult(new DialogFixture(
-                dispatcher,
-                new WindowsSkinOutputDialogs(() => owner, actions)));
-            Dispatcher.Run();
+                    return actualSuggested;
+                });
+
+            var selected = dialogs.ChooseExportPath(suggested);
+
+            Assert.Equal(expectedSuggestion, selected);
+            Assert.Empty(service.Calls);
         });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        var fixture = await ready.Task.WaitAsync(TimeSpan.FromSeconds(2));
-
-        try
-        {
-            var actual = await Task.Run(() =>
-                fixture.Dialogs.ChooseExportPath(suggested));
-
-            Assert.Equal(selected, actual);
-        }
-        finally
-        {
-            fixture.Dispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
-            Assert.True(thread.Join(TimeSpan.FromSeconds(2)));
-        }
     }
 
-    [Fact]
-    public async Task ConfirmExportReplace_RunsOnExactDesignerOwnerDispatcherFromWorkerThread()
+    [Theory]
+    [InlineData("replace", true)]
+    [InlineData("cancel", false)]
+    public void ConfirmExportReplace_MapsThemedActionsToExistingBoolean(
+        string response,
+        bool expected)
     {
-        const string destination = @"C:\exports\Ocean Ring.cqskin";
-        var ready = new TaskCompletionSource<DialogFixture>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
+        RunSta(() =>
         {
             var owner = new Window();
-            var dispatcher = owner.Dispatcher;
-            var actions = new WindowsSkinOutputDialogActions(
-                (_, _) => throw new InvalidOperationException(),
-                (actualOwner, actualDestination) =>
-                {
-                    Assert.Same(owner, actualOwner);
-                    Assert.True(dispatcher.CheckAccess());
-                    Assert.Equal(destination, actualDestination);
-                    return true;
-                },
-                (_, _) => throw new InvalidOperationException(),
-                (_, _, _) => throw new InvalidOperationException());
-            ready.SetResult(new DialogFixture(
-                dispatcher,
-                new WindowsSkinOutputDialogs(() => owner, actions)));
-            Dispatcher.Run();
+            var service = new RecordingDesignerDialogService(response);
+            var dialogs = new WindowsSkinOutputDialogs(() => owner, service);
+
+            var actual = dialogs.ConfirmExportReplace(@"C:\exports\Ocean Ring.cqskin");
+
+            Assert.Equal(expected, actual);
+            var call = Assert.Single(service.Calls);
+            Assert.Same(owner, call.Owner);
+            Assert.Equal("Export skin package", call.Request.Title);
+            Assert.Equal(
+                "Replace the existing package 'Ocean Ring.cqskin'?",
+                call.Request.Message);
+            Assert.Equal(DesignerDialogIcon.Warning, call.Request.Icon);
+            Assert.Collection(
+                call.Request.Actions,
+                action => AssertAction(action, "replace", "Replace"),
+                action => AssertAction(action, "cancel", "Cancel", true, true));
         });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        var fixture = await ready.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    }
 
-        try
+    [Theory]
+    [InlineData("replace", SkinCollisionDecision.Replace)]
+    [InlineData("keep-copy", SkinCollisionDecision.KeepCopy)]
+    [InlineData("cancel", SkinCollisionDecision.Cancel)]
+    public void ChooseApplyCollision_MapsThemedActionsToExistingDecision(
+        string response,
+        SkinCollisionDecision expected)
+    {
+        RunSta(() =>
         {
-            var confirmed = await Task.Run(() =>
-                fixture.Dialogs.ConfirmExportReplace(destination));
+            using var root = new TemporaryRoot();
+            var owner = new Window();
+            var service = new RecordingDesignerDialogService(response);
+            var dialogs = new WindowsSkinOutputDialogs(() => owner, service);
 
-            Assert.True(confirmed);
-        }
-        finally
-        {
-            fixture.Dispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
-            Assert.True(thread.Join(TimeSpan.FromSeconds(2)));
-        }
+            var actual = dialogs.ChooseApplyCollision(CreatePreview(root));
+
+            Assert.Equal(expected, actual);
+            var call = Assert.Single(service.Calls);
+            Assert.Same(owner, call.Owner);
+            Assert.Equal("Apply skin", call.Request.Title);
+            Assert.Equal(
+                "A skin with this ID is already installed.\n\nYes: Replace   No: Keep a copy   Cancel: Stop",
+                call.Request.Message);
+            Assert.Equal(DesignerDialogIcon.Question, call.Request.Icon);
+            Assert.Collection(
+                call.Request.Actions,
+                action => AssertAction(action, "replace", "Replace"),
+                action => AssertAction(action, "keep-copy", "Keep a copy"),
+                action => AssertAction(action, "cancel", "Stop", true, true));
+        });
     }
 
     [Fact]
-    public async Task CollisionChoices_RunOnExactDesignerOwnerDispatcherFromWorkerThread()
+    public void ShowResult_UsesThemedOkActionForSuccessfulOutput()
     {
-        using var root = new TemporaryRoot();
+        RunSta(() =>
+        {
+            var owner = new Window();
+            var service = new RecordingDesignerDialogService("ok");
+            var dialogs = new WindowsSkinOutputDialogs(() => owner, service);
+            var result = new DesignerOutputResult(
+                DesignerOutputDisposition.Exported,
+                null,
+                @"C:\exports\Ocean Ring.cqskin",
+                [],
+                "Skin package exported.");
+
+            dialogs.ShowResult(result);
+
+            var call = Assert.Single(service.Calls);
+            Assert.Same(owner, call.Owner);
+            Assert.Equal("Skin Designer", call.Request.Title);
+            Assert.Equal("Skin package exported.", call.Request.Message);
+            Assert.Equal(DesignerDialogIcon.Information, call.Request.Icon);
+            var action = Assert.Single(call.Request.Actions);
+            AssertAction(action, "ok", "OK", true, true);
+        });
+    }
+
+    [Fact]
+    public void ShowResult_UsesWarningIconForCommittedOutputWithCleanupError()
+    {
+        RunSta(() =>
+        {
+            var service = new RecordingDesignerDialogService("ok");
+            var dialogs = new WindowsSkinOutputDialogs(() => null, service);
+            var result = new DesignerOutputResult(
+                DesignerOutputDisposition.AppliedLive,
+                null,
+                null,
+                [new SkinValidationError(
+                    "apply.cleanup-failed",
+                    "$operation",
+                    "Cleanup failed.")],
+                "Installed, but cleanup failed.");
+
+            dialogs.ShowResult(result);
+
+            var call = Assert.Single(service.Calls);
+            Assert.Null(call.Owner);
+            Assert.Equal(DesignerDialogIcon.Warning, call.Request.Icon);
+        });
+    }
+
+    private static SkinInstallPreview CreatePreview(TemporaryRoot root)
+    {
         var packagePath = Path.Combine(root.Path, "preview.cqskin");
         var request = new DraftPackageBuilder(OutputTestFixture.HudVersion).Build(
             OutputTestFixture.CompleteDraft(),
@@ -121,128 +175,63 @@ public sealed class WindowsSkinOutputDialogsTests
                 packagePath,
                 OutputTestFixture.HudVersion,
                 CancellationToken.None);
-        var preview = Assert.IsType<SkinInstallPreview>(inspected.Value);
-        var ready = new TaskCompletionSource<DialogFixture>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            var owner = new Window();
-            var dispatcher = owner.Dispatcher;
-            var choices = new Queue<SkinCollisionDecision>(
-            [
-                SkinCollisionDecision.Replace,
-                SkinCollisionDecision.KeepCopy,
-                SkinCollisionDecision.Cancel
-            ]);
-            var actions = new WindowsSkinOutputDialogActions(
-                (_, _) => null,
-                (_, _) => false,
-                (actualOwner, _) =>
-                {
-                    Assert.Same(owner, actualOwner);
-                    Assert.True(dispatcher.CheckAccess());
-                    return choices.Dequeue();
-                },
-                (_, _, _) => { });
-            ready.SetResult(new DialogFixture(
-                dispatcher,
-                new WindowsSkinOutputDialogs(() => owner, actions)));
-            Dispatcher.Run();
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        var fixture = await ready.Task.WaitAsync(TimeSpan.FromSeconds(2));
-
-        try
-        {
-            var observed = new List<SkinCollisionDecision>();
-            foreach (var expected in new[]
-                     {
-                         SkinCollisionDecision.Replace,
-                         SkinCollisionDecision.KeepCopy,
-                         SkinCollisionDecision.Cancel
-                     })
-            {
-                var actual = await Task.Run(() =>
-                    fixture.Dialogs.ChooseApplyCollision(preview));
-                observed.Add(actual);
-                Assert.Equal(expected, actual);
-            }
-
-            Assert.Equal(
-                [
-                    SkinCollisionDecision.Replace,
-                    SkinCollisionDecision.KeepCopy,
-                    SkinCollisionDecision.Cancel
-                ],
-                observed);
-        }
-        finally
-        {
-            fixture.Dispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
-            Assert.True(thread.Join(TimeSpan.FromSeconds(2)));
-        }
+        return Assert.IsType<SkinInstallPreview>(inspected.Value);
     }
 
-    [Fact]
-    public async Task CommittedResultWithCleanupError_UsesWarningPresentationOnOwnerDispatcher()
+    private static void AssertAction(
+        DesignerDialogAction action,
+        string id,
+        string label,
+        bool isDefault = false,
+        bool isCancel = false)
     {
-        var ready = new TaskCompletionSource<WarningFixture>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
+        Assert.Equal(id, action.Id);
+        Assert.Equal(label, action.Label);
+        Assert.Equal(isDefault, action.IsDefault);
+        Assert.Equal(isCancel, action.IsCancel);
+    }
+
+    private static void RunSta(Action action)
+    {
+        Exception? failure = null;
         var thread = new Thread(() =>
         {
-            var owner = new Window();
-            var dispatcher = owner.Dispatcher;
-            MessageBoxImage? observed = null;
-            var actions = new WindowsSkinOutputDialogActions(
-                (_, _) => null,
-                (_, _) => false,
-                (_, _) => SkinCollisionDecision.Cancel,
-                (actualOwner, _, image) =>
-                {
-                    Assert.Same(owner, actualOwner);
-                    Assert.True(dispatcher.CheckAccess());
-                    observed = image;
-                });
-            ready.SetResult(new WarningFixture(
-                dispatcher,
-                new WindowsSkinOutputDialogs(() => owner, actions),
-                () => observed));
-            Dispatcher.Run();
+            try
+            {
+                action();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        var fixture = await ready.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        var result = new DesignerOutputResult(
-            DesignerOutputDisposition.AppliedLive,
-            null,
-            null,
-            [new CodexQuotaHud.Skins.Contracts.SkinValidationError(
-                "apply.cleanup-failed",
-                "$operation",
-                "Cleanup failed.")],
-            "Installed, but cleanup failed.");
-
-        try
+        thread.Join();
+        if (failure is not null)
         {
-            await Task.Run(() => fixture.Dialogs.ShowResult(result));
-            Assert.Equal(MessageBoxImage.Warning, fixture.GetObservedImage());
-        }
-        finally
-        {
-            fixture.Dispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
-            Assert.True(thread.Join(TimeSpan.FromSeconds(2)));
+            throw new Xunit.Sdk.XunitException(failure.ToString());
         }
     }
 
-    private sealed record DialogFixture(
-        Dispatcher Dispatcher,
-        WindowsSkinOutputDialogs Dialogs);
+    private sealed class RecordingDesignerDialogService(
+        params string[] responses)
+        : IDesignerDialogService
+    {
+        private readonly Queue<string> _responses = new(responses);
 
-    private sealed record WarningFixture(
-        Dispatcher Dispatcher,
-        WindowsSkinOutputDialogs Dialogs,
-        Func<MessageBoxImage?> GetObservedImage);
+        public List<DesignerDialogCall> Calls { get; } = [];
+
+        public string Show(Window? owner, DesignerDialogRequest request)
+        {
+            Calls.Add(new DesignerDialogCall(owner, request));
+            return _responses.Dequeue();
+        }
+    }
+
+    private sealed record DesignerDialogCall(
+        Window? Owner,
+        DesignerDialogRequest Request);
 
     private sealed class TemporaryRoot : IDisposable
     {

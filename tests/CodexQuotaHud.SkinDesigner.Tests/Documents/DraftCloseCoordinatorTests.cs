@@ -1,10 +1,14 @@
+using System.Windows;
 using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
+using CodexQuotaHud.SkinDesigner.Tests.Preview;
+using CodexQuotaHud.SkinDesigner.UI.Dialogs;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Storage;
 
 namespace CodexQuotaHud.SkinDesigner.Tests.Documents;
 
+[Collection(DesignerPreviewWpfCollection.Name)]
 public sealed class DraftCloseCoordinatorTests
 {
     [Fact]
@@ -220,6 +224,64 @@ public sealed class DraftCloseCoordinatorTests
         await context.Recovery.DisposeAsync();
     }
 
+    [Theory]
+    [InlineData("save", UnsavedCloseChoice.Save)]
+    [InlineData("discard", UnsavedCloseChoice.Discard)]
+    [InlineData("cancel", UnsavedCloseChoice.Cancel)]
+    public void WindowsUnsavedChangesDialog_MapsThemedActionsToCloseChoices(
+        string response,
+        UnsavedCloseChoice expected)
+    {
+        RunSta(() =>
+        {
+            var owner = new Window();
+            var service = new RecordingDesignerDialogService(response);
+            var draft = SkinDraftFactory.CreateNew(
+                Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                DateTimeOffset.Parse("2026-08-02T00:00:00Z"),
+                SemanticVersion.Parse("1.1.1")) with
+            {
+                ProjectName = "Ocean Ring"
+            };
+            var dialog = new WindowsUnsavedChangesDialog(service, () => owner);
+
+            var actual = dialog.Show(draft);
+
+            Assert.Equal(expected, actual);
+            var call = Assert.Single(service.Calls);
+            Assert.Same(owner, call.Owner);
+            Assert.Equal("Unsaved skin draft", call.Request.Title);
+            Assert.Equal(
+                "Save changes to 'Ocean Ring'?\n\nYes: Save   No: Discard   Cancel: Keep editing",
+                call.Request.Message);
+            Assert.Equal(DesignerDialogIcon.Warning, call.Request.Icon);
+            Assert.Collection(
+                call.Request.Actions,
+                action =>
+                {
+                    Assert.Equal("save", action.Id);
+                    Assert.Equal("Save", action.Label);
+                    Assert.False(action.IsDefault);
+                    Assert.False(action.IsCancel);
+                },
+                action =>
+                {
+                    Assert.Equal("discard", action.Id);
+                    Assert.Equal("Discard", action.Label);
+                    Assert.False(action.IsDefault);
+                    Assert.False(action.IsCancel);
+                },
+                action =>
+                {
+                    Assert.Equal("cancel", action.Id);
+                    Assert.Equal("Keep editing", action.Label);
+                    Assert.True(action.IsDefault);
+                    Assert.True(action.IsCancel);
+                });
+        });
+    }
+
     private static TestContext CreateContext(
         TemporaryDirectory temporary,
         UnsavedCloseChoice choice = UnsavedCloseChoice.Cancel,
@@ -277,6 +339,48 @@ public sealed class DraftCloseCoordinatorTests
             ShowCount++;
             onShow?.Invoke(draft);
             return choice;
+        }
+    }
+
+    private sealed class RecordingDesignerDialogService(
+        params string[] responses)
+        : IDesignerDialogService
+    {
+        private readonly Queue<string> _responses = new(responses);
+
+        public List<DesignerDialogCall> Calls { get; } = [];
+
+        public string Show(Window? owner, DesignerDialogRequest request)
+        {
+            Calls.Add(new DesignerDialogCall(owner, request));
+            return _responses.Dequeue();
+        }
+    }
+
+    private sealed record DesignerDialogCall(
+        Window? Owner,
+        DesignerDialogRequest Request);
+
+    private static void RunSta(Action action)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null)
+        {
+            throw new Xunit.Sdk.XunitException(failure.ToString());
         }
     }
 
