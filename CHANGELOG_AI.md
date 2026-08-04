@@ -1,6 +1,6 @@
 # AI Change Log
 
-## 2026-08-04 — v1.2.3 local candidate prepared; installation pending
+## 2026-08-05 — v1.2.3 final local candidate installed; user acceptance pending
 
 - Added a shared requested/effective refresh animation state machine. Built-in
   skin speed profiles are unchanged and receive a 1.5-second completion hold.
@@ -17,29 +17,44 @@
 - Moved the Designer palette and button template to shared resources and
   replaced Designer-owned native message boxes with typed accessible
   dark-themed WPF dialogs. Native Windows open/save pickers remain allowed.
+- Final branch review fixed three release-gate defects: animation presets now
+  preserve refresh speed/hold, the currently focused dialog action wins Enter,
+  and pressed buttons show accent tint plus a 1-DIP depression. Final source is
+  `c66cf9d5d135b864ad90af5c74455177902c7c04`.
 - Fresh Release verification passed Core `75/75`, Skins `355/355`, App/UI
-  `622/622`, and Designer `389/389`, totaling `1441/1441`, zero failed/skipped.
+  `622/622`, and Designer `395/395`, totaling `1447/1447`, zero failed/skipped.
   Release build completed with zero warnings/errors; `git diff --check` passed.
 - Built local candidate Setup
-  `59296C2244E9EF80AAA1CC29223C711FFE1323E893E365F7615994E66FD762EA`
-  (100,044,997 bytes), ZIP
-  `65B13D023509EE994D51CEC5017AA08B687F17866EA466F6ECBB764BBCD5B0F2`
-  (68,335,547 bytes), and 196-byte checksum manifest
-  `B26DF6A56E3D45AB1614791AE74F9B1D53E3265A3F093170C99732C472126E22`.
+  `579C1CE73392970E93323C99600F013950CC463BC4BB5C4B305085584F743F80`
+  (100,048,867 bytes), ZIP
+  `16BF2692D591D039014CD2976CD639DE5B5C599F19826B8A07E7E0A1631504D1`
+  (68,335,551 bytes), and 196-byte checksum manifest
+  `DCE728EE15522FFDAABF841C11F90310DDC5342A920B01EADA41730FA04D2771`.
   The manifest matches both artifacts; ZIP has exactly five approved entries
   and no Designer; Setup publish has exactly App plus optional Designer.
 - App and Designer report
-  `1.2.3+fb6ae812c9a35ba84c74353d63eff0d7926d946e`; Setup reports product
+  `1.2.3+c66cf9d5d135b864ad90af5c74455177902c7c04`; Setup reports product
   version `1.2.3`. Setup and both executables are `NotSigned`.
 - All seven normal isolated installer scenarios plus both committed-cleanup
-  failure/retry scenarios passed in the authorized run, with zero final smoke
-  roots/processes. One preceding restricted run was excluded after sandbox
-  denial of its GUID-scoped HKCU test key; Inno rolled back, its log was
-  retained long enough to prove error 5, and the exact temp root was removed.
-- Stopped before production installation. The machine remains on v1.2.2.
-  Manual timing/package/dialog GUI checks and installed startup/formal-HUD/user
-  acceptance remain `NOT RUN`. No push, `main` movement, tag, upload, release,
-  or publication was performed or authorized.
+  failure/retry scenarios passed against the final Setup in `946.3 s`, with
+  zero final smoke roots or installer processes.
+- Installed the final Setup locally over v1.2.2 with startup plus optional
+  Designer; exit code was `0`. All 23 existing user-data files retained their
+  paths and hashes. Installed App/Designer versions and hashes match publish,
+  uninstall reports `1.2.3`, startup remains formal `--background`, and the
+  formal HUD process is running. The maintainer-only `--preview` desktop
+  shortcut was restored separately after Setup, preserving ordinary-user Setup
+  semantics.
+- Installed Designer GUI smoke verified the dark main window, default
+  `2.0×`/`1.5 秒`, `0×` pause safety, `4.0×`/`3.0 秒` extremes, all three
+  presets preserving both values, a dark unsaved dialog, dark disabled owner
+  controls, and the native picker rooted at the drafts directory. The smoke
+  modified only an unnamed temporary draft and restored a new default draft;
+  no user skin was saved, applied, exported, or overwritten.
+- Exact motion timing across all skin combinations, every dialog variant,
+  legacy-package output, sign-out/restart, and user practical acceptance remain
+  partial or `NOT RUN`. No push, `main` movement, tag, upload, release, or
+  publication was performed or authorized.
 
 ## 2026-08-04 — v1.2.2 skin metadata correction released
 

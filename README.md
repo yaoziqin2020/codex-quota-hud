@@ -23,7 +23,9 @@ and a numeric tray icon without scraping web pages or storing credentials.
 
 After local acceptance and public release authorization, the primary path is
 `CodexQuotaHud-Setup-v1.2.3.exe`. The current v1.2.3 artifacts are local
-release candidates only; the latest public release remains v1.2.2.
+release candidates only. The exact final candidate is installed on the
+maintainer machine for hands-on acceptance; the latest public release remains
+v1.2.2.
 
 完成本机验收并明确授权公开发布后，主要安装文件为
 `CodexQuotaHud-Setup-v1.2.3.exe`。当前 v1.2.3 资产仅为本地候选；最新公开版仍是
@@ -328,7 +330,7 @@ two-direction handoff remains an optional manual UI check.
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
 
-元数据修正版已从标签 `v1.2.2` 发布。v1.2.3 本地候选仍等待安装与用户验收，尚未
+元数据修正版已从标签 `v1.2.2` 发布。v1.2.3 本地候选已完成安装，仍等待用户实操验收，尚未
 创建标签或公开 Release。不要移动 `v1.2.0`、`v1.2.1`、`v1.2.2` 历史标签，也不要
 替换其 Release 资产。
 
@@ -347,13 +349,13 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前 v1.2.3 候选源码包含 1441 项自动化测试：
+当前 v1.2.3 候选源码包含 1447 项自动化测试：
 
 - Core：75 项
 - Skins：355 项
 - App / UI：622 项
-- Skin Designer：389 项
-- Total：1441 项
+- Skin Designer：395 项
+- Total：1447 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -364,15 +366,16 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 自包含发布检查。CI 包固定使用临时版本 `0.0.0`，只在 Runner 内做安装烟测，
 不会冒用或覆盖公开 Release 版本。
 
-当前 v1.2.3 候选的 fresh Release 测试为 `1441/1441`、跳过 `0`，Release build
+当前 v1.2.3 候选的 fresh Release 测试为 `1447/1447`、跳过 `0`，Release build
 为 `0` warnings / `0` errors。刷新时序、旧包默认值、0x 暂停、对话框契约与
-Designer 控件均有自动化覆盖；真实 GUI 时序、对话框视觉、安装后启动与用户实用
-验收仍明确为 `NOT RUN`，不能由自动化结果代替。历史 v1.2.0 的未复现存储异常仍按
-原记录保留。详见
+Designer 控件均有自动化覆盖；最终 Setup 已本地安装，安装后身份/哈希/数据保留、
+正式启动和核心 Designer GUI 冒烟通过。精确 GUI 动画时序、全部对话框类型、旧包
+输出、重启矩阵与用户实操验收仍为 `PARTIAL` 或 `NOT RUN`，不能由自动化结果代替。
+历史 v1.2.0 的未复现存储异常仍按原记录保留。详见
 [`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
 
-v1.2.3 候选的 Setup/ZIP 结构、隔离安装器矩阵、哈希和签名状态已完整记录在
-验收文档中。现有正式安装仍为 v1.2.2；未获用户验收前不会推送、移动 `main`、创建
+v1.2.3 候选的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态和本地安装证据已完整记录在
+验收文档中。现有正式安装为本地 v1.2.3 候选；未获用户验收前不会推送、移动 `main`、创建
 `v1.2.3` 标签、上传资产或发布 GitHub Release。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and

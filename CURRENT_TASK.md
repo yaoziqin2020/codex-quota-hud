@@ -1,6 +1,6 @@
 # Current Task
 
-## v1.2.3 local candidate — automated PASS, installation and acceptance pending
+## v1.2.3 installed local candidate — user practical acceptance pending
 
 The v1.2.3 candidate preserves every built-in skin's existing refresh-speed
 profile and adds a shared 1.5-second post-refresh hold. Custom skins can use an
@@ -11,23 +11,30 @@ immediately. The optional Skin Designer exposes both values and now uses shared
 dark-themed WPF dialogs for Designer-owned messages while retaining native
 Windows open/save pickers.
 
-Fresh Release verification passed Core `75/75`, Skins `355/355`, App/UI
-`622/622`, and Designer `389/389`, totaling `1441/1441` with zero failed or
+Final source commit is
+`c66cf9d5d135b864ad90af5c74455177902c7c04`. Fresh Release verification
+passed Core `75/75`, Skins `355/355`, App/UI `622/622`, and Designer
+`395/395`, totaling `1447/1447` with zero failed or
 skipped. `dotnet build .\CodexQuotaHud.sln -c Release --no-restore` completed
 with zero warnings and zero errors, and `git diff --check` passed. The first
 full-test and package invocations were blocked only by sandboxed NuGet access;
 their authorized exact reruns completed successfully.
 
+One final closeout test invocation was deliberately excluded after the
+installed Designer left open for GUI handoff held the product single-instance
+mutex, causing exactly three guard tests to fail. After closing that exact
+installed process, the unchanged full Release command passed `1447/1447`.
+
 The canonical local candidate files are:
 
-- Setup: `artifacts\release\CodexQuotaHud-Setup-v1.2.3.exe` — 100,044,997
+- Setup: `artifacts\release\CodexQuotaHud-Setup-v1.2.3.exe` — 100,048,867
   bytes — SHA-256
-  `59296C2244E9EF80AAA1CC29223C711FFE1323E893E365F7615994E66FD762EA`
-- ZIP: `artifacts\release\CodexQuotaHud-v1.2.3-win-x64.zip` — 68,335,547
+  `579C1CE73392970E93323C99600F013950CC463BC4BB5C4B305085584F743F80`
+- ZIP: `artifacts\release\CodexQuotaHud-v1.2.3-win-x64.zip` — 68,335,551
   bytes — SHA-256
-  `65B13D023509EE994D51CEC5017AA08B687F17866EA466F6ECBB764BBCD5B0F2`
+  `16BF2692D591D039014CD2976CD639DE5B5C599F19826B8A07E7E0A1631504D1`
 - `artifacts\release\SHA256SUMS.txt` — 196 bytes — SHA-256
-  `B26DF6A56E3D45AB1614791AE74F9B1D53E3265A3F093170C99732C472126E22`
+  `DCE728EE15522FFDAABF841C11F90310DDC5342A920B01EADA41730FA04D2771`
 
 The checksum manifest has exactly two lowercase entries and both match. The
 ZIP has exactly the five approved normal-HUD fallback entries and no Designer.
@@ -35,40 +42,37 @@ The Setup publish tree has exactly the App plus
 `designer\CodexQuotaHud.SkinDesigner.exe`; the optional-component installer
 matrix confirms Designer is absent by default and present only when selected.
 App and Designer are `1.2.3.0` and report
-`1.2.3+fb6ae812c9a35ba84c74353d63eff0d7926d946e`. Setup reports product version
+`1.2.3+c66cf9d5d135b864ad90af5c74455177902c7c04`. Setup reports product version
 `1.2.3`. Setup, App, and Designer are all `NotSigned`, with no signer or
 timestamper certificate.
 
 All seven normal isolated installer scenarios and both committed-cleanup
-failure/retry scenarios passed in the authorized rerun. Every successful GUID
-root was removed with checked postconditions. An initial sandbox-only
-fresh-default attempt reached the isolated registry write, received Windows
-error 5 because the sandbox denied that test key, and rolled back; its log was
-captured and its exact diagnostic root was then removed. Final checks found
-zero installer-smoke roots, zero smoke processes, and zero installer processes.
+failure/retry scenarios passed against the final Setup in `946.3 s`. Final
+checks found zero installer-smoke roots and zero installer processes.
 
-No production Setup was launched. The real installation still reports App and
-Designer `1.2.2`, uninstall version `1.2.2`, and formal startup with
-`--background`. Manual refresh timing, old-package Designer editing/export,
-themed-dialog visuals, installed v1.2.3 startup/formal-HUD behavior, and user
-practical acceptance are `NOT RUN`. No push, `main` movement, tag, upload, or
-GitHub Release action is authorized before explicit user acceptance.
+The real v1.2.2-to-v1.2.3 upgrade was then run with startup and Designer.
+Setup exited `0`; the retained log is
+`C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud\.worktrees\inno-setup-installer-20260731\artifacts\release\CodexQuotaHud-Setup-v1.2.3-install.log`.
 
-For the root Agent's later authorized local upgrade with Designer and startup,
-use this candidate and retain the log:
+Before/after inventory contained 23 user-data files; none was missing and none
+changed hash. Installed App/Designer hashes exactly match publish, both report
+`1.2.3.0` plus final commit `c66cf9d`, the uninstall entry reports `1.2.3`, and
+startup is still the installed formal HUD with `--background`. Normal HUD and
+Designer Start-menu shortcuts exist. The ordinary Setup correctly created no
+Developer Preview desktop entry; the maintainer-only desktop shortcut was
+restored separately with `--preview`. The installed formal HUD process is
+running.
 
-```powershell
-$setup = 'C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud\.worktrees\inno-setup-installer-20260731\artifacts\release\CodexQuotaHud-Setup-v1.2.3.exe'
-$log = 'C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud\.worktrees\inno-setup-installer-20260731\artifacts\release\CodexQuotaHud-Setup-v1.2.3-install.log'
-$arguments = '/SILENT /SUPPRESSMSGBOXES /NORESTART /TASKS="startup" /TYPE=custom /COMPONENTS=designer /LOG="{0}"' -f $log
-$process = Start-Process -FilePath $setup -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
-$process.ExitCode
-```
+Installed Designer GUI smoke passed the default `2.0×`/`1.5 秒` display,
+`0×` pause safety, `4.0×`/`3.0 秒` extremes, speed/hold preservation across
+all three presets, one dark unsaved dialog, dark disabled background controls,
+and a native file picker rooted at the Designer drafts directory. GUI coverage
+of exact motion timing, all dialog variants, legacy-package output, and
+sign-out/restart remains partial or not run. The current handoff is for the
+user to inspect this exact installed candidate.
 
-After installation, the root Agent must verify installed/publish hashes,
-version resources, uninstall/startup entries, shortcuts, retained data, formal
-HUD refresh, Designer launch, and the manual rows below before asking the user
-for practical acceptance.
+No push, `main` movement, tag, upload, or GitHub Release action has occurred or
+is authorized before explicit user acceptance.
 
 ## v1.2.2 skin metadata correction — released
 
