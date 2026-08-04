@@ -120,9 +120,13 @@ git commit -m "feat: target skin hold metadata at v1.2.3"
 - Modify: `src/CodexQuotaHud.App/UI/Animation/OrbAnimationController.cs`
 - Modify: `src/CodexQuotaHud.App/UI/Skins/CustomQuotaSkin.cs`
 - Modify: `src/CodexQuotaHud.App/UI/QuotaOrbWindow.xaml.cs`
+- Modify: `src/CodexQuotaHud.Skins/Templates/CustomSkinRenderer.cs`
+- Modify: `src/CodexQuotaHud.Skins/Templates/FreeDecorationRing/FreeDecorationRingRenderer.xaml.cs`
 - Create: `tests/CodexQuotaHud.App.Tests/UI/FakeAnimationDelay.cs`
 - Modify: `tests/CodexQuotaHud.App.Tests/UI/OrbAnimationControllerTests.cs`
 - Modify: `tests/CodexQuotaHud.App.Tests/UI/CustomQuotaSkinTests.cs`
+- Modify: corresponding `CodexQuotaHud.Skins.Tests` renderer tests required to
+  prove absolute 0-4x multiplier behavior.
 
 **Interfaces:**
 - Produce `IAnimationDelay.Delay(TimeSpan duration, CancellationToken cancellationToken) : Task`.
