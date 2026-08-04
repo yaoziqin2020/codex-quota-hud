@@ -39,7 +39,9 @@ public sealed record SkinAnimationSettings(
     double RotationIntensity,
     double BreathingIntensity,
     double GlowIntensity,
-    double FloatingIntensity);
+    double FloatingIntensity,
+    double RefreshSpeedMultiplier = 2d,
+    double RefreshHoldSeconds = 1.5d);
 
 public sealed record SkinManifest(
     int SchemaVersion,

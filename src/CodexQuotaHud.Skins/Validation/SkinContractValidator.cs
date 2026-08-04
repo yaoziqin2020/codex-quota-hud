@@ -479,6 +479,18 @@ public static class SkinContractValidator
             SkinPackageLimits.MaximumEffectIntensity,
             "$.animation.floatingIntensity",
             errors);
+        ValidateNumber(
+            animation.RefreshSpeedMultiplier,
+            SkinPackageLimits.MinimumRefreshSpeedMultiplier,
+            SkinPackageLimits.MaximumRefreshSpeedMultiplier,
+            "$.animation.refreshSpeedMultiplier",
+            errors);
+        ValidateNumber(
+            animation.RefreshHoldSeconds,
+            SkinPackageLimits.MinimumRefreshHoldSeconds,
+            SkinPackageLimits.MaximumRefreshHoldSeconds,
+            "$.animation.refreshHoldSeconds",
+            errors);
     }
 
     private static void ValidateNumber(

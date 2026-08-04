@@ -49,6 +49,29 @@ public sealed class SkinContractValidatorTests
     }
 
     [Theory]
+    [InlineData(0d, 0d)]
+    [InlineData(2d, 1.5d)]
+    [InlineData(4d, 3d)]
+    public void ValidateTheme_AcceptsRefreshAnimationContractValues(
+        double refreshSpeedMultiplier,
+        double refreshHoldSeconds)
+    {
+        var theme = ValidTheme();
+        theme = theme with
+        {
+            Animation = theme.Animation with
+            {
+                RefreshSpeedMultiplier = refreshSpeedMultiplier,
+                RefreshHoldSeconds = refreshHoldSeconds
+            }
+        };
+
+        var result = SkinContractValidator.ValidateTheme(theme);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Errors));
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(2)]
     public void Validate_RejectsUnsupportedManifestAndThemeSchemas(int schema)
@@ -343,6 +366,26 @@ public sealed class SkinContractValidatorTests
             "number.out-of-range",
             "$.ringThickness");
 
+    [Theory]
+    [InlineData("animation.refreshSpeedMultiplier", double.NaN)]
+    [InlineData("animation.refreshSpeedMultiplier", double.PositiveInfinity)]
+    [InlineData("animation.refreshSpeedMultiplier", double.NegativeInfinity)]
+    [InlineData("animation.refreshHoldSeconds", double.NaN)]
+    [InlineData("animation.refreshHoldSeconds", double.PositiveInfinity)]
+    [InlineData("animation.refreshHoldSeconds", double.NegativeInfinity)]
+    public void ValidateTheme_RejectsProgrammaticNonFiniteRefreshSettings(
+        string field,
+        double value)
+    {
+        var result = SkinContractValidator.ValidateTheme(WithThemeNumber(field, value));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            error => error.Code == "number.out-of-range" &&
+                error.Location == $"$.{field}");
+    }
+
     public static IEnumerable<object[]> MetadataBoundaryCases()
     {
         yield return ["displayName", string.Concat(Enumerable.Repeat("😀", 80)), string.Concat(Enumerable.Repeat("😀", 81))];
@@ -389,6 +432,8 @@ public sealed class SkinContractValidatorTests
         yield return ["animation.breathingIntensity", 0d, 1d, -0.001d, 1.001d];
         yield return ["animation.glowIntensity", 0d, 1d, -0.001d, 1.001d];
         yield return ["animation.floatingIntensity", 0d, 1d, -0.001d, 1.001d];
+        yield return ["animation.refreshSpeedMultiplier", 0d, 4d, -0.001d, 4.001d];
+        yield return ["animation.refreshHoldSeconds", 0d, 3d, -0.001d, 3.001d];
     }
 
     private static SkinValidationResult<(SkinManifest Manifest, SkinTheme Theme)> Validate(
@@ -521,6 +566,8 @@ public sealed class SkinContractValidatorTests
                 "breathingIntensity" => theme.Animation with { BreathingIntensity = value },
                 "glowIntensity" => theme.Animation with { GlowIntensity = value },
                 "floatingIntensity" => theme.Animation with { FloatingIntensity = value },
+                "refreshSpeedMultiplier" => theme.Animation with { RefreshSpeedMultiplier = value },
+                "refreshHoldSeconds" => theme.Animation with { RefreshHoldSeconds = value },
                 _ => throw new ArgumentOutOfRangeException(nameof(field))
             };
             return theme with { Animation = animation };

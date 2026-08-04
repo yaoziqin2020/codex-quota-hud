@@ -43,4 +43,8 @@ public static class SkinPackageLimits
     public const double MaximumTextSizeDip = 34;
     public const double MinimumEffectIntensity = 0;
     public const double MaximumEffectIntensity = 1;
+    public const double MinimumRefreshSpeedMultiplier = 0;
+    public const double MaximumRefreshSpeedMultiplier = 4;
+    public const double MinimumRefreshHoldSeconds = 0;
+    public const double MaximumRefreshHoldSeconds = 3;
 }

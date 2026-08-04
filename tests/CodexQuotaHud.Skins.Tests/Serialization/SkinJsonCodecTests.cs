@@ -46,6 +46,35 @@ public sealed class SkinJsonCodecTests
         Assert.False(SkinJsonCodec.ParseTheme(json).IsValid);
     }
 
+    [Fact]
+    public void ParseTheme_DefaultsRefreshSettingsForLegacyAnimationJson()
+    {
+        var theme = AssertValid(SkinJsonCodec.ParseTheme(Utf8(ValidThemeJson)));
+
+        Assert.Equal(2d, theme.Animation.RefreshSpeedMultiplier);
+        Assert.Equal(1.5d, theme.Animation.RefreshHoldSeconds);
+    }
+
+    [Theory]
+    [InlineData(0d, 0d)]
+    [InlineData(2d, 1.5d)]
+    [InlineData(4d, 3d)]
+    public void ParseTheme_ReadsRefreshSettingsAtContractValues(
+        double refreshSpeedMultiplier,
+        double refreshHoldSeconds)
+    {
+        var replacement = FormattableString.Invariant(
+            $"\"floatingIntensity\":1,\"refreshSpeedMultiplier\":{refreshSpeedMultiplier},\"refreshHoldSeconds\":{refreshHoldSeconds}");
+        var json = ValidThemeJson.Replace(
+            "\"floatingIntensity\":1",
+            replacement);
+
+        var theme = AssertValid(SkinJsonCodec.ParseTheme(Utf8(json)));
+
+        Assert.Equal(refreshSpeedMultiplier, theme.Animation.RefreshSpeedMultiplier);
+        Assert.Equal(refreshHoldSeconds, theme.Animation.RefreshHoldSeconds);
+    }
+
     [Theory]
     [InlineData("[]")]
     [InlineData("null")]
@@ -361,7 +390,9 @@ public sealed class SkinJsonCodecTests
             "rotationIntensity": 0.25,
             "breathingIntensity": 0.5,
             "glowIntensity": 0.75,
-            "floatingIntensity": 1
+            "floatingIntensity": 1,
+            "refreshSpeedMultiplier": 2,
+            "refreshHoldSeconds": 1.5
           }
         }
         """;

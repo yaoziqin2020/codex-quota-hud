@@ -68,8 +68,17 @@ public static class SkinJsonCodec
         "rotationIntensity",
         "breathingIntensity",
         "glowIntensity",
-        "floatingIntensity"
+        "floatingIntensity",
+        "refreshSpeedMultiplier",
+        "refreshHoldSeconds"
     ];
+
+    private static readonly IReadOnlySet<string> OptionalAnimationProperties =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "refreshSpeedMultiplier",
+            "refreshHoldSeconds"
+        };
 
     private static readonly JsonDocumentOptions DocumentOptions = new()
     {
@@ -210,7 +219,8 @@ public static class SkinJsonCodec
                 root.GetProperty("animation"),
                 "$.animation",
                 AnimationProperties,
-                errors);
+                errors,
+                OptionalAnimationProperties);
 
             if (errors.Count != 0)
             {
@@ -409,6 +419,12 @@ public static class SkinJsonCodec
             writer.WriteNumber(
                 "floatingIntensity",
                 theme.Animation.FloatingIntensity);
+            writer.WriteNumber(
+                "refreshSpeedMultiplier",
+                theme.Animation.RefreshSpeedMultiplier);
+            writer.WriteNumber(
+                "refreshHoldSeconds",
+                theme.Animation.RefreshHoldSeconds);
             writer.WriteEndObject();
             writer.WriteEndObject();
         });
@@ -479,13 +495,26 @@ public static class SkinJsonCodec
             ReadDouble(
                 element.GetProperty("floatingIntensity"),
                 $"{path}.floatingIntensity",
+                errors),
+            ReadOptionalDouble(
+                element,
+                "refreshSpeedMultiplier",
+                $"{path}.refreshSpeedMultiplier",
+                2d,
+                errors),
+            ReadOptionalDouble(
+                element,
+                "refreshHoldSeconds",
+                $"{path}.refreshHoldSeconds",
+                1.5d,
                 errors));
 
     private static bool ValidateObject(
         JsonElement element,
         string path,
         IReadOnlyList<string> expectedProperties,
-        ICollection<SkinValidationError> errors)
+        ICollection<SkinValidationError> errors,
+        IReadOnlySet<string>? optionalProperties = null)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
@@ -517,7 +546,9 @@ public static class SkinJsonCodec
 
         foreach (var propertyName in expectedProperties)
         {
-            if (!seen.Contains(propertyName))
+            if (!seen.Contains(propertyName) &&
+                (optionalProperties is null ||
+                    !optionalProperties.Contains(propertyName)))
             {
                 errors.Add(new SkinValidationError(
                     "json.missing-property",
@@ -528,6 +559,16 @@ public static class SkinJsonCodec
 
         return errors.Count == startingErrorCount;
     }
+
+    private static double ReadOptionalDouble(
+        JsonElement element,
+        string propertyName,
+        string path,
+        double defaultValue,
+        ICollection<SkinValidationError> errors) =>
+        element.TryGetProperty(propertyName, out var property) ?
+            ReadDouble(property, path, errors) :
+            defaultValue;
 
     private static int ReadInt32(
         JsonElement element,
