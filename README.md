@@ -303,13 +303,13 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前未发布源码包含 1362 项自动化测试：
+当前未发布源码包含 1363 项自动化测试：
 
 - Core：75 项
 - Skins：331 项
 - App / UI：609 项
-- Skin Designer：347 项
-- Total：1362 项
+- Skin Designer：348 项
+- Total：1363 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -319,7 +319,7 @@ dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
 自包含发布检查。
 
-最新串行 Release 测试为 `1362/1362`、跳过 `0`，Release build 为
+最新串行 Release 测试为 `1363/1363`、跳过 `0`，Release build 为
 `0` warnings / `0` errors；三套安全与回滚筛选分别为 `223/223`、`224/224`
 和 `116/116`。同一提交较早的一次完整测试曾出现 `1` 项未能复现、未能取得
 `result.Errors` 的存储删除失败，因此自动 gate 记录为带未解决异常的通过证据，

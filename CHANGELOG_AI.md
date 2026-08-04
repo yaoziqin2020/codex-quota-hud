@@ -37,8 +37,14 @@
   Formal windows also synchronize quota that arrived before construction
   completed. Focused tests cover both quota-arrival orders and preserve the
   preview's intentionally hidden initial window.
+- Fixed a second replacement-window lifecycle regression: after `打开草稿` or
+  another successful document replacement, apply/export dialogs still used the
+  closed original window as owner and apply could silently stop before overwrite
+  confirmation. A shared loaded-window owner is now promoted by every active
+  editor. The focused regression test verifies that the replacement editor is
+  the output owner.
 - Latest serial Release verification passed Core `75/75`, Skins `331/331`,
-  App/UI `609/609`, and Designer `347/347`, total `1362/1362` with `0` skipped.
+  App/UI `609/609`, and Designer `348/348`, total `1363/1363` with `0` skipped.
   Release build
   completed with `0` warnings and `0` errors.
 - Fixed the installed-host About crash reported during real GUI acceptance.
@@ -52,16 +58,24 @@
   normal-only ZIP SHA-256 is
   `A99DB908F700E446A36BAD58655C79D583D658E4250A956ED2C01095239C6452`.
   Setup, App, and Designer remain `NotSigned`.
-- Replaced that candidate with the final local package from `6348c6a`. Setup
+- Replaced the earlier candidates with the current local package from
+  `7393ffc`. Setup
   SHA-256 is
-  `5EB8150C695274D33DCB465E352C0564B6FF7FFF3B4D4914426D487620FD571B`;
+  `A87631B96F21EF6C8E35B14F4ED64E411243D5DC071ABE680704C673225746DC`;
   normal-only ZIP SHA-256 is
-  `EEA235CA10F3F3EF6717CF36D252B7CB615080DCFC0C15C951371BE7202A50C9`.
+  `044BD0B844AC7922E76B9EDD1C143152194B39A33CF231F159DDF3FB53E02D4D`.
   All seven isolated installer scenarios and both committed-cleanup failure
-  scenarios passed. The final reinstall exited `0`; installed App/Designer
-  report `1.2.0+6348c6a4e4e7341ed26b33e9cab01f162f0e2d4b` and match the
+  scenarios passed before the later Designer-only window-owner fix and were
+  not repeated for that fix. The final reinstall exited `0`; installed
+  App/Designer report `1.2.0+7393ffc4983d03552314295fe74061781e0b1318` and match the
   packaged publish hashes. Startup remains formal `--background`; the
   maintainer desktop was restored to only the `--preview` shortcut.
+- Installed GUI acceptance reopened the saved `柔光玫瑰` draft, displayed the
+  existing-ID confirmation from the replacement editor, replaced the skin,
+  displayed the success result, and started the HUD. Disk inspection confirmed
+  `assets/decoration.png` plus rotation `0.7987`, breathing `0.9004`, and glow
+  `0.8994`. Automated capture did not independently prove the formal HUD's
+  visible rotation, so that last visual observation is not claimed as PASS.
 - Real local upgrade installation completed with exit code `0`. Installed App
   and Designer hashes match the packaged publish tree, the uninstall entry is
   `1.2.0`, startup remains formal `--background`, ordinary-user shortcuts have
@@ -80,15 +94,15 @@
   window startup orders. A temporary opt-in trace then observed a real formal
   startup execute `Show()` with `IsVisible=True`, `Visibility=Visible`, and a
   nonzero WPF handle. The trace code and local trace files were removed. The
-  final installed binary reports
-  `1.2.0+c3d545ea0cd709d291d22fa8486ca5f270695b20`; the user directly
+  current installed binary reports
+  `1.2.0+7393ffc4983d03552314295fe74061781e0b1318`; the user directly
   confirmed that the formal HUD is visible after the final reinstall.
 - Distinguished two historical `0.0.0` candidates: the earlier isolated Task
   18 package was never run; a later production-structure candidate was
   mistakenly installed, then replaced by v1.2.0. Its obsolete Setup/ZIP were
   removed while its log and rollback backup were retained.
-- No tag, push, upload, GitHub Release, or replacement of public v1.1.1 assets
-  was performed.
+- No tag, PR, GitHub Release, or replacement of public v1.1.1 assets was
+  performed. Only the authorized feature branch may be pushed.
 
 ## 2026-08-03 — Unreleased optional Skin Designer automated handoff
 

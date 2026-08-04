@@ -10,8 +10,11 @@ It also includes immediate custom-skin catalog synchronization, the shared
 selection, visible center-breathing and dedicated ring-glow animation, simple
 `静止 / 柔和 / 明显` presets with collapsed advanced controls, compact grouped
 synthetic-preview controls, readable light dropdowns, and a distinct Designer
-application icon. It is installed on the maintainer machine as a local `1.2.0`
-acceptance candidate, but it is not tagged, uploaded, or published.
+application icon. Reopened drafts now also promote their replacement editor as
+the owner for apply/export dialogs, so overwrite confirmation and result
+dialogs remain usable after `打开草稿`. It is installed on the maintainer
+machine as a local `1.2.0` acceptance candidate, but it is not tagged,
+uploaded, or published.
 
 Source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` adds the shared
 custom-skin runtime/import path and a separate optional Skin Designer. It is
@@ -22,13 +25,13 @@ unreleased and is not part of the installed or published `v1.1.1` build.
 Automated evidence is `PASS with unresolved historical anomaly`; overall
 feature acceptance is **PARTIAL — no public release is authorized**. The latest
 serial Release runs passed Core `75/75`, Skins `331/331`, App/UI `609/609`, and
-Designer `347/347`, for `1362/1362` with `0` skipped. Release build passed with
+Designer `348/348`, for `1363/1363` with `0` skipped. Release build passed with
 `0` warnings and `0` errors. The earlier exact security/rollback suites passed
 Skins `223/223`, App `224/224`, and Designer `116/116`.
 
 The local `v1.2.0` Setup upgrade completed with exit code `0`. Installed App
 and Designer binaries are version `1.2.0.0`; both report product version
-`1.2.0+6348c6a4e4e7341ed26b33e9cab01f162f0e2d4b`, and installed binaries
+`1.2.0+7393ffc4983d03552314295fe74061781e0b1318`, and installed binaries
 exactly match the packaged publish hashes. The uninstall entry reports
 `1.2.0`; formal startup remains
 `CodexQuotaHud.App.exe --background`. This local install selected startup and
@@ -64,7 +67,7 @@ before their fixes and now pass. A temporary opt-in runtime trace recorded the
 real startup transition from hidden data to `model=True`, followed by
 `Show()`, `IsVisible=True`, `Visibility=Visible`, and a nonzero WPF handle.
 The temporary trace code and files were removed. The same startup fix remains
-in the final packaged `6348c6a` executable, and the user directly confirmed
+in the final packaged `7393ffc` executable, and the user directly confirmed
 that the formal HUD is visible after the earlier diagnostic reinstall.
 
 One earlier full-solution run at the same commit remains an unresolved anomaly:
@@ -100,9 +103,9 @@ as evidence.
 The current local candidate artifacts are:
 
 - Setup: `CodexQuotaHud-Setup-v1.2.0.exe` — SHA-256
-  `5EB8150C695274D33DCB465E352C0564B6FF7FFF3B4D4914426D487620FD571B`
+  `A87631B96F21EF6C8E35B14F4ED64E411243D5DC071ABE680704C673225746DC`
 - ZIP: `CodexQuotaHud-v1.2.0-win-x64.zip` — SHA-256
-  `EEA235CA10F3F3EF6717CF36D252B7CB615080DCFC0C15C951371BE7202A50C9`
+  `044BD0B844AC7922E76B9EDD1C143152194B39A33CF231F159DDF3FB53E02D4D`
 
 The production installer was also exercised through all seven isolated
 install/upgrade/component/uninstall scenarios and both committed-cleanup
@@ -112,10 +115,21 @@ Designer hashes match the final publish tree, startup is still `--background`,
 normal and Designer Start-menu shortcuts exist, and the maintainer desktop was
 restored to only `Codex Quota HUD 开发预览` with `--preview`.
 
+The reopened-draft apply regression was reproduced against the old installed
+candidate: the command returned without confirmation because output dialogs
+still targeted the closed original editor. Commit `7393ffc` adds one shared
+loaded-window owner, a focused replacement-window regression test, and the
+corrected package. Installed GUI acceptance then opened the saved `柔光玫瑰`
+draft, replaced the existing skin through the confirmation dialog, received
+the success result, and started the HUD. The installed package now contains
+`assets/decoration.png` and the saved rotation/breathing/glow values. Formal-HUD
+rotation was not independently captured by automation, so direct visual
+confirmation remains a manual check.
+
 ### Next continuation point
 
-The compact installed Designer layout is open for the user's direct visual
-inspection. Continue from the manual matrix in
+The installed Designer was closed for the final mutex-safe test run. Continue
+from the manual matrix in
 `docs/verification/2026-08-02-optional-skin-designer-acceptance.md`. Every
 Designer layout/DPI/image/slot rows, fresh install without Designer, component
 removal, uninstall, sign-out, restart, and the real About-window visual row are

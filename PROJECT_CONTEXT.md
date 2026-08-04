@@ -45,7 +45,7 @@ that local convenience is not Setup behavior.
 
 Commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` is the base custom-skin
 runtime/Designer handoff. The current local candidate is packaged from
-`6348c6a4e4e7341ed26b33e9cab01f162f0e2d4b` and is installed on the
+`7393ffc4983d03552314295fe74061781e0b1318` and is installed on the
 maintainer machine as `1.2.0`; it is still not part of public `v1.1.1` and has
 no public tag, Setup, ZIP, or GitHub Release.
 
@@ -90,18 +90,25 @@ normal-HUD-only and still supports `.cqskin` validation/import/rendering.
 
 Current automated evidence is `PASS with unresolved historical anomaly`:
 serial Release runs passed Core `75/75`, Skins `331/331`, App/UI `609/609`,
-and Designer `347/347`, totaling `1362/1362`; the Release build reported zero
+and Designer `348/348`, totaling `1363/1363`; the Release build reported zero
 warnings/errors. The production installer passed seven isolated normal
 install/upgrade/component/uninstall scenarios plus two committed-cleanup
 failure scenarios. One earlier full run failed a single exact-directory Remove
 assertion; isolated, class, project, parallel, cross-project, and 1000-operation
 stress investigation did not reproduce it or capture `result.Errors`, so no
 root cause or source fix is claimed. The final local Setup and ZIP hashes are
-`5EB8150C695274D33DCB465E352C0564B6FF7FFF3B4D4914426D487620FD571B`
-and `EEA235CA10F3F3EF6717CF36D252B7CB615080DCFC0C15C951371BE7202A50C9`.
+`A87631B96F21EF6C8E35B14F4ED64E411243D5DC071ABE680704C673225746DC`
+and `044BD0B844AC7922E76B9EDD1C143152194B39A33CF231F159DDF3FB53E02D4D`.
 The local install matches the packaged App/Designer hashes. Some manual
 layout/DPI/image, uninstall, sign-out, restart, and About-window rows remain
 unrun; overall acceptance is `PARTIAL — no public release is authorized`.
+
+Designer output dialogs resolve against a shared loaded-window owner rather
+than `Application.MainWindow`. This is required because loading or creating a
+document replaces and closes the original editor window. The installed
+reopened-draft workflow now reaches overwrite confirmation and the success
+result, and the applied custom-skin directory contains the decoration asset and
+animation parameters from the saved draft.
 
 ## Product behavior
 
