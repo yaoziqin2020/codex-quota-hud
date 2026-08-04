@@ -15,7 +15,7 @@ namespace CodexQuotaHud.App.Tests.UI.SkinManagement;
 public sealed class SkinImportPreviewWindowTests
 {
     [Fact]
-    public void CleanPreview_LabelsAuthorUnverifiedAndRendersRealFixedIdleState() =>
+    public void CleanPreview_LabelsAuthorAndEffectiveCompatibilityAndRendersRealFixedIdleState() =>
         RunSta(() =>
         {
             using var fixture = PreviewFixture.Clean();
@@ -32,7 +32,7 @@ public sealed class SkinImportPreviewWindowTests
                 .ToArray();
             var arcs = Descendants<FreeDecorationRingArc>(renderer).ToArray();
 
-            Assert.Contains("未验证", window.AuthorLabel.Text);
+            Assert.Equal("作者：Unverified author", window.AuthorLabel.Text);
             Assert.Contains("68%", text);
             Assert.Contains(arcs, arc => Math.Abs(arc.SweepAngle - (68 * 3.6)) < 0.01);
             Assert.Contains(arcs, arc => Math.Abs(arc.SweepAngle - (34 * 3.6)) < 0.01);
@@ -43,7 +43,8 @@ public sealed class SkinImportPreviewWindowTests
             Assert.Equal(Visibility.Collapsed, window.KeepCopyButton.Visibility);
             Assert.Equal("取消", window.CancelButton.Content);
             Assert.Contains("无可选图片", window.AssetSummaryText.Text);
-            Assert.Contains("1.1.1", window.CompatibilityText.Text);
+            Assert.Contains("1.2.0", window.CompatibilityText.Text);
+            Assert.DoesNotContain("1.1.1", window.CompatibilityText.Text);
             Assert.Equal(SkinCollisionDecision.Cancel, window.Decision);
         });
 

@@ -11,6 +11,8 @@ public sealed class DesignerDocumentServiceTests
 {
     private static readonly SemanticVersion HudVersion =
         SemanticVersion.Parse("1.1.1");
+    private static readonly SemanticVersion TemplateMinimumHudVersion =
+        SemanticVersion.Parse("1.2.0");
 
     [Fact]
     public void CreateNew_UsesTask11DefaultsAndSuppliedIdentities()
@@ -21,7 +23,7 @@ public sealed class DesignerDocumentServiceTests
         var now = DateTimeOffset.Parse("2026-08-02T01:02:03Z");
         var sut = CreateService(temporary, () => Guid.NewGuid(), () => now);
 
-        var result = sut.CreateNew(draftId, skinId, now, HudVersion);
+        var result = sut.CreateNew(draftId, skinId, now);
 
         Assert.Empty(result.Errors);
         var draft = Assert.IsType<SkinDraftDocument>(result.Draft);
@@ -29,7 +31,7 @@ public sealed class DesignerDocumentServiceTests
             draftId,
             skinId,
             now,
-            HudVersion);
+            TemplateMinimumHudVersion);
         Assert.Equal(expected, draft);
         Assert.Empty(result.Assets);
         Assert.False(Directory.Exists(new SkinStoragePaths(
@@ -78,6 +80,7 @@ public sealed class DesignerDocumentServiceTests
         Assert.Equal(
             recovery.Assets[SkinAssetSlot.Background],
             opened.Assets[SkinAssetSlot.Background]);
+        Assert.Equal(TemplateMinimumHudVersion, opened.MinimumHudVersion);
         var asset = Assert.Single(result.Assets).Value;
         Assert.Equal(AlphaPng, asset.Content);
         Assert.Equal(1, asset.PixelWidth);
@@ -115,6 +118,7 @@ public sealed class DesignerDocumentServiceTests
         Assert.Equal("Fixture Author", draft.Author);
         Assert.Equal(SemanticVersion.Parse("2.3.4"), draft.PackageVersion);
         Assert.Equal("Fixture description", draft.Description);
+        Assert.Equal(TemplateMinimumHudVersion, draft.MinimumHudVersion);
         Assert.Equal(installedBefore, File.ReadAllBytes(installedAsset));
         var owned = Path.Combine(
             new DraftProjectPaths(paths.DraftsRoot, newDraftId).AssetsRoot,
@@ -145,6 +149,7 @@ public sealed class DesignerDocumentServiceTests
         Assert.Equal(draftId, draft.DraftId);
         Assert.Equal(skinId, draft.SkinId);
         Assert.Equal("Imported Ocean", draft.DisplayName);
+        Assert.Equal(TemplateMinimumHudVersion, draft.MinimumHudVersion);
         Assert.Equal(packageBefore, await File.ReadAllBytesAsync(package));
         Assert.False(Directory.Exists(paths.InstalledSkinsRoot));
         Assert.Single(result.Assets);

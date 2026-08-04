@@ -8,5 +8,7 @@ public interface ISkinTemplate
 
     int SchemaVersion { get; }
 
+    SemanticVersion MinimumHudVersion { get; }
+
     CustomSkinRenderer CreateRenderer(SkinPackageDocument package);
 }

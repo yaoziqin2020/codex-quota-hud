@@ -22,7 +22,7 @@ public partial class App : System.Windows.Application
             Environment.SpecialFolder.LocalApplicationData));
         var dialog = new WindowsUnsavedChangesDialog();
         var requests = new WindowsDesignerDocumentRequestSource(paths);
-        var hudVersion = SemanticVersion.Parse("1.1.1");
+        var hudVersion = DesignerHudVersion.Current();
         var outputWindowOwner = new DesignerWindowOwner();
 
         _composition = DesignerStartupComposition.TryCreate(
@@ -56,8 +56,7 @@ public partial class App : System.Windows.Application
                     var initial = documents.CreateNew(
                         Guid.NewGuid(),
                         Guid.NewGuid(),
-                        DateTimeOffset.UtcNow,
-                        hudVersion);
+                        DateTimeOffset.UtcNow);
                     return new DesignerDocumentWorkspace(
                         initial,
                         documents,
@@ -88,6 +87,26 @@ public partial class App : System.Windows.Application
     {
         _composition?.Dispose();
         base.OnExit(e);
+    }
+}
+
+internal static class DesignerHudVersion
+{
+    private static readonly SemanticVersion RuntimeBaseline =
+        SemanticVersion.Parse("1.2.0");
+
+    internal static SemanticVersion Current()
+    {
+        var version = typeof(App).Assembly.GetName().Version;
+        var detected = version is null
+            ? RuntimeBaseline
+            : new SemanticVersion(
+                Math.Max(0, version.Major),
+                Math.Max(0, version.Minor),
+                Math.Max(0, version.Build));
+        return detected.CompareTo(RuntimeBaseline) >= 0
+            ? detected
+            : RuntimeBaseline;
     }
 }
 

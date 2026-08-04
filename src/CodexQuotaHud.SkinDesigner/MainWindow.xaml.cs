@@ -184,7 +184,7 @@ public partial class MainWindow : Window, IDesignerWindow
             store,
             new InstalledSkinCatalog(
                 paths,
-                SemanticVersion.Parse("1.1.1")),
+                DesignerHudVersion.Current()),
             new SkinPackageReader());
     }
 
@@ -206,8 +206,7 @@ public partial class MainWindow : Window, IDesignerWindow
         Task.FromResult<DesignerDocumentResult?>(_documents.CreateNew(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            DateTimeOffset.UtcNow,
-            SemanticVersion.Parse("1.1.1")));
+            DateTimeOffset.UtcNow));
 
     private Task<DesignerDocumentResult?> OpenSelectedDocumentAsync()
     {
@@ -232,7 +231,7 @@ public partial class MainWindow : Window, IDesignerWindow
             ? null
             : await _documents.ImportForEditingAsync(
                 packagePath,
-                SemanticVersion.Parse("1.1.1")).ConfigureAwait(false);
+                DesignerHudVersion.Current()).ConfigureAwait(false);
     }
 
     private void BeginDocumentOperation(

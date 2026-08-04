@@ -5,6 +5,7 @@ using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Packaging;
 using CodexQuotaHud.Skins.Storage;
+using CodexQuotaHud.Skins.Templates;
 
 namespace CodexQuotaHud.SkinDesigner.Documents;
 
@@ -26,6 +27,7 @@ public sealed class DesignerDocumentService
     private readonly Func<Guid> _newId;
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly IDesignerDraftStorageLeaseProvider _storage;
+    private readonly SkinTemplateRegistry _templates;
 
     public DesignerDocumentService(
         SkinStoragePaths paths,
@@ -63,13 +65,13 @@ public sealed class DesignerDocumentService
         _newId = newId ?? Guid.NewGuid;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
         _storage = storage ?? throw new ArgumentNullException(nameof(storage));
+        _templates = SkinTemplateRegistry.CreateDefault();
     }
 
     public DesignerDocumentResult CreateNew(
         Guid draftId,
         Guid skinId,
-        DateTimeOffset nowUtc,
-        SemanticVersion minimumHudVersion)
+        DateTimeOffset nowUtc)
     {
         if (draftId == Guid.Empty || skinId == Guid.Empty)
         {
@@ -79,12 +81,13 @@ public sealed class DesignerDocumentService
                 "A new draft requires valid draft and skin identities.");
         }
 
-        return new DesignerDocumentResult(
-            SkinDraftFactory.CreateNew(
+        var draft = SkinDraftFactory.CreateNew(
                 draftId,
                 skinId,
                 nowUtc.ToUniversalTime(),
-                minimumHudVersion),
+                new SemanticVersion(0, 0, 0));
+        return new DesignerDocumentResult(
+            NormalizeMinimumHudVersion(draft),
             EmptyAssets,
             []);
     }
@@ -116,7 +119,10 @@ public sealed class DesignerDocumentService
 
         // Non-fatal evidence about an older corrupt counterpart remains visible
         // in the catalog, but does not prevent opening the selected valid snapshot.
-        return assets;
+        return assets with
+        {
+            Draft = NormalizeMinimumHudVersion(assets.Draft!)
+        };
     }
 
     public DesignerDocumentResult EditInstalled(string selectionKey)
@@ -210,7 +216,10 @@ public sealed class DesignerDocumentService
             Author: manifest.Author,
             PackageVersion: manifest.PackageVersion,
             Description: manifest.Description,
-            MinimumHudVersion: manifest.MinimumHudVersion,
+            MinimumHudVersion: EffectiveMinimumHudVersion(
+                manifest.TemplateId,
+                manifest.SchemaVersion,
+                manifest.MinimumHudVersion),
             OriginSkinId: manifest.OriginSkinId,
             Theme: package.Theme,
             Assets: references,
@@ -218,6 +227,33 @@ public sealed class DesignerDocumentService
             UpdatedAtUtc: now);
 
         return CopyPackageAssets(draft, package.Assets, cancellationToken);
+    }
+
+    private SkinDraftDocument NormalizeMinimumHudVersion(
+        SkinDraftDocument draft)
+    {
+        var minimum = EffectiveMinimumHudVersion(
+            draft.Theme.TemplateId,
+            draft.Theme.SchemaVersion,
+            draft.MinimumHudVersion);
+        return minimum == draft.MinimumHudVersion
+            ? draft
+            : draft with { MinimumHudVersion = minimum };
+    }
+
+    private SemanticVersion EffectiveMinimumHudVersion(
+        string templateId,
+        int schemaVersion,
+        SemanticVersion declaredMinimum)
+    {
+        if (!_templates.TryResolve(templateId, schemaVersion, out var template))
+        {
+            return declaredMinimum;
+        }
+
+        return declaredMinimum.CompareTo(template.MinimumHudVersion) >= 0
+            ? declaredMinimum
+            : template.MinimumHudVersion;
     }
 
     private DesignerDocumentResult CopyPackageAssets(

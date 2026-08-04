@@ -21,18 +21,6 @@ public partial class SkinImportPreviewWindow : Window
 
         var package = preview.Package;
         var manifest = package.Manifest;
-        DisplayNameText.Text = manifest.DisplayName;
-        AuthorLabel.Text = $"作者（未验证）：{manifest.Author}";
-        VersionText.Text = $"版本：{manifest.PackageVersion}";
-        TemplateText.Text = $"模板：{manifest.TemplateId}";
-        AssetSummaryText.Text = package.Assets.Count == 0
-            ? "资源：无可选图片"
-            : $"资源：{package.Assets.Count} 个已验证图片";
-        DescriptionText.Text = manifest.Description;
-        CompatibilityText.Text = preview.IsDowngrade
-            ? "兼容性：不允许降级"
-            : $"兼容性：需要 HUD {manifest.MinimumHudVersion} 或更高版本";
-
         var registry = SkinTemplateRegistry.CreateDefault();
         if (!registry.TryResolve(
                 manifest.TemplateId,
@@ -42,6 +30,22 @@ public partial class SkinImportPreviewWindow : Window
             throw new InvalidOperationException(
                 "The validated skin template is unavailable.");
         }
+
+        var minimumHudVersion = manifest.MinimumHudVersion.CompareTo(
+            template.MinimumHudVersion) >= 0
+            ? manifest.MinimumHudVersion
+            : template.MinimumHudVersion;
+        DisplayNameText.Text = manifest.DisplayName;
+        AuthorLabel.Text = $"作者：{manifest.Author}";
+        VersionText.Text = $"版本：{manifest.PackageVersion}";
+        TemplateText.Text = $"模板：{manifest.TemplateId}";
+        AssetSummaryText.Text = package.Assets.Count == 0
+            ? "资源：无可选图片"
+            : $"资源：{package.Assets.Count} 个已验证图片";
+        DescriptionText.Text = manifest.Description;
+        CompatibilityText.Text = preview.IsDowngrade
+            ? "兼容性：不允许降级"
+            : $"兼容性：需要 HUD {minimumHudVersion} 或更高版本";
 
         _renderer = template.CreateRenderer(package);
         var skin = new CustomQuotaSkin(
