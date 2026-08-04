@@ -125,9 +125,10 @@ public sealed class AnimationEditorViewModel(
         var settings = AnimationPresets.Resolve(
             preset,
             CanEditDecorationAnimation);
-        return Owner.Apply(draft => draft with
+        return Update(animation => settings with
         {
-            Theme = draft.Theme with { Animation = settings }
+            RefreshSpeedMultiplier = animation.RefreshSpeedMultiplier,
+            RefreshHoldSeconds = animation.RefreshHoldSeconds
         });
     }
 

@@ -109,6 +109,7 @@ public sealed class ProjectBoundaryTests
                      "DesignerBackgroundBrush",
                      "DesignerSurfaceBrush",
                      "DesignerRaisedBrush",
+                     "DesignerPressedBrush",
                      "DesignerTextBrush",
                      "DesignerMutedTextBrush",
                      "DesignerBorderBrush",
@@ -127,6 +128,15 @@ public sealed class ProjectBoundaryTests
         Assert.Contains("<Style TargetType=\"Button\">", theme, StringComparison.Ordinal);
         Assert.Contains(
             "<ControlTemplate TargetType=\"Button\">",
+            theme,
+            StringComparison.Ordinal);
+        Assert.Contains("<TranslateTransform Y=\"1\" />", theme, StringComparison.Ordinal);
+        Assert.Contains(
+            "Value=\"{DynamicResource DesignerPressedBrush}\"",
+            theme,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Property=\"RenderTransform\"",
             theme,
             StringComparison.Ordinal);
         foreach (var binding in new[]

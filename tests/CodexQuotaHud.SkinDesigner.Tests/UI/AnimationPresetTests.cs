@@ -56,6 +56,47 @@ public sealed class AnimationPresetTests
     }
 
     [Theory]
+    [InlineData(AnimationPresetKind.Still, 0d, 0d, 0d, 0d)]
+    [InlineData(AnimationPresetKind.Gentle, 0d, .55d, .65d, 0d)]
+    [InlineData(AnimationPresetKind.Noticeable, 0d, .9d, .9d, 0d)]
+    public void ApplyPreset_PreservesRefreshTimingInDraftAndPublishedPreview(
+        AnimationPresetKind preset,
+        double rotation,
+        double breathing,
+        double glow,
+        double floating)
+    {
+        var timestamp = DateTimeOffset.Parse("2026-08-04T00:00:00Z");
+        var session = new SkinDraftSession(
+            SkinDraftFactory.CreateNew(
+                Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                timestamp,
+                SemanticVersion.Parse("1.2.3")),
+            () => timestamp = timestamp.AddSeconds(1));
+        var previewed = new List<SkinDraftDocument>();
+        using var sut = new DesignerViewModel(session, previewed.Add);
+        Assert.True(sut.Animation.SetRefreshSpeedMultiplier(4).Succeeded);
+        Assert.True(sut.Animation.SetRefreshHoldSeconds(3).Succeeded);
+        Assert.True(sut.Animation.SetBreathingIntensity(.123).Succeeded);
+        previewed.Clear();
+
+        var result = sut.Animation.ApplyPreset(preset);
+
+        Assert.True(result.Succeeded, Format(result.Errors));
+        Assert.Equal(
+            new SkinAnimationSettings(
+                rotation,
+                breathing,
+                glow,
+                floating,
+                RefreshSpeedMultiplier: 4,
+                RefreshHoldSeconds: 3),
+            session.Current.Theme.Animation);
+        Assert.Equal(session.Current, Assert.Single(previewed));
+    }
+
+    [Theory]
     [InlineData("speed", 0d, "$.animation.refreshSpeedMultiplier")]
     [InlineData("speed", 4d, "$.animation.refreshSpeedMultiplier")]
     [InlineData("hold", 0d, "$.animation.refreshHoldSeconds")]

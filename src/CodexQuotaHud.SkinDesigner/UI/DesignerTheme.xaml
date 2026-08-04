@@ -3,6 +3,7 @@
     <SolidColorBrush x:Key="DesignerBackgroundBrush" Color="#FF08111F" />
     <SolidColorBrush x:Key="DesignerSurfaceBrush" Color="#FF111D2E" />
     <SolidColorBrush x:Key="DesignerRaisedBrush" Color="#FF17263A" />
+    <SolidColorBrush x:Key="DesignerPressedBrush" Color="#FF15526B" />
     <SolidColorBrush x:Key="DesignerTextBrush" Color="#FFF1F5F9" />
     <SolidColorBrush x:Key="DesignerMutedTextBrush" Color="#FFA9B8CC" />
     <SolidColorBrush x:Key="DesignerBorderBrush" Color="#FF33445B" />
@@ -42,6 +43,9 @@
                             CornerRadius="5"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
+                        <Border.RenderTransform>
+                            <TranslateTransform />
+                        </Border.RenderTransform>
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                           TextElement.Foreground="{TemplateBinding Foreground}"
@@ -60,7 +64,13 @@
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="DesignerButtonBorder"
                                     Property="Background"
-                                    Value="{DynamicResource DesignerBackgroundBrush}" />
+                                    Value="{DynamicResource DesignerPressedBrush}" />
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="RenderTransform">
+                                <Setter.Value>
+                                    <TranslateTransform Y="1" />
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="DesignerButtonBorder"

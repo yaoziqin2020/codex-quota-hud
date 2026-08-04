@@ -59,7 +59,8 @@ public partial class DesignerDialogWindow : Window
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var action = key switch
         {
-            Key.Enter => _actions.FirstOrDefault(item => item.IsDefault),
+            Key.Enter => FocusedAction() ??
+                _actions.FirstOrDefault(item => item.IsDefault),
             Key.Escape => CancelOrSafeAction(),
             _ => null
         };
@@ -70,6 +71,19 @@ public partial class DesignerDialogWindow : Window
 
         e.Handled = true;
         Choose(action);
+    }
+
+    private DesignerDialogAction? FocusedAction()
+    {
+        var focusedButton = ActionPanel.Children
+            .OfType<Button>()
+            .FirstOrDefault(button => button.IsKeyboardFocusWithin);
+        return focusedButton?.Tag is string actionId
+            ? _actions.FirstOrDefault(action => string.Equals(
+                action.Id,
+                actionId,
+                StringComparison.Ordinal))
+            : null;
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)

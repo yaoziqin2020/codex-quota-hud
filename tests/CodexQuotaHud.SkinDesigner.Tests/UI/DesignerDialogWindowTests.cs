@@ -99,6 +99,28 @@ public sealed class DesignerDialogWindowTests
         });
     }
 
+    [Theory]
+    [InlineData("copy")]
+    [InlineData("cancel")]
+    public void Window_EnterChoosesEachFocusedNonDefaultAction(string actionId)
+    {
+        RunSta(() =>
+        {
+            var dialog = CreateDialog(
+                new DesignerDialogAction("replace", "Replace", true),
+                new DesignerDialogAction("copy", "Keep copy"),
+                new DesignerDialogAction("cancel", "Cancel", IsCancel: true));
+            dialog.Show();
+            var focused = Action(Actions(dialog), actionId);
+            Assert.True(focused.Focus());
+            Assert.True(focused.IsKeyboardFocusWithin);
+
+            Press(dialog, Key.Enter);
+
+            Assert.Equal(actionId, dialog.SelectedActionId);
+        });
+    }
+
     [Fact]
     public void Window_EscapeChoosesTheExplicitCancelAction()
     {

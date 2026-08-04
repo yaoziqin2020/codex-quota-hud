@@ -36,7 +36,7 @@ public sealed class MainWindowLayoutTests
     }
 
     [Fact]
-    public void MainWindowButton_UsesDesignerTemplateAndKeepsRaisedSurfaceWhenDisabled()
+    public void MainWindowButton_UsesDesignerTemplateWithPressedOffsetAndKeepsRaisedSurfaceWhenDisabled()
     {
         RunSta(() =>
         {
@@ -48,6 +48,21 @@ public sealed class MainWindowLayoutTests
             button.ApplyTemplate();
             var templateRoot = Assert.IsType<Border>(
                 button.Template.FindName("DesignerButtonBorder", button));
+            var normalOffset = Assert.IsType<TranslateTransform>(
+                templateRoot.RenderTransform);
+            var pressedTrigger = Assert.Single(
+                button.Template.Triggers.OfType<Trigger>(),
+                trigger => trigger.Property == Button.IsPressedProperty &&
+                    Equals(trigger.Value, true));
+            var offsetSetter = Assert.Single(
+                pressedTrigger.Setters.OfType<Setter>(),
+                setter => setter.TargetName == "DesignerButtonBorder" &&
+                    setter.Property == UIElement.RenderTransformProperty);
+            var pressedOffset = Assert.IsType<TranslateTransform>(
+                offsetSetter.Value);
+
+            Assert.Equal(0, normalOffset.Y);
+            Assert.Equal(1, pressedOffset.Y);
 
             window.IsEnabled = false;
             window.UpdateLayout();
@@ -399,6 +414,73 @@ public sealed class MainWindowLayoutTests
                 new SkinAnimationSettings(0, .9, .9, 0),
                 window.Editor.Current.Theme.Animation);
             Assert.Equal("明显", status.Text);
+            window.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
+    public void RealWindow_EachPresetPreservesFourTimesThreeSecondsAcrossControlsDraftAndSave()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var paths = new SkinStoragePaths(temporary.Path);
+            var store = new DraftStore(paths);
+            var window = CreateWindow(
+                temporary,
+                out _,
+                draftStore: store);
+            window.AttachPreviewOwnerForTesting();
+            Assert.IsType<Expander>(window.FindName("AnimationSection"))
+                .IsExpanded = true;
+            window.UpdateLayout();
+
+            var speed = Assert.Single(
+                Descendants<Slider>(window),
+                control => Equals(control.Tag, "RefreshSpeedMultiplier"));
+            var hold = Assert.Single(
+                Descendants<Slider>(window),
+                control => Equals(control.Tag, "RefreshHoldSeconds"));
+            speed.Value = 4;
+            hold.Value = 3;
+
+            foreach (var buttonName in new[]
+                     {
+                         "AnimationStillPresetButton",
+                         "AnimationGentlePresetButton",
+                         "AnimationNoticeablePresetButton"
+                     })
+            {
+                Assert.IsType<Button>(window.FindName(buttonName)).RaiseEvent(
+                    new RoutedEventArgs(Button.ClickEvent));
+
+                Assert.Equal(
+                    4,
+                    window.Editor.Current.Theme.Animation.RefreshSpeedMultiplier);
+                Assert.Equal(
+                    3,
+                    window.Editor.Current.Theme.Animation.RefreshHoldSeconds);
+                Assert.Equal(4, speed.Value);
+                Assert.Equal(3, hold.Value);
+                Assert.StartsWith("4.0", Assert.IsType<TextBlock>(
+                    window.FindName("RefreshSpeedValueText")).Text);
+                Assert.StartsWith("3.0", Assert.IsType<TextBlock>(
+                    window.FindName("RefreshHoldValueText")).Text);
+
+                Assert.IsType<Button>(window.FindName("SaveDraftButton"))
+                    .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                PumpUntil(() => window.SaveOperationForTesting.IsCompleted);
+                Assert.True(window.SaveOperationForTesting.IsCompletedSuccessfully);
+                var saved = store.LoadForOpen(window.Editor.Current.DraftId);
+                Assert.NotNull(saved.Document);
+                Assert.Equal(
+                    4,
+                    saved.Document.Theme.Animation.RefreshSpeedMultiplier);
+                Assert.Equal(
+                    3,
+                    saved.Document.Theme.Animation.RefreshHoldSeconds);
+            }
+
             window.DisposeWithoutShowingForTesting();
         });
     }
