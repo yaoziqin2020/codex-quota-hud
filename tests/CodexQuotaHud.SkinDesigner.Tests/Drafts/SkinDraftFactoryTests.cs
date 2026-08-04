@@ -13,7 +13,7 @@ public sealed class SkinDraftFactoryTests
     private static readonly DateTimeOffset NowUtc =
         DateTimeOffset.Parse("2026-08-02T00:00:00Z");
     private static readonly SemanticVersion MinimumHudVersion =
-        SemanticVersion.Parse("1.1.1");
+        SemanticVersion.Parse("1.2.3");
 
     [Fact]
     public void CreateNew_UsesOnlySuppliedIdentityAndExactDraftDefaults()
@@ -36,6 +36,8 @@ public sealed class SkinDraftFactoryTests
         Assert.Equal(MinimumHudVersion, draft.MinimumHudVersion);
         Assert.Null(draft.OriginSkinId);
         Assert.Empty(draft.Assets);
+        Assert.Equal(2d, draft.Theme.Animation.RefreshSpeedMultiplier);
+        Assert.Equal(1.5d, draft.Theme.Animation.RefreshHoldSeconds);
         Assert.Equal(NowUtc, draft.CreatedAtUtc);
         Assert.Equal(NowUtc, draft.UpdatedAtUtc);
     }

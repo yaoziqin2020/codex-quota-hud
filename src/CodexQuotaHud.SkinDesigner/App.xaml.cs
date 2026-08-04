@@ -98,7 +98,7 @@ public partial class App : System.Windows.Application
 internal static class DesignerHudVersion
 {
     private static readonly SemanticVersion RuntimeBaseline =
-        SemanticVersion.Parse("1.2.0");
+        SemanticVersion.Parse("1.2.3");
 
     internal static SemanticVersion Current()
     {

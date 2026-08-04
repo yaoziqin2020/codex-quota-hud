@@ -21,9 +21,12 @@ public sealed class DraftPackageBuilderTests
         var assets = OutputTestFixture.Assets(orderedSlots[..assetCount]);
         var draft = OutputTestFixture.WithReferences(
             OutputTestFixture.CompleteDraft(),
-            assets);
+            assets) with
+        {
+            MinimumHudVersion = SemanticVersion.Parse("1.2.3")
+        };
 
-        var result = new DraftPackageBuilder(OutputTestFixture.HudVersion)
+        var result = new DraftPackageBuilder(SemanticVersion.Parse("1.2.3"))
             .Build(draft, assets);
 
         Assert.True(result.IsValid, Format(result.Errors));
@@ -35,7 +38,12 @@ public sealed class DraftPackageBuilderTests
         Assert.Equal(SemanticVersion.Parse("1.2.3"), request.Manifest.PackageVersion);
         Assert.Equal("A deterministic package", request.Manifest.Description);
         Assert.Equal(draft.MinimumHudVersion, request.Manifest.MinimumHudVersion);
+        Assert.Equal(
+            SemanticVersion.Parse("1.2.3"),
+            request.Manifest.MinimumHudVersion);
         Assert.Equal(draft.Theme, request.Theme);
+        Assert.Equal(2d, request.Theme.Animation.RefreshSpeedMultiplier);
+        Assert.Equal(1.5d, request.Theme.Animation.RefreshHoldSeconds);
         Assert.Null(request.Manifest.OriginSkinId);
         Assert.Empty(request.Manifest.Assets);
         Assert.Equal(

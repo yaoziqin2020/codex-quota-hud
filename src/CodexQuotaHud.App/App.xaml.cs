@@ -461,12 +461,12 @@ public partial class App : System.Windows.Application
     {
           var version = typeof(App).Assembly.GetName().Version;
           var detected = version is null
-              ? SemanticVersion.Parse("1.2.0")
+              ? SemanticVersion.Parse("1.2.3")
             : new SemanticVersion(
                 Math.Max(0, version.Major),
                 Math.Max(0, version.Minor),
                 Math.Max(0, version.Build));
-          var runtimeBaseline = SemanticVersion.Parse("1.2.0");
+          var runtimeBaseline = SemanticVersion.Parse("1.2.3");
         return detected.CompareTo(runtimeBaseline) >= 0
             ? detected
             : runtimeBaseline;

@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.Skins.Contracts;
@@ -12,10 +14,10 @@ public sealed class DesignerDocumentServiceTests
     private static readonly SemanticVersion HudVersion =
         SemanticVersion.Parse("1.1.1");
     private static readonly SemanticVersion TemplateMinimumHudVersion =
-        SemanticVersion.Parse("1.2.0");
+        SemanticVersion.Parse("1.2.3");
 
     [Fact]
-    public void CreateNew_UsesTask11DefaultsAndSuppliedIdentities()
+    public void CreateNew_UsesRefreshDefaultsAndTemplateCompatibility()
     {
         using var temporary = new TemporaryDirectory();
         var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
@@ -27,12 +29,11 @@ public sealed class DesignerDocumentServiceTests
 
         Assert.Empty(result.Errors);
         var draft = Assert.IsType<SkinDraftDocument>(result.Draft);
-        var expected = SkinDraftFactory.CreateNew(
-            draftId,
-            skinId,
-            now,
-            TemplateMinimumHudVersion);
-        Assert.Equal(expected, draft);
+        Assert.Equal(draftId, draft.DraftId);
+        Assert.Equal(skinId, draft.SkinId);
+        Assert.Equal(TemplateMinimumHudVersion, draft.MinimumHudVersion);
+        Assert.Equal(2d, draft.Theme.Animation.RefreshSpeedMultiplier);
+        Assert.Equal(1.5d, draft.Theme.Animation.RefreshHoldSeconds);
         Assert.Empty(result.Assets);
         Assert.False(Directory.Exists(new SkinStoragePaths(
             temporary.Path).DraftsRoot));
@@ -64,8 +65,12 @@ public sealed class DesignerDocumentServiceTests
         var store = new DraftStore(paths);
         await store.SaveNamedAsync(named);
         await store.SaveRecoveryAsync(recovery);
+        var project = new DraftProjectPaths(paths.DraftsRoot, draftId);
+        var legacyRecovery = RemoveRefreshAnimationFields(
+            await File.ReadAllBytesAsync(project.RecoveryPath));
+        await File.WriteAllBytesAsync(project.RecoveryPath, legacyRecovery);
         var owned = Path.Combine(
-            new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
+            project.AssetsRoot,
             "background.png");
         await File.WriteAllBytesAsync(owned, AlphaPng);
         var sut = CreateService(temporary, Guid.NewGuid, () => recovery.UpdatedAtUtc);
@@ -81,10 +86,17 @@ public sealed class DesignerDocumentServiceTests
             recovery.Assets[SkinAssetSlot.Background],
             opened.Assets[SkinAssetSlot.Background]);
         Assert.Equal(TemplateMinimumHudVersion, opened.MinimumHudVersion);
+        Assert.Equal(2d, opened.Theme.Animation.RefreshSpeedMultiplier);
+        Assert.Equal(1.5d, opened.Theme.Animation.RefreshHoldSeconds);
+        Assert.Equal(legacyRecovery, await File.ReadAllBytesAsync(project.RecoveryPath));
         var asset = Assert.Single(result.Assets).Value;
         Assert.Equal(AlphaPng, asset.Content);
         Assert.Equal(1, asset.PixelWidth);
         Assert.Equal(1, asset.PixelHeight);
+
+        await store.SaveRecoveryAsync(opened);
+        AssertCanonicalRefreshAnimation(
+            await File.ReadAllBytesAsync(project.RecoveryPath));
     }
 
     [Fact]
@@ -136,6 +148,7 @@ public sealed class DesignerDocumentServiceTests
         var skinId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
         var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         var package = BuildPackage(temporary, skinId, "Imported Ocean");
+        RemoveRefreshAnimationFieldsFromPackage(package);
         var packageBefore = await File.ReadAllBytesAsync(package);
         var sut = CreateService(
             temporary,
@@ -150,12 +163,41 @@ public sealed class DesignerDocumentServiceTests
         Assert.Equal(skinId, draft.SkinId);
         Assert.Equal("Imported Ocean", draft.DisplayName);
         Assert.Equal(TemplateMinimumHudVersion, draft.MinimumHudVersion);
+        Assert.Equal(2d, draft.Theme.Animation.RefreshSpeedMultiplier);
+        Assert.Equal(1.5d, draft.Theme.Animation.RefreshHoldSeconds);
         Assert.Equal(packageBefore, await File.ReadAllBytesAsync(package));
         Assert.False(Directory.Exists(paths.InstalledSkinsRoot));
         Assert.Single(result.Assets);
         Assert.True(File.Exists(Path.Combine(
             new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
             "background.png")));
+    }
+
+    [Fact]
+    public async Task ImportForEditing_PreservesHigherDeclaredMinimumHudVersion()
+    {
+        using var temporary = new TemporaryDirectory();
+        var skinId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var package = BuildPackage(
+            temporary,
+            skinId,
+            "Future Ocean",
+            minimumHudVersion: SemanticVersion.Parse("2.0.0"));
+        var packageBefore = await File.ReadAllBytesAsync(package);
+        var sut = CreateService(
+            temporary,
+            () => draftId,
+            () => DateTimeOffset.Parse("2026-08-02T03:00:00Z"));
+
+        var result = await sut.ImportForEditingAsync(
+            package,
+            SemanticVersion.Parse("9.0.0"));
+
+        Assert.Empty(result.Errors);
+        var draft = Assert.IsType<SkinDraftDocument>(result.Draft);
+        Assert.Equal(SemanticVersion.Parse("2.0.0"), draft.MinimumHudVersion);
+        Assert.Equal(packageBefore, await File.ReadAllBytesAsync(package));
     }
 
     [Theory]
@@ -341,7 +383,8 @@ public sealed class DesignerDocumentServiceTests
         TemporaryDirectory temporary,
         Guid skinId,
         string displayName,
-        bool includeCenter = false)
+        bool includeCenter = false,
+        SemanticVersion? minimumHudVersion = null)
     {
         var packagePath = Path.Combine(
             temporary.SourceRoot,
@@ -359,7 +402,7 @@ public sealed class DesignerDocumentServiceTests
             SemanticVersion.Parse("2.3.4"),
             "Fixture description",
             defaults.Theme.TemplateId,
-            HudVersion,
+            minimumHudVersion ?? HudVersion,
             OriginSkinId: null,
             Assets: []);
         var assets = new Dictionary<SkinAssetSlot, SkinAsset>
@@ -397,6 +440,61 @@ public sealed class DesignerDocumentServiceTests
         Assert.True(written.IsValid,
             string.Join("; ", written.Errors.Select(error => error.Code)));
         return packagePath;
+    }
+
+    private static byte[] RemoveRefreshAnimationFields(
+        byte[] document,
+        bool draftDocument = true)
+    {
+        var root = Assert.IsType<JsonObject>(JsonNode.Parse(document));
+        var theme = draftDocument
+            ? Assert.IsType<JsonObject>(root["theme"])
+            : root;
+        var animation = Assert.IsType<JsonObject>(theme["animation"]);
+
+        Assert.True(animation.Remove("refreshSpeedMultiplier"));
+        Assert.True(animation.Remove("refreshHoldSeconds"));
+
+        return JsonSerializer.SerializeToUtf8Bytes(root);
+    }
+
+    private static void AssertCanonicalRefreshAnimation(byte[] document)
+    {
+        using var parsed = JsonDocument.Parse(document);
+        Assert.Equal(
+            "1.2.3",
+            parsed.RootElement.GetProperty("minimumHudVersion").GetString());
+        var animation = parsed.RootElement
+            .GetProperty("theme")
+            .GetProperty("animation");
+
+        Assert.Equal(2d, animation.GetProperty("refreshSpeedMultiplier").GetDouble());
+        Assert.Equal(1.5d, animation.GetProperty("refreshHoldSeconds").GetDouble());
+    }
+
+    private static void RemoveRefreshAnimationFieldsFromPackage(string packagePath)
+    {
+        using var archive = ZipFile.Open(packagePath, ZipArchiveMode.Update);
+        var entry = Assert.Single(
+            archive.Entries,
+            candidate => string.Equals(
+                candidate.FullName,
+                "theme.json",
+                StringComparison.Ordinal));
+        byte[] theme;
+        using (var source = entry.Open())
+        using (var buffer = new MemoryStream())
+        {
+            source.CopyTo(buffer);
+            theme = buffer.ToArray();
+        }
+
+        entry.Delete();
+        var replacement = archive.CreateEntry(
+            "theme.json",
+            CompressionLevel.NoCompression);
+        using var destination = replacement.Open();
+        destination.Write(RemoveRefreshAnimationFields(theme, draftDocument: false));
     }
 
     private static void ExtractInstalled(
