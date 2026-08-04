@@ -224,14 +224,10 @@ public sealed class SkinManagementController
     internal bool SynchronizeCatalog(HudSkinCatalogSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        if (!ReplaceCatalogWithFallback(snapshot))
-        {
-            return false;
-        }
-
+        var runtimeSynchronized = ReplaceCatalogWithFallback(snapshot);
         _entries = BuildEntries(snapshot);
         RaiseCatalogChanged();
-        return true;
+        return runtimeSynchronized;
     }
 
     public bool OpenDesigner()
