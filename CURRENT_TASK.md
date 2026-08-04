@@ -1,5 +1,58 @@
 # Current Task
 
+## v1.2.2 skin metadata correction — release candidate verified
+
+The v1.2.2 patch removes the misleading `作者（未验证）` import label and
+derives the effective minimum HUD version from the selected skin template.
+The current `free-decoration-ring` template requires HUD `1.2.0`. New drafts
+use that value automatically; older drafts, installed skins, and packages
+recorded as `1.1.1` are normalized in memory when opened for editing, so their
+next save/apply/export writes the corrected value. Import preview also shows
+the effective template minimum for older packages. The `.cqskin` schema and
+installer structure are unchanged.
+
+Fresh serial Release verification passed Core `75/75`, Skins `335/335`,
+App/UI `609/609`, and Designer `348/348`, totaling `1367/1367` with zero
+skipped. Release build passed with zero warnings and zero errors. Focused tests
+were first observed failing against the old author/minimum-version behavior and
+then passing after the fix.
+
+The v1.2.2 production assets are:
+
+- Setup: `CodexQuotaHud-Setup-v1.2.2.exe` — 100,046,941 bytes — SHA-256
+  `B9BBB5D10377374AF3FA4A8B078DC4C87973682FBFA98A333F49316D04D0A4E9`
+- ZIP: `CodexQuotaHud-v1.2.2-win-x64.zip` — 68,330,913 bytes — SHA-256
+  `F0D0E59BA056E5BB6A05E35E3FA080C1816416C3A304ACAFFCFDCD9631B8A498`
+- `SHA256SUMS.txt` — 196 bytes — SHA-256
+  `97C6A94C9FDE3BEF4422CFD614ACDDCF8928F303598937089C635288D2E299E5`
+
+The ZIP contains exactly the five approved normal-HUD fallback entries and no
+Designer. Setup contains the normal HUD plus the optional Designer. Setup and
+both executables are `NotSigned`. All seven normal isolated installer scenarios
+and both committed-cleanup failure scenarios passed; no installer temp root or
+installer process remained.
+
+The real local v1.2.1-to-v1.2.2 upgrade completed with exit code `0`. Installed
+App and Designer are `1.2.2.0`, report
+`1.2.2+2d53407bca90b580c937f56137872dee178352ff`, and exactly match the
+packaged publish hashes. The uninstall entry is `1.2.2`; startup remains formal
+`--background`; normal and Designer Start-menu shortcuts exist; no normal
+desktop shortcut exists. The maintainer-only Developer Preview shortcut was
+separately restored with `--preview`.
+
+The selected custom skin, animation state, installed-skin payload, Designer
+drafts, recovery data, and preview-window state were retained. The installed
+formal HUD started and refreshed successfully. The installed Designer opened
+with its complete editor/preview surface and closed normally. The exact import
+metadata presentation is covered by the WPF regression test and packaged-binary
+identity; the installed HUD import dialog was not separately opened for a
+visual screenshot.
+
+Release publication is the remaining step: fast-forward `main`, wait for the
+Windows CI gate, create immutable tag `v1.2.2`, publish the three assets, verify
+online hashes/sizes, then record final closeout. Do not alter historical
+v1.2.0 or v1.2.1 tags/assets.
+
 ## v1.2.1 animation correction — released
 
 The user approved a v1.2.1 patch after direct visual inspection in the source

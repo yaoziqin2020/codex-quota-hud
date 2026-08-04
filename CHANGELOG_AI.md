@@ -1,5 +1,43 @@
 # AI Change Log
 
+## 2026-08-04 — v1.2.2 skin metadata correction verified locally
+
+- Replaced the import-preview label `作者（未验证）` with `作者`. Codex Quota
+  HUD currently has no author identity-verification system, so it no longer
+  presents every package author as universally unverified.
+- Added `MinimumHudVersion` to the versioned skin-template contract. The only
+  current template, `free-decoration-ring`, declares its true minimum as HUD
+  `1.2.0`. Import preview displays the effective maximum of the package and
+  template declarations.
+- New Designer drafts derive compatibility from the template. Opening an older
+  draft, editing an installed skin, or importing a package for editing raises
+  an incorrect `1.1.1` declaration to `1.2.0` in memory; the next save, apply,
+  or export persists it. Higher future declarations are not downgraded.
+- Updated the source/debug HUD and Designer runtime baseline to `1.2.0`, while
+  published builds still detect and use their actual assembly version.
+- Added focused regression coverage for the author label, effective import
+  compatibility, template metadata, new-draft generation, and old draft/package
+  normalization. Fresh serial Release verification passed Core `75/75`, Skins
+  `335/335`, App/UI `609/609`, and Designer `348/348` (`1367/1367`, skipped
+  `0`); Release build reported zero warnings and zero errors.
+- Packaged Setup `B9BBB5D10377374AF3FA4A8B078DC4C87973682FBFA98A333F49316D04D0A4E9`
+  (100,046,941 bytes), ZIP
+  `F0D0E59BA056E5BB6A05E35E3FA080C1816416C3A304ACAFFCFDCD9631B8A498`
+  (68,330,913 bytes), and the 196-byte checksum manifest. The ZIP has exactly
+  five approved entries and no Designer; all three binaries are unsigned.
+- All seven normal isolated installer scenarios and both committed-cleanup
+  failure scenarios passed with no residual smoke root/process. The real
+  v1.2.1-to-v1.2.2 upgrade then exited `0`; installed App/Designer match the
+  publish tree and report
+  `1.2.2+2d53407bca90b580c937f56137872dee178352ff`.
+- Retained formal startup, the selected custom skin, installed skin payload,
+  Designer drafts/recovery, and preview state. Restored the maintainer-only
+  `--preview` desktop shortcut separately. The installed formal HUD refreshed;
+  the installed Designer opened and closed normally.
+- Public `main`, tag, Release, online asset verification, and final closeout
+  remain pending at this checkpoint. Historical v1.2.0/v1.2.1 assets are
+  unchanged.
+
 ## 2026-08-04 — v1.2.1 animation correction released
 
 - Reduced the custom quota-ring glow peak from `.15 + .75 * intensity` to

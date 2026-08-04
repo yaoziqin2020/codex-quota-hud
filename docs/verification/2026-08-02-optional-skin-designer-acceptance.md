@@ -4,9 +4,20 @@
 
 This record covers the optional Skin Designer and safe `.cqskin` runtime/import work developed after the public `v1.1.1` release and later published as `v1.2.0`. The `v1.1.1` Setup/ZIP names, sizes, hashes, tag, and release evidence elsewhere in this repository remain historical facts and are not evidence for this feature.
 
-The original Task 18 boundary authorized only an ephemeral internal `0.0.0` build in a unique system-temporary directory. Later user instructions separately authorized GUI acceptance, the production `v1.2.0` package/install, and finally the public `main` fast-forward, tag, and GitHub Release. The current release decision near the end of this record supersedes the original authorization boundary without rewriting historical row results.
+The original Task 18 boundary authorized only an ephemeral internal `0.0.0` build in a unique system-temporary directory. Later user instructions separately authorized GUI acceptance, production packages/installs, and public `main`/tag/GitHub Release work. The current release decisions supersede the original authorization boundary without rewriting historical row results.
 
 Evidence states are `PASS`, `PARTIAL`, `FAIL`, and `NOT RUN`. A row moves to `PASS` only from direct evidence collected for that exact row. Automated PASS cannot make the overall feature acceptance PASS.
+
+## 2026-08-04 v1.2.2 skin metadata correction
+
+| Status | Date/time (Asia/Tokyo) | Command or action | Expected | Observed | Evidence |
+|---|---|---|---|---|---|
+| PASS | 2026-08-04 18:38 +09:00 | Serial Release tests and solution build | All current tests pass with no skips; build has no warnings/errors | Core `75/75`, Skins `335/335`, App/UI `609/609`, Designer `348/348`; total `1367/1367`, skipped `0`; build `0` warnings / `0` errors | Fresh VSTest summaries and build stdout |
+| PASS | 2026-08-04 18:11 +09:00 | `package-release.ps1 -Version 1.2.2` | Setup, normal-only ZIP, and checksums are internally consistent | Setup `B9BBB5D10377374AF3FA4A8B078DC4C87973682FBFA98A333F49316D04D0A4E9`; ZIP `F0D0E59BA056E5BB6A05E35E3FA080C1816416C3A304ACAFFCFDCD9631B8A498`; ZIP has exactly five approved entries | Fresh artifact metadata, archive entry list, and `SHA256SUMS.txt` readback |
+| PASS | 2026-08-04 18:30 +09:00 | Production installer isolated matrix | Seven normal scenarios and two committed-cleanup failure scenarios pass without touching production state | All nine scenarios passed; no smoke root or installer process remained | `scripts/test-installer.ps1` stdout, exit `0`, and checked cleanup postconditions |
+| PASS | 2026-08-04 18:32 +09:00 | Silent real v1.2.1-to-v1.2.2 upgrade with Designer + startup | Exit `0`; install exact payload; preserve user data; no normal desktop shortcut | Exit `0`; App/Designer `1.2.2+2d53407bca90b580c937f56137872dee178352ff`; installed hashes match publish; uninstall entry `1.2.2`; startup `--background`; selected custom skin, skins, drafts, recovery, and preview state retained | Setup log, version/hash reads, HKCU reads, and before/after user-data checks |
+| PASS | 2026-08-04 18:34 +09:00 | Restore maintainer desktop and launch installed apps | Only Developer Preview desktop shortcut uses `--preview`; formal HUD and Designer start normally | Shortcut readback matched; formal HUD refreshed with retained custom skin; installed Designer exposed the complete editor/preview surface and closed normally | `.lnk` COM readback, process/settings evidence, Computer Use screenshot/accessibility tree |
+| PARTIAL | 2026-08-04 18:34 +09:00 | Installed import-metadata visual | Import dialog shows plain author and effective HUD `1.2.0` minimum | Exact WPF regression passes and installed executable matches the tested packaged binary; installed HUD import dialog was not separately opened for a screenshot | Automated UI assertion plus binary identity; direct installed-dialog visual remains `NOT RUN` |
 
 ## 2026-08-04 v1.2.1 animation correction
 

@@ -116,6 +116,40 @@ reopened-draft workflow now reaches overwrite confirmation and the success
 result, and the applied custom-skin directory contains the decoration asset and
 animation parameters from the saved draft.
 
+## v1.2.2 skin metadata correction
+
+The v1.2.2 patch removes the universal `作者（未验证）` label because the
+application has no author identity-verification system. It adds a template-
+owned minimum HUD version to `ISkinTemplate`; the current
+`free-decoration-ring` template declares `1.2.0`. Import preview displays the
+higher of the package declaration and template minimum. The Designer derives
+the value for new drafts and normalizes older drafts/packages in memory without
+downgrading any higher future declaration. The next save/apply/export persists
+the corrected value. No `.cqskin` schema or installer boundary changed.
+
+Serial Release verification is Core `75/75`, Skins `335/335`, App/UI `609/609`,
+and Designer `348/348`, totaling `1367/1367` with zero skipped. Release build
+has zero warnings and zero errors. All nine isolated installer scenarios pass
+and leave no smoke root or installer process.
+
+The production Setup is 100,046,941 bytes with SHA-256
+`B9BBB5D10377374AF3FA4A8B078DC4C87973682FBFA98A333F49316D04D0A4E9`.
+The normal-only ZIP is 68,330,913 bytes with SHA-256
+`F0D0E59BA056E5BB6A05E35E3FA080C1816416C3A304ACAFFCFDCD9631B8A498`.
+`SHA256SUMS.txt` is 196 bytes with SHA-256
+`97C6A94C9FDE3BEF4422CFD614ACDDCF8928F303598937089C635288D2E299E5`.
+
+The maintainer machine was upgraded from v1.2.1 to v1.2.2 with exit code `0`.
+Installed App and Designer match the publish tree and report
+`1.2.2+2d53407bca90b580c937f56137872dee178352ff`. Formal startup, custom-skin
+selection, installed skins, drafts, recovery, and preview state were retained.
+The formal HUD refreshed successfully; the installed Designer opened and
+closed normally. The maintainer desktop again contains only the separately
+restored Developer Preview shortcut with `--preview`.
+
+GitHub publication remains pending at this checkpoint. Historical v1.2.0 and
+v1.2.1 tags and assets must remain immutable.
+
 ## v1.2.1 animation correction
 
 The approved v1.2.1 patch changes only the shared
@@ -208,13 +242,13 @@ It does not call a private web endpoint directly.
 - Public source: GitHub `main`
 - Installed executable:
   `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`
-- Installed release: `v1.2.1`
-- Latest public release: `v1.2.1`
+- Installed release: `v1.2.2`
+- Latest public release: `v1.2.1` (v1.2.2 local candidate verified)
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 
-The real machine currently has the verified `v1.2.1` package code from
-`b1126e3`. It includes the optional Designer, because that component was
+The real machine currently has the verified `v1.2.2` package code from
+`2d53407`. It includes the optional Designer, because that component was
 selected for maintainer acceptance. The maintainer-only desktop Developer
 Preview shortcut is local customization and is not public Setup behavior.
 
