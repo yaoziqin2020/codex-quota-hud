@@ -169,9 +169,11 @@ Idle -> Refreshing -> Hold -> Idle
   clock attached to the old target.
 - A zero-second hold restores idle immediately.
 
-All five built-in skins use a fixed 2.0 multiplier and the global 1.5-second
-hold. Custom skins use their package values. The refresh timing changes only
-presentation; it never delays quota-result publication or changes network work.
+All five built-in skins retain their existing per-skin refresh-speed profiles
+and receive the global 1.5-second hold. They are not flattened to one common
+speed. Custom skins use their package multiplier and hold values, with 2.0 and
+1.5 as the fallback. The refresh timing changes only presentation; it never
+delays quota-result publication or changes network work.
 
 The hold coordinator uses cancellation and an injectable delay/clock boundary
 so a stale completion cannot restore a newly selected skin or a newer refresh
@@ -224,9 +226,10 @@ Automated coverage will prove:
 
 Manual acceptance will open a native file picker and confirm that the disabled
 Designer buttons remain dark. It will also exercise each themed dialog shape
-and visually verify a 2.0× refresh followed by a 1.5-second hold on one built-in
-skin and one custom skin. A deliberately fast refresh must still show the full
-additional 1.5-second accelerated phase before returning smoothly to idle.
+and visually verify the existing accelerated profile followed by a 1.5-second
+hold on one built-in skin, plus a 2.0× refresh followed by the same hold on one
+custom skin. A deliberately fast refresh must still show the full additional
+1.5-second accelerated phase before returning smoothly to idle.
 
 ## Release boundary
 
