@@ -1,6 +1,6 @@
 # AI Change Log
 
-## 2026-08-04 — v1.2.1 animation correction locally verified
+## 2026-08-04 — v1.2.1 animation correction released
 
 - Reduced the custom quota-ring glow peak from `.15 + .75 * intensity` to
   `.15 + .25 * intensity`, while retaining the existing `.08` floor and
@@ -38,6 +38,14 @@
   maintainer desktop was separately restored to only Developer Preview with
   `--preview`. The installed formal HUD refreshed successfully and the
   installed Designer opened and closed normally.
+- Fast-forwarded GitHub `main` without a PR to evidence commit `509314e`.
+  CI run `30888862526` passed restore, `1367/1367` tests, build, ephemeral
+  packaging, and all nine isolated installer scenarios. Created and pushed
+  annotated tag `v1.2.1` at that evidence commit.
+- Published GitHub Release `v1.2.1` as Latest, non-draft, and non-prerelease.
+  Uploaded Setup (100,052,875 bytes), ZIP (68,330,307 bytes), and
+  `SHA256SUMS.txt` (196 bytes). GitHub's online sizes and SHA-256 digests match
+  the local release assets exactly. The v1.2.0 tag and assets were not changed.
 
 ## 2026-08-04 — v1.2.0 released with optional Skin Designer
 

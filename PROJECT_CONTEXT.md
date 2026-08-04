@@ -155,8 +155,14 @@ contains only the separately restored Developer Preview shortcut with
 `--preview`. The selected custom skin, installed skin payload, Designer draft
 and recovery document, and preview-window state were retained. The installed
 formal HUD started and refreshed successfully, and the installed Designer
-opened and closed normally. GitHub `main`, tag, Release, and online-asset
-verification remain pending.
+opened and closed normally.
+
+GitHub `main` was fast-forwarded without a PR to evidence commit
+`509314e88312ab0fee7cab1f26521ee51449cc0b`. CI run `30888862526` passed all
+steps, including the full isolated installer matrix. Annotated tag `v1.2.1`
+points to the evidence commit. The public v1.2.1 Release is Latest, non-draft,
+and non-prerelease; its three online asset sizes and SHA-256 digests match the
+local release files exactly. The v1.2.0 tag and assets were not changed.
 
 ## Product behavior
 
@@ -202,8 +208,8 @@ It does not call a private web endpoint directly.
 - Public source: GitHub `main`
 - Installed executable:
   `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`
-- Installed release candidate: `v1.2.1`
-- Latest public release until publication completes: `v1.2.0`
+- Installed release: `v1.2.1`
+- Latest public release: `v1.2.1`
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 

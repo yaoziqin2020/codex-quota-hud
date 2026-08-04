@@ -1,15 +1,15 @@
 # Current Task
 
-## v1.2.1 animation correction — local release candidate verified
+## v1.2.1 animation correction — released
 
 The user approved a v1.2.1 patch after direct visual inspection in the source
 Designer. The custom quota-ring glow peak is capped below the solid progress
 arc, and decoration floating now has practical travel and timing across the
 existing 0–1 control range. The `.cqskin` schema, current skin parameters,
 installer component boundary, and ordinary-user shortcut behavior are
-unchanged. Production packaging and local upgrade acceptance are complete.
-Push, tag, and GitHub Release remain in progress and must use the new `1.2.1`
-version; the published v1.2.0 assets and tag must remain unchanged.
+unchanged. Production packaging, local upgrade acceptance, `main` integration,
+tag, GitHub Release, and online-asset verification are complete. The published
+v1.2.0 assets and tag remain unchanged.
 
 Serial Release verification passed Core `75/75`, Skins `335/335`, App/UI
 `609/609`, and Designer `348/348`, totaling `1367/1367` with zero skipped.
@@ -52,6 +52,15 @@ installed formal HUD started and refreshed quota successfully. The installed
 Designer opened with the complete editor/preview surface and then closed
 normally. Source Designer motion was visually accepted; the installed
 transparent HUD could not be independently captured as a targetable window.
+
+GitHub `main` was fast-forwarded without a PR to evidence commit
+`509314e88312ab0fee7cab1f26521ee51449cc0b`. CI run
+[`30888862526`](https://github.com/yaoziqin2020/codex-quota-hud/actions/runs/30888862526)
+passed restore, all tests, build, Inno Setup installation, ephemeral packaging,
+and the full isolated installer smoke matrix. Annotated tag `v1.2.1` points to
+that evidence commit. The public GitHub Release is Latest, non-draft, and
+non-prerelease. Its three online asset sizes and SHA-256 digests exactly match
+the local files above; the v1.2.0 Release was not modified.
 
 ## v1.2.0 released — historical baseline
 
@@ -196,15 +205,15 @@ confirmation remains a manual check.
 
 ### Next continuation point
 
-The installed Designer was closed for the final mutex-safe test run. Continue
-from the manual matrix in
+v1.2.1 packaging, local installation, `main` fast-forward, green CI, tag, and
+public GitHub Release are complete. The installed formal HUD is running and the
+installed Designer was closed after launch acceptance. Continue from the manual matrix in
 `docs/verification/2026-08-02-optional-skin-designer-acceptance.md`. Every
 Designer layout/DPI/image/slot rows, fresh install without Designer, component
 removal, uninstall, sign-out, restart, and the real About-window visual row are
-not all complete. Version bump, package/install acceptance, `main` fast-forward,
-tag `v1.2.0`, and the public GitHub Release are complete. Do not move the tag or
-replace the three public assets; any correction must use an explicitly approved
-new version. No PR is needed for this completed release.
+not all complete. Do not move tags or replace the three public v1.2.0/v1.2.1
+assets; any correction must use an explicitly approved new version. No PR is
+needed for this completed release.
 
 If the storage Remove anomaly recurs, first preserve and expose the returned
 error code/location/message and failing temp-root evidence; do not add retries,

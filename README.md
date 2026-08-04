@@ -296,7 +296,7 @@ two-direction handoff remains an optional manual UI check.
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
 
-`v1.2.0` 的标签与发布资产保持不变。动画修正版使用新的 `v1.2.1` 版本；
+动画修正版已从标签 `v1.2.1` 公开发布，`v1.2.0` 的标签与发布资产保持不变。
 不要用已有版本号生成不同二进制，也不要移动历史标签或替换历史 Release 资产。
 
 ## 项目结构 / Project Structure
@@ -339,6 +339,8 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 
 v1.2.1 的七个隔离安装/升级/组件/卸载场景及两个已提交清理失败场景全部通过。
 本机 v1.2.0 到 v1.2.1 升级、安装文件一致性、启动项、快捷方式和用户数据保留均已核对。
+GitHub `main` 的发布门槛 CI 全绿；v1.2.1 是 Latest、非草稿、非预发布，Setup、ZIP
+与 `SHA256SUMS.txt` 的线上大小和 SHA-256 均与本地发布文件一致。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and
 total `388/388`; the Release build completed with zero warnings and zero
