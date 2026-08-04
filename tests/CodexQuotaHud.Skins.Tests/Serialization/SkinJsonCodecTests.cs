@@ -241,8 +241,8 @@ public sealed class SkinJsonCodecTests
         var manifestBytes = SkinJsonCodec.WriteManifest(manifest);
         var themeBytes = SkinJsonCodec.WriteTheme(theme);
 
-        Assert.Equal(Utf8(CanonicalManifestJson), manifestBytes);
-        Assert.Equal(Utf8(CanonicalThemeJson), themeBytes);
+        Assert.Equal(Utf8(CanonicalManifestJson.ReplaceLineEndings("\n")), manifestBytes);
+        Assert.Equal(Utf8(CanonicalThemeJson.ReplaceLineEndings("\n")), themeBytes);
         Assert.DoesNotContain((byte)'\r', manifestBytes);
         Assert.DoesNotContain((byte)'\r', themeBytes);
         Assert.False(manifestBytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }));

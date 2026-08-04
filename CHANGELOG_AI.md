@@ -118,6 +118,10 @@
   ephemeral `0.0.0` candidate. The runner still builds and smoke-tests the full
   production package structure, but no longer gives current-source CI output a
   previously released version number.
+- Fixed the Windows CI-only canonical JSON assertion: C# raw-string expected
+  values inherited CRLF from checkout while the serializer correctly emitted
+  canonical LF. The test now normalizes only its expected multiline strings to
+  LF before byte comparison; production serialization is unchanged.
 
 ## 2026-08-03 — Unreleased optional Skin Designer automated handoff
 

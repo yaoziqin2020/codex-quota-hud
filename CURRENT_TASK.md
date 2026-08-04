@@ -38,6 +38,12 @@ release files. Public `v1.1.1` assets were not replaced. Main-branch CI now
 uses version `0.0.0` for its ephemeral package/smoke candidate instead of
 mislabeling current source as `1.1.1`.
 
+The first post-merge Windows CI run exposed one checkout-dependent test
+failure: raw-string canonical JSON expectations inherited CRLF while the
+serializer correctly emitted LF. The test expectation now explicitly
+normalizes to LF; production serialization and published binaries are
+unchanged. The replacement CI run is the verification gate for this fix.
+
 The local `v1.2.0` Setup upgrade completed with exit code `0`. Installed App
 and Designer binaries are version `1.2.0.0`; both report product version
 `1.2.0+7393ffc4983d03552314295fe74061781e0b1318`, and installed binaries
