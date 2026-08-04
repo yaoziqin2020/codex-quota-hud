@@ -1,6 +1,6 @@
 # AI Change Log
 
-## 2026-08-04 — v1.2.2 skin metadata correction verified locally
+## 2026-08-04 — v1.2.2 skin metadata correction released
 
 - Replaced the import-preview label `作者（未验证）` with `作者`. Codex Quota
   HUD currently has no author identity-verification system, so it no longer
@@ -34,9 +34,16 @@
   Designer drafts/recovery, and preview state. Restored the maintainer-only
   `--preview` desktop shortcut separately. The installed formal HUD refreshed;
   the installed Designer opened and closed normally.
-- Public `main`, tag, Release, online asset verification, and final closeout
-  remain pending at this checkpoint. Historical v1.2.0/v1.2.1 assets are
-  unchanged.
+- Fast-forwarded `main` without a PR to release-evidence commit `29b9475`.
+  CI run `30897439435` passed on attempt 2, including `1367/1367` tests,
+  build, ephemeral packaging, and all nine installer scenarios. Attempt 1
+  timed out only in an unrelated local-control test's final cleanup after its
+  production assertions; its exact local regression set passed `10/10` before
+  the complete successful rerun.
+- Created annotated tag `v1.2.2` at `29b9475` and published the GitHub Release
+  as Latest, non-draft, and non-prerelease. All three online asset names, sizes,
+  and SHA-256 digests match the local production files exactly. Historical
+  v1.2.0/v1.2.1 tags and assets are unchanged.
 
 ## 2026-08-04 — v1.2.1 animation correction released
 

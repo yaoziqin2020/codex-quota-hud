@@ -147,8 +147,18 @@ The formal HUD refreshed successfully; the installed Designer opened and
 closed normally. The maintainer desktop again contains only the separately
 restored Developer Preview shortcut with `--preview`.
 
-GitHub publication remains pending at this checkpoint. Historical v1.2.0 and
-v1.2.1 tags and assets must remain immutable.
+GitHub `main` passed the complete release gate at evidence commit
+`29b9475e75247e7880d97b9103fb36b8d5232e90`. CI run `30897439435` succeeded
+on attempt 2 after restore, all `1367/1367` tests, build, ephemeral packaging,
+and all nine installer scenarios. Attempt 1 had timed out only while an
+unrelated local-control test awaited final cleanup after its production
+assertions; the exact local regression set passed `10/10` before the clean
+rerun.
+
+Annotated tag `v1.2.2` points to the evidence commit. The public v1.2.2 Release
+is Latest, non-draft, and non-prerelease. Its Setup, ZIP, and checksum-file
+names, sizes, and online SHA-256 digests exactly match the local release files.
+Historical v1.2.0 and v1.2.1 tags and assets remain unchanged.
 
 ## v1.2.1 animation correction
 
@@ -243,7 +253,7 @@ It does not call a private web endpoint directly.
 - Installed executable:
   `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`
 - Installed release: `v1.2.2`
-- Latest public release: `v1.2.1` (v1.2.2 local candidate verified)
+- Latest public release: `v1.2.2`
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 

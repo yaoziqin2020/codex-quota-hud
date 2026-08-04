@@ -290,7 +290,7 @@ dotnet run --project .\src\CodexQuotaHud.App -- --preview
 
 On the maintainer's machine, a separately created **Codex Quota HUD Developer
 Preview** shortcut performs the opposite handoff: it closes installed mode
-before the preview HUD and control window open. The installed `v1.2.0` build exits through its normal cleanup
+before the preview HUD and control window open. The installed build exits through its normal cleanup
 path. Older builds use a fallback only when the running executable resolves to
 the exact standard installation path above; a same-name process at any other
 path is never force-closed. If replacement cannot be completed, the shortcut
@@ -347,9 +347,9 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 `result.Errors` 的存储删除失败，因此验证记录仍保留这项未解决的历史异常。详见
 [`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
 
-v1.2.1 的七个隔离安装/升级/组件/卸载场景及两个已提交清理失败场景全部通过。
-本机 v1.2.0 到 v1.2.1 升级、安装文件一致性、启动项、快捷方式和用户数据保留均已核对。
-GitHub `main` 的发布门槛 CI 全绿；v1.2.1 是 Latest、非草稿、非预发布，Setup、ZIP
+v1.2.2 的七个隔离安装/升级/组件/卸载场景及两个已提交清理失败场景全部通过。
+本机 v1.2.1 到 v1.2.2 升级、安装文件一致性、启动项、快捷方式和用户数据保留均已核对。
+GitHub `main` 的发布门槛 CI 全绿；v1.2.2 是 Latest、非草稿、非预发布，Setup、ZIP
 与 `SHA256SUMS.txt` 的线上大小和 SHA-256 均与本地发布文件一致。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and

@@ -1,6 +1,6 @@
 # Current Task
 
-## v1.2.2 skin metadata correction — release candidate verified
+## v1.2.2 skin metadata correction — released
 
 The v1.2.2 patch removes the misleading `作者（未验证）` import label and
 derives the effective minimum HUD version from the selected skin template.
@@ -48,10 +48,20 @@ metadata presentation is covered by the WPF regression test and packaged-binary
 identity; the installed HUD import dialog was not separately opened for a
 visual screenshot.
 
-Release publication is the remaining step: fast-forward `main`, wait for the
-Windows CI gate, create immutable tag `v1.2.2`, publish the three assets, verify
-online hashes/sizes, then record final closeout. Do not alter historical
-v1.2.0 or v1.2.1 tags/assets.
+GitHub `main` was fast-forwarded without a PR to release-evidence commit
+`29b9475e75247e7880d97b9103fb36b8d5232e90`. CI run
+[`30897439435`](https://github.com/yaoziqin2020/codex-quota-hud/actions/runs/30897439435)
+passed on attempt 2: restore, `1367/1367` tests, build, Inno Setup installation,
+ephemeral packaging, and all nine isolated installer scenarios completed
+successfully. Attempt 1 had already completed its production assertions before
+an unrelated local-control test timed out during final cleanup; the exact local
+test then passed `10/10` before the successful complete rerun.
+
+Annotated tag `v1.2.2` points to the evidence commit. The public
+[GitHub Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.2)
+is Latest, non-draft, and non-prerelease. Its three online asset names, sizes,
+and SHA-256 digests exactly match the local files above. Historical v1.2.0 and
+v1.2.1 tags and assets were not modified.
 
 ## v1.2.1 animation correction — released
 
