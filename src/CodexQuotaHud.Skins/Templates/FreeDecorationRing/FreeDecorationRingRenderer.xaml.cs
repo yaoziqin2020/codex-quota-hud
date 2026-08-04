@@ -23,7 +23,6 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
     private readonly SlotTransforms _backgroundTransforms;
     private readonly SlotTransforms _centerTransforms;
     private readonly SlotTransforms _decorationTransforms;
-    private readonly double _primaryProgressBaseOpacity;
     private bool _animationsStarted;
 
     internal FreeDecorationRingRenderer(SkinPackageDocument package)
@@ -50,7 +49,6 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         _decorationTransforms = ApplyTransform(DecorationImage, theme.Decoration);
 
         ApplyTheme(theme);
-        _primaryProgressBaseOpacity = PrimaryProgress.Opacity;
         ConfigureAnimations(theme.Animation);
     }
 
@@ -118,12 +116,24 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
 
         var primaryColor = ParseColor(theme.PrimaryRingColor);
         var secondaryColor = ParseColor(theme.SecondaryRingColor);
+        var glowColor = ParseColor(theme.GlowColor);
         PrimaryTrack.Stroke = CreateTrackBrush(primaryColor);
         SecondaryTrack.Stroke = CreateTrackBrush(secondaryColor);
         PrimaryProgress.Stroke = CreateFrozenBrush(primaryColor);
         SecondaryProgress.Stroke = CreateFrozenBrush(secondaryColor);
+        AnimatedGlow.Stroke = CreateFrozenBrush(glowColor);
+        AnimatedGlow.Effect = new DropShadowEffect
+        {
+            Color = glowColor,
+            BlurRadius = 18,
+            ShadowDepth = 0,
+            Opacity = theme.GlowIntensity
+        };
 
         SetRingMetrics(PrimaryTrack, PrimaryProgress, theme.RingDiameter, theme);
+        AnimatedGlow.Width = theme.RingDiameter;
+        AnimatedGlow.Height = theme.RingDiameter;
+        AnimatedGlow.StrokeThickness = theme.RingThickness;
         var secondaryDiameter = Math.Max(
             2 * theme.RingThickness,
             theme.RingDiameter -
@@ -296,16 +306,11 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
 
         if (settings.BreathingIntensity > 0)
         {
-            var peak = _centerTransforms.BaseScale *
-                (1 + (0.08 * settings.BreathingIntensity));
-            var scaleX = CreatePulse(
+            var range = FreeDecorationRingMotionProfile.Breathing(
                 _centerTransforms.BaseScale,
-                peak,
                 settings.BreathingIntensity);
-            var scaleY = CreatePulse(
-                _centerTransforms.BaseScale,
-                peak,
-                settings.BreathingIntensity);
+            var scaleX = CreatePulse(range);
+            var scaleY = CreatePulse(range);
             var storyboard = new Storyboard();
             storyboard.Children.Add(scaleX);
             storyboard.Children.Add(scaleY);
@@ -327,11 +332,9 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         if (settings.GlowIntensity > 0)
         {
             var glow = CreatePulse(
-                Math.Max(0.45, 1 - (0.25 * settings.GlowIntensity)),
-                1,
-                settings.GlowIntensity);
+                FreeDecorationRingMotionProfile.Glow(settings.GlowIntensity));
             _animationTracks.Add(CreateTrack(
-                PrimaryProgress,
+                AnimatedGlow,
                 OpacityProperty,
                 glow,
                 settings.GlowIntensity));
@@ -339,10 +342,10 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
 
         if (settings.FloatingIntensity > 0)
         {
-            var floating = CreatePulse(
+            var floating = CreatePulse(new AnimationRange(
                 _decorationTransforms.BaseY - (2 * settings.FloatingIntensity),
                 _decorationTransforms.BaseY + (2 * settings.FloatingIntensity),
-                settings.FloatingIntensity);
+                2.5 / settings.FloatingIntensity));
             _animationTracks.Add(CreateTrack(
                 _decorationTransforms.Translate,
                 TranslateTransform.YProperty,
@@ -351,15 +354,12 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         }
     }
 
-    private static DoubleAnimation CreatePulse(
-        double from,
-        double to,
-        double intensity) =>
+    private static DoubleAnimation CreatePulse(AnimationRange range) =>
         new()
         {
-            From = from,
-            To = to,
-            Duration = TimeSpan.FromSeconds(2.5 / Math.Max(intensity, 0.01)),
+            From = range.From,
+            To = range.To,
+            Duration = TimeSpan.FromSeconds(range.HalfCycleSeconds),
             AutoReverse = true,
             RepeatBehavior = RepeatBehavior.Forever,
             EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
@@ -476,8 +476,8 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         Reset(_backgroundTransforms);
         Reset(_centerTransforms);
         Reset(_decorationTransforms);
-        PrimaryProgress.BeginAnimation(OpacityProperty, null);
-        PrimaryProgress.Opacity = _primaryProgressBaseOpacity;
+        AnimatedGlow.BeginAnimation(OpacityProperty, null);
+        AnimatedGlow.Opacity = 0;
     }
 
     private static void Reset(SlotTransforms transforms)

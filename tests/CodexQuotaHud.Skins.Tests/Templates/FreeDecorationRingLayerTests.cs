@@ -366,6 +366,11 @@ public sealed class FreeDecorationRingLayerTests
                 Assert.Equal(1, renderer.AnimationTrackCount);
                 renderer.ApplyAnimationState(CustomSkinAnimationState.Refreshing, true);
                 AssertAnimationSources(renderer, channel, expectedAnimated: true);
+                Assert.False(DependencyPropertyHelper
+                    .GetValueSource(
+                        renderer.PrimaryProgress,
+                        UIElement.OpacityProperty)
+                    .IsAnimated);
 
                 if (stopWithHidden)
                 {
@@ -451,6 +456,7 @@ public sealed class FreeDecorationRingLayerTests
         AssertTransform(renderer.BackgroundImage, 0, 0, 1, 0, 1);
         AssertTransform(renderer.CenterImage, 0, 0, 1, 0, 1);
         AssertTransform(renderer.DecorationImage, 0, 0, 1, 0, 1);
+        Assert.Equal(0, renderer.AnimatedGlow.Opacity);
     }
 
     private static SkinAnimationSettings CreateAnimationSettings(
@@ -536,9 +542,9 @@ public sealed class FreeDecorationRingLayerTests
             [AnimationChannel.Glow] =
             [
                 new AnimationProperty(
-                    renderer.PrimaryProgress,
+                    renderer.AnimatedGlow,
                     UIElement.OpacityProperty,
-                    1)
+                    0)
             ],
             [AnimationChannel.Floating] =
             [

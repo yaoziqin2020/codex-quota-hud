@@ -32,6 +32,8 @@
                  Fill="Transparent" IsHitTestVisible="False" />
         <local:FreeDecorationRingArc x:Name="SecondaryProgress"
                  Panel.ZIndex="41" IsHitTestVisible="False" />
+        <Ellipse x:Name="AnimatedGlow" Panel.ZIndex="49"
+                 Fill="Transparent" Opacity="0" IsHitTestVisible="False" />
         <Ellipse x:Name="PrimaryTrack" Panel.ZIndex="50"
                  Fill="Transparent" IsHitTestVisible="False" />
         <local:FreeDecorationRingArc x:Name="PrimaryProgress"
