@@ -1,0 +1,83 @@
+<Window x:Class="CodexQuotaHud.SkinDesigner.UI.Dialogs.DesignerDialogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Name="DialogWindow"
+        Width="520"
+        MinWidth="380"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource DesignerSurfaceBrush}"
+        Foreground="{DynamicResource DesignerTextBrush}"
+        Closing="OnClosing"
+        PreviewKeyDown="OnPreviewKeyDown">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../DesignerTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    <Border Margin="1"
+            Padding="24"
+            Background="{DynamicResource DesignerSurfaceBrush}"
+            BorderBrush="{DynamicResource DesignerBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="44" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Row="0"
+                    Grid.RowSpan="2"
+                    Grid.Column="0"
+                    Width="32"
+                    Height="32"
+                    Margin="0,2,12,0"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Background="{DynamicResource DesignerRaisedBrush}"
+                    BorderBrush="{DynamicResource DesignerAccentBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16">
+                <TextBlock x:Name="DialogIcon"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource DesignerAccentBrush}" />
+            </Border>
+
+            <TextBlock x:Name="DialogTitle"
+                       Grid.Row="0"
+                       Grid.Column="1"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource DesignerTextBrush}"
+                       TextWrapping="Wrap" />
+
+            <TextBlock x:Name="DialogMessage"
+                       Grid.Row="1"
+                       Grid.Column="1"
+                       Margin="0,10,0,0"
+                       Foreground="{DynamicResource DesignerMutedTextBrush}"
+                       TextWrapping="Wrap" />
+
+            <StackPanel x:Name="ActionPanel"
+                        Grid.Row="2"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        Margin="0,24,0,0"
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal" />
+        </Grid>
+    </Border>
+</Window>
