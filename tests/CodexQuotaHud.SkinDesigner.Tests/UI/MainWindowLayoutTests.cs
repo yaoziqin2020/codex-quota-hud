@@ -404,6 +404,65 @@ public sealed class MainWindowLayoutTests
     }
 
     [Fact]
+    public void RealWindow_ProvidesOneAccessibleRefreshControlForEachLivePreviewSetting()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var window = CreateWindow(temporary, out _);
+            window.AttachPreviewOwnerForTesting();
+            Assert.IsType<Expander>(window.FindName("AnimationSection"))
+                .IsExpanded = true;
+            window.ApplyTemplate();
+            window.UpdateLayout();
+
+            var speed = Assert.Single(
+                Descendants<Slider>(window),
+                control => Equals(control.Tag, "RefreshSpeedMultiplier"));
+            var hold = Assert.Single(
+                Descendants<Slider>(window),
+                control => Equals(control.Tag, "RefreshHoldSeconds"));
+
+            Assert.Equal(SkinPackageLimits.MinimumRefreshSpeedMultiplier,
+                speed.Minimum);
+            Assert.Equal(SkinPackageLimits.MaximumRefreshSpeedMultiplier,
+                speed.Maximum);
+            Assert.Equal(SkinPackageLimits.MinimumRefreshHoldSeconds,
+                hold.Minimum);
+            Assert.Equal(SkinPackageLimits.MaximumRefreshHoldSeconds,
+                hold.Maximum);
+            Assert.Equal(0.1, speed.SmallChange, precision: 6);
+            Assert.Equal(0.1, hold.SmallChange, precision: 6);
+            Assert.Equal("刷新速度", AutomationProperties.GetName(speed));
+            Assert.Equal("加速延续", AutomationProperties.GetName(hold));
+            Assert.Equal("2.0×", Assert.IsType<TextBlock>(
+                window.FindName("RefreshSpeedValueText")).Text);
+            Assert.Equal("1.5 秒", Assert.IsType<TextBlock>(
+                window.FindName("RefreshHoldValueText")).Text);
+
+            foreach (var value in new[] { 0d, 2d, 4d })
+            {
+                speed.Value = value;
+                Assert.Equal(
+                    value,
+                    window.Editor.Current.Theme.Animation.RefreshSpeedMultiplier);
+            }
+
+            hold.Value = 3;
+            Assert.Equal(3, window.Editor.Current.Theme.Animation.RefreshHoldSeconds);
+
+            speed.Maximum = 5;
+            speed.Value = 4.5;
+
+            Assert.Equal(4, window.Editor.Current.Theme.Animation.RefreshSpeedMultiplier);
+            Assert.Equal(4, speed.Value);
+            Assert.NotNull(speed.ToolTip);
+            Assert.Same(Brushes.OrangeRed, speed.BorderBrush);
+            window.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
     public void RealWindow_UsesTwoReadableSyntheticRowsAtMinimumWidth()
     {
         RunSta(() =>
@@ -500,7 +559,7 @@ public sealed class MainWindowLayoutTests
                 Assert.False(string.IsNullOrWhiteSpace(
                     AutomationProperties.GetName(control))));
             var tabIndexes = controls.Select(KeyboardNavigation.GetTabIndex).ToArray();
-            Assert.Equal(Enumerable.Range(1, 60), tabIndexes);
+            Assert.Equal(Enumerable.Range(1, 62), tabIndexes);
             Assert.Equal(
                 "图片变换目标",
                 AutomationProperties.GetName(controls[15]));
@@ -509,10 +568,10 @@ public sealed class MainWindowLayoutTests
                 AutomationProperties.GetName(controls[23]));
             Assert.Equal(
                 "额度显示模式",
-                AutomationProperties.GetName(controls[44]));
+                AutomationProperties.GetName(controls[46]));
             Assert.Equal(
                 "保存草稿",
-                AutomationProperties.GetName(controls[57]));
+                AutomationProperties.GetName(controls[59]));
             var projectName = Assert.IsType<TextBox>(
                 window.FindName("ProjectNameTextBox"));
             var displayName = Assert.IsType<TextBox>(

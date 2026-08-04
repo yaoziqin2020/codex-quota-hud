@@ -868,6 +868,10 @@ public partial class MainWindow : Window, IDesignerWindow
                 Editor.Animation.SetGlowIntensity(e.NewValue),
             "FloatingIntensity" =>
                 Editor.Animation.SetFloatingIntensity(e.NewValue),
+            "RefreshSpeedMultiplier" =>
+                Editor.Animation.SetRefreshSpeedMultiplier(e.NewValue),
+            "RefreshHoldSeconds" =>
+                Editor.Animation.SetRefreshHoldSeconds(e.NewValue),
             _ => new EditorMutationResult(false, [])
         };
         PresentMutationResult(slider, result);
@@ -1024,6 +1028,8 @@ public partial class MainWindow : Window, IDesignerWindow
                 "BreathingIntensity" => theme.Animation.BreathingIntensity,
                 "AnimationGlowIntensity" => theme.Animation.GlowIntensity,
                 "FloatingIntensity" => theme.Animation.FloatingIntensity,
+                "RefreshSpeedMultiplier" => theme.Animation.RefreshSpeedMultiplier,
+                "RefreshHoldSeconds" => theme.Animation.RefreshHoldSeconds,
                 _ => slider.Value
             };
         }

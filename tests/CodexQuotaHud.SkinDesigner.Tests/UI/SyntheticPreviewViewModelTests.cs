@@ -65,6 +65,22 @@ public sealed class SyntheticPreviewViewModelTests
         Assert.Equal(0, session.WeeklyChanges);
     }
 
+    [Fact]
+    public void RefreshToggle_UsesTheSharedPreviewSessionForHoldAndRestart()
+    {
+        var session = new RecordingPreviewSession();
+        using var sut = new SyntheticPreviewViewModel(
+            session,
+            animationsAllowed: () => true);
+
+        sut.IsRefreshing = true;
+        sut.IsRefreshing = false;
+        sut.IsRefreshing = true;
+
+        Assert.Equal([true, false, true], session.RefreshingValues);
+        Assert.True(sut.IsRefreshing);
+    }
+
     private sealed class RecordingPreviewSession : ISyntheticPreviewSession
     {
         public PreviewDisplayChoice DisplayChoice { get; private set; } =
@@ -85,6 +101,8 @@ public sealed class SyntheticPreviewViewModelTests
         public bool AnimationsEnabled { get; private set; } = true;
 
         public bool IsRefreshing { get; private set; }
+
+        public List<bool> RefreshingValues { get; } = [];
 
         public List<EdgeDockSide> Edges { get; } = [];
 
@@ -114,7 +132,11 @@ public sealed class SyntheticPreviewViewModelTests
 
         public void SetAnimationsEnabled(bool value) => AnimationsEnabled = value;
 
-        public void SetRefreshing(bool value) => IsRefreshing = value;
+        public void SetRefreshing(bool value)
+        {
+            IsRefreshing = value;
+            RefreshingValues.Add(value);
+        }
 
         public void PreviewEdge(EdgeDockSide side) => Edges.Add(side);
 

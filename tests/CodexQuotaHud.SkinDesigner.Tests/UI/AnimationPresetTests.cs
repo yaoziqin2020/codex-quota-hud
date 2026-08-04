@@ -1,3 +1,4 @@
+using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.UI;
 using CodexQuotaHud.Skins.Contracts;
 
@@ -53,4 +54,68 @@ public sealed class AnimationPresetTests
             "柔和",
             AnimationPresets.DisplayName(settings, hasDecoration: true));
     }
+
+    [Theory]
+    [InlineData("speed", 0d, "$.animation.refreshSpeedMultiplier")]
+    [InlineData("speed", 4d, "$.animation.refreshSpeedMultiplier")]
+    [InlineData("hold", 0d, "$.animation.refreshHoldSeconds")]
+    [InlineData("hold", 3d, "$.animation.refreshHoldSeconds")]
+    public void RefreshAnimationEditors_ValidateBoundsAndPublishDirtyPreviewDrafts(
+        string field,
+        double value,
+        string errorLocation)
+    {
+        var timestamp = DateTimeOffset.Parse("2026-08-04T00:00:00Z");
+        var session = new SkinDraftSession(
+            SkinDraftFactory.CreateNew(
+                Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                timestamp,
+                SemanticVersion.Parse("1.2.3")),
+            () => timestamp = timestamp.AddSeconds(1));
+        var previewed = new List<SkinDraftDocument>();
+        using var sut = new DesignerViewModel(session, previewed.Add);
+        var beforeRevision = session.Current.Revision;
+
+        Assert.False(session.HasUnsavedChanges);
+        var accepted = field == "speed"
+            ? sut.Animation.SetRefreshSpeedMultiplier(value)
+            : sut.Animation.SetRefreshHoldSeconds(value);
+
+        Assert.True(accepted.Succeeded, Format(accepted.Errors));
+        Assert.True(session.HasUnsavedChanges);
+        Assert.Equal(beforeRevision + 1, session.Current.Revision);
+        Assert.Single(previewed);
+        Assert.Equal(
+            value,
+            field == "speed"
+                ? session.Current.Theme.Animation.RefreshSpeedMultiplier
+                : session.Current.Theme.Animation.RefreshHoldSeconds);
+        Assert.Equal(session.Current, previewed[0]);
+
+        var revision = session.Current.Revision;
+        foreach (var invalid in new[]
+                 {
+                     -0.001d,
+                     field == "speed" ? 4.001d : 3.001d,
+                     double.NaN,
+                     double.PositiveInfinity,
+                     double.NegativeInfinity
+                 })
+        {
+            var rejected = field == "speed"
+                ? sut.Animation.SetRefreshSpeedMultiplier(invalid)
+                : sut.Animation.SetRefreshHoldSeconds(invalid);
+
+            Assert.False(rejected.Succeeded);
+            Assert.Contains(rejected.Errors, error =>
+                error.Location == errorLocation);
+            Assert.Equal(revision, session.Current.Revision);
+            Assert.Single(previewed);
+        }
+    }
+
+    private static string Format(IReadOnlyList<SkinValidationError> errors) =>
+        string.Join("; ", errors.Select(error =>
+            $"{error.Code}@{error.Location}"));
 }

@@ -143,6 +143,12 @@ public sealed class AnimationEditorViewModel(
     public EditorMutationResult SetFloatingIntensity(double value) =>
         Update(animation => animation with { FloatingIntensity = value });
 
+    public EditorMutationResult SetRefreshSpeedMultiplier(double value) =>
+        Update(animation => animation with { RefreshSpeedMultiplier = value });
+
+    public EditorMutationResult SetRefreshHoldSeconds(double value) =>
+        Update(animation => animation with { RefreshHoldSeconds = value });
+
     internal void NotifyStateChanged()
     {
         PropertyChanged?.Invoke(
