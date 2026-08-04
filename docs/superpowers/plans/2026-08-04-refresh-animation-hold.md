@@ -260,6 +260,12 @@ both properties, and confirm the package declares HUD v1.2.3.
 
 Use the repository's documented v1.2.2 packaging workflow with version changed to v1.2.3. Verify Setup excludes developer tooling unless selected, ZIP behavior remains documented, installed App/Designer report 1.2.3, startup/formal HUD remains correct, and the Designer dialog plan's acceptance is also complete.
 
-- [ ] **Step 5: Record exact evidence and release**
+- [ ] **Step 5: Record exact local evidence and stop for user acceptance**
 
-Update project handoff documents with pass/fail/not-run evidence. Commit only intended files, push `main`, create annotated tag `v1.2.3`, upload verified artifacts to the GitHub release, and confirm the final CI run succeeds. Never stage `tmp/`.
+Update project handoff documents with pass/fail/not-run evidence and commit only
+intended files. Install the verified v1.2.3 candidate locally, complete the
+Agent-owned smoke checks, and hand it to the user for practical acceptance.
+Never stage `tmp/`. Do not push, move `main`, create tag `v1.2.3`, upload
+artifacts, or publish a GitHub Release until the user explicitly confirms the
+installed candidate is accepted. After that confirmation, perform those remote
+release actions and confirm the final CI run succeeds.
