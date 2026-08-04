@@ -46,10 +46,10 @@ public static class SkinDraftFactory
             TextWeight: SkinTextWeight.SemiBold,
             TextPlacement: SkinTextPlacement.NumberAboveLabel,
             Animation: new SkinAnimationSettings(
-                RotationIntensity: 0.25,
-                BreathingIntensity: 0.5,
-                GlowIntensity: 0.75,
-                FloatingIntensity: 1));
+                RotationIntensity: 0,
+                BreathingIntensity: 0.55,
+                GlowIntensity: 0.65,
+                FloatingIntensity: 0));
 
         return new SkinDraftDocument(
             DraftSchemaVersion: 1,
