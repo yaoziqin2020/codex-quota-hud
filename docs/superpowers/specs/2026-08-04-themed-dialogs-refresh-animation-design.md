@@ -25,7 +25,10 @@ animation-programming environment:
   warning, and failure dialogs.
 - Native Windows file-open and file-save pickers remain native.
 - A global 1.5-second post-refresh hold for all five built-in skins.
-- Refresh speed and hold settings for custom skins.
+- An automatic 2.0× / 1.5-second fallback for existing custom skins, without
+  requiring migration, re-export, or reinstallation of those skin packages.
+- Refresh speed and hold authoring settings for new or subsequently edited
+  custom skins.
 - Backward-compatible defaults for custom skins that predate the new fields.
 - Live Designer preview of the refresh and post-refresh-hold phases.
 - Serialization, validation, runtime, Designer, and regression tests.
@@ -100,6 +103,13 @@ synthetic-preview checkbox remains the direct preview trigger:
   configured hold time;
 - after the hold, preview animation returns to ordinary speed.
 
+These controls are an authoring option, not a prerequisite for receiving the
+runtime correction. A newly created skin can be tuned while its refresh state
+is previewed. An older installed or imported skin also receives the 2.0× /
+1.5-second fallback immediately in the upgraded HUD; if an author later opens
+that skin in the new Designer, the same controls become available and the
+chosen values are persisted on its next save, apply, or export.
+
 ### Contract and compatibility
 
 `SkinAnimationSettings` gains two values represented in `theme.json` as:
@@ -123,7 +133,9 @@ Validation accepts `refreshSpeedMultiplier` from 1.0 through 4.0 and
 When either field is absent, the reader supplies 2.0 and 1.5 respectively.
 Therefore existing installed skins and old `.cqskin` files receive the newly
 approved 1.5-second hold after the HUD upgrade. New drafts use the same values.
-The writer emits both fields for newly saved, applied, or exported skins.
+No existing skin package has to be rewritten. The writer emits both fields for
+newly saved skins and for older skins that are subsequently saved, applied, or
+exported through the updated Designer.
 
 Packages written with the new fields declare HUD v1.2.3 as their minimum.
 Older packages remain readable; no archive layout or asset boundary changes.
