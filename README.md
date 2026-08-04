@@ -19,15 +19,16 @@ and a numeric tray icon without scraping web pages or storing credentials.
 > This is an independent open-source project and is not an official OpenAI
 > product.
 
-## v1.2.3 candidate installation / 候选安装
+## v1.2.3 installation / 安装
 
-After public release authorization, the primary path is
-`CodexQuotaHud-Setup-v1.2.3.exe`. The current v1.2.3 artifacts remain local
-release candidates. The exact final candidate is installed and has passed
-maintainer hands-on acceptance; the latest public release remains v1.2.2.
+Download the primary installer `CodexQuotaHud-Setup-v1.2.3.exe` from the
+[latest GitHub Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3).
+This exact release was installed and accepted on the maintainer machine before
+publication.
 
-明确授权公开发布后，主要安装文件为 `CodexQuotaHud-Setup-v1.2.3.exe`。当前
-v1.2.3 资产已通过本机实操验收但仍是本地候选；最新公开版仍是 v1.2.2。
+请从[最新 GitHub Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
+下载主要安装文件 `CodexQuotaHud-Setup-v1.2.3.exe`。公开发布前，这一完全相同的版本
+已在维护者机器上完成安装和实操验收。
 
 Setup automatically offers Simplified Chinese or English, installs only for
 the current Windows user, and needs no administrator permission. It installs
@@ -328,9 +329,8 @@ two-direction handoff remains an optional manual UI check.
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
 
-元数据修正版已从标签 `v1.2.2` 发布。v1.2.3 本地候选已完成安装和用户实操验收，尚未
-创建标签或公开 Release。不要移动 `v1.2.0`、`v1.2.1`、`v1.2.2` 历史标签，也不要
-替换其 Release 资产。
+刷新时序和设计器深色弹窗修正版已从标签 `v1.2.3` 公开发布。不要移动
+`v1.2.0`、`v1.2.1`、`v1.2.2`、`v1.2.3` 历史标签，也不要替换其 Release 资产。
 
 ## 项目结构 / Project Structure
 
@@ -347,7 +347,7 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前 v1.2.3 候选源码包含 1447 项自动化测试：
+当前 v1.2.3 发布源码包含 1447 项自动化测试：
 
 - Core：75 项
 - Skins：355 项
@@ -364,7 +364,7 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 自包含发布检查。CI 包固定使用临时版本 `0.0.0`，只在 Runner 内做安装烟测，
 不会冒用或覆盖公开 Release 版本。
 
-当前 v1.2.3 候选的 fresh Release 测试为 `1447/1447`、跳过 `0`，Release build
+当前 v1.2.3 的 fresh Release 测试为 `1447/1447`、跳过 `0`，Release build
 为 `0` warnings / `0` errors。刷新时序、旧包默认值、0x 暂停、对话框契约与
 Designer 控件均有自动化覆盖；最终 Setup 已本地安装，安装后身份/哈希/数据保留、
 正式启动和核心 Designer GUI 冒烟通过。精确 GUI 动画时序、全部对话框类型、旧包
@@ -372,9 +372,9 @@ Designer 控件均有自动化覆盖；最终 Setup 已本地安装，安装后�
 历史 v1.2.0 的未复现存储异常仍按原记录保留。详见
 [`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
 
-v1.2.3 候选的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已
-完整记录在验收文档中。现有正式安装为本地 v1.2.3 候选；`v1.2.3` 标签、资产上传和
-GitHub Release 仍是后续独立发布步骤。
+v1.2.3 的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已
+完整记录在验收文档中。注释标签 `v1.2.3` 指向通过 CI 的提交 `0f42c5d`；公开 Release
+为 Latest、非草稿、非预发布，三个上传资产的在线大小和重新下载后的 SHA-256 均与本地一致。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and
 total `388/388`; the Release build completed with zero warnings and zero

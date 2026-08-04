@@ -8,14 +8,15 @@ The original Task 18 boundary authorized only an ephemeral internal `0.0.0` buil
 
 Evidence states are `PASS`, `PARTIAL`, `FAIL`, and `NOT RUN`. A row moves to `PASS` only from direct evidence collected for that exact row. Automated PASS cannot make the overall feature acceptance PASS.
 
-## 2026-08-05 v1.2.3 final local candidate — installed and user-accepted
+## 2026-08-05 v1.2.3 release — installed, user-accepted, and published
 
-This candidate combines the themed Designer dialogs and refresh-animation
+This release combines the themed Designer dialogs and refresh-animation
 timing plans. Final source is
 `c66cf9d5d135b864ad90af5c74455177902c7c04`. Local installation and bounded
 GUI smoke are complete. The user then tested the exact installed candidate,
-reported no issues, and authorized Git synchronization. Automated or practical
-acceptance does not promote unperformed exhaustive GUI rows.
+reported no issues, and authorized complete Git synchronization and release.
+Automated or practical acceptance does not promote unperformed exhaustive GUI
+rows.
 
 | Status | Date/time (Asia/Tokyo) | Command or action | Expected | Observed | Evidence |
 |---|---|---|---|---|---|
@@ -23,6 +24,8 @@ acceptance does not promote unperformed exhaustive GUI rows.
 | PARTIAL | 2026-08-05 03:02 +09:00 | First post-acceptance GitHub CI attempt | Full CI passes on the accepted source | Product result succeeded, but `Server_RealPipeNearCommitCutoffSucceedsBeforeClientDeadline` took `2.815 s` under Runner load and failed only its redundant `<1.9 s` elapsed assertion; App `621/622`, all other test projects passed | GitHub Actions run `30936427590`, attempt 1, job `92083625341` |
 | PARTIAL | 2026-08-05 03:10 +09:00 | Rerun the same GitHub CI without code changes | Distinguish one-off scheduling noise from a repeated test-design problem | A different real-WPF activation test completed its product assertions but timed out during the fixed three-second shutdown guard; App `621/622`, all other test projects passed | GitHub Actions run `30936427590`, attempt 2, job `92085803839` |
 | PASS | 2026-08-05 03:18 +09:00 | Test-only timing stabilization plus focused and full local reruns | Remove scheduler speed from correctness assertions without changing product timeout behavior | Redundant elapsed assertions removed; real-window class joined serial WPF collection; cleanup uses a 15-second deadlock guard. Focused `33/33`; full Core `75/75`, Skins `355/355`, App/UI `622/622`, Designer `395/395`; total `1447/1447` | Fresh local VSTest summaries and exit `0`; project `AGENTS.md` timing-test rule |
+| PASS | 2026-08-05 03:39 +09:00 | GitHub Actions run `30938108523` on `0f42c5d` | Full remote gate passes after timing-test stabilization | Test, Build, ephemeral CI candidate packaging, and isolated installer smoke all completed successfully; job conclusion `success` | [GitHub Actions job `92089266406`](https://github.com/yaoziqin2020/codex-quota-hud/actions/runs/30938108523/job/92089266406) and public API readback |
+| PASS | 2026-08-05 03:47 +09:00 | Publish annotated tag and GitHub Release `v1.2.3`, then download every uploaded asset | Latest non-draft/non-prerelease Release points to the tested commit; three immutable production assets match local files | Tag dereferences to `0f42c5d`; Setup, ZIP, and checksum file have exact expected names/sizes/API digests; fresh downloads reproduced all three local SHA-256 values | [GitHub Release v1.2.3](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3), remote tag/API readback, and downloaded-file hashes |
 | PASS | 2026-08-04 23:33 +09:00 | `dotnet build .\CodexQuotaHud.sln -c Release --no-restore` and `git diff --check` | Build and source formatting gate pass | Build `0` warnings / `0` errors; diff check had no output | Fresh stdout and exit `0` |
 | PASS | 2026-08-05 +09:00 | `.\scripts\package-release.ps1 -Version 1.2.3` | Canonical Setup, normal-only ZIP, and checksum manifest are created from final v1.2.3 publish output | Inno Setup `6.7.3` compiled successfully from `c66cf9d`; exact authorized rerun exited `0` | Packaging stdout, artifact inventory, and checksum readback |
 | PASS | 2026-08-05 +09:00 | `.\scripts\test-installer.ps1 -Version 1.2.3 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.2.3.exe` | Seven normal plus two committed-cleanup failure scenarios pass without changing production state | All nine passed in `946.3 s`; every successful GUID root was removed with checked postconditions; production registry snapshots remained unchanged | Full scenario stdout and exit `0` |
@@ -48,10 +51,10 @@ acceptance does not promote unperformed exhaustive GUI rows.
 | PASS | 2026-08-05 +09:00 | Install v1.2.3 on maintainer machine | Installed App/Designer report 1.2.3, match publish hashes, retain data, startup/shortcuts, and formal HUD behavior | Exit `0`; identities/hashes/data/startup/shortcuts passed; formal installed process is running; Designer launched and completed bounded GUI smoke | Setup log, hashes, registry/shortcut/process evidence, Computer Use screenshots |
 | PASS | 2026-08-05 02:55 +09:00 | User practical acceptance | User accepts the exact installed candidate before any remote release action | User reported no issues after hands-on testing of the installed candidate and instructed the Agent to push Git | Current user acceptance statement |
 
-**Current v1.2.3 decision: ACCEPTED — source, package, installer matrix, real
-installation, bounded GUI smoke, and user practical acceptance are sufficient
-for the authorized Git synchronization. Exhaustive manual matrices remain
-honestly PASS/PARTIAL/NOT RUN; public tag and Release publication are separate.**
+**Current v1.2.3 decision: RELEASED — source, package, installer matrix, real
+installation, bounded GUI smoke, user practical acceptance, remote CI, tag,
+public Release, and downloaded-asset verification are complete. Exhaustive
+manual matrices remain honestly PASS/PARTIAL/NOT RUN.**
 
 ## 2026-08-04 v1.2.2 skin metadata correction
 

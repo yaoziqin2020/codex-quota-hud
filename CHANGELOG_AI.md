@@ -1,5 +1,22 @@
 # AI Change Log
 
+## 2026-08-05 — v1.2.3 public release completed
+
+- Fast-forwarded both `main` and the retained feature branch directly to
+  `0f42c5d6b83b3ec97ba423ea8eaa20e9f8f9d010` without a pull request, after
+  adding the project timing-test stability rule and test-only CI fixes.
+- GitHub Actions run
+  [`30938108523`](https://github.com/yaoziqin2020/codex-quota-hud/actions/runs/30938108523)
+  passed the complete Test and Build steps, ephemeral CI candidate packaging,
+  and isolated installer smoke matrix.
+- Created annotated tag `v1.2.3` at `0f42c5d` and published
+  [Codex Quota HUD v1.2.3](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
+  as Latest, non-draft, and non-prerelease.
+- Uploaded only the approved Setup, normal-HUD ZIP, and `SHA256SUMS.txt` assets.
+  Their public API names, sizes, and digests match local artifacts. All three
+  assets were then downloaded afresh; each downloaded SHA-256 reproduced its
+  local value exactly.
+
 ## 2026-08-05 — v1.2.3 final local candidate installed and user-accepted
 
 - Added a shared requested/effective refresh animation state machine. Built-in
@@ -54,8 +71,8 @@
 - The user completed hands-on testing of the exact installed candidate,
   reported no issues, and accepted it for Git synchronization. Exact motion
   timing across all skin combinations, every dialog variant, legacy-package
-  output, and sign-out/restart remain partial or `NOT RUN`. The public
-  `v1.2.3` tag, asset upload, and GitHub Release remain separate pending steps.
+  output, and sign-out/restart remain partial or `NOT RUN`; those honest manual
+  limits remain unchanged by the later public release.
 - The first two post-acceptance CI attempts exposed two pre-existing timing
   assumptions under Runner load: a successful real-pipe result failed a
   redundant `<1.9 s` wall-clock assertion at `2.815 s`, then a real-WPF test

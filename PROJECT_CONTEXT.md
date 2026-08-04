@@ -8,7 +8,7 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
-## v1.2.3 installed local candidate — user accepted; public release pending
+## v1.2.3 released — installed, accepted, and public assets verified
 
 The v1.2.3 work combines two approved corrections. Skin Designer-owned
 messages now use accessible dark-themed WPF dialogs and a shared Designer
@@ -25,7 +25,7 @@ Final source is commit
 Core `75/75`, Skins `355/355`, App/UI `622/622`, and Designer `395/395`,
 totaling `1447/1447`, with zero failed or skipped. Release build is zero
 warnings/errors and `git diff --check` passes. The final production-structure
-package workflow created these local-only files:
+package workflow created these release files:
 
 After user acceptance, two GitHub CI attempts exposed unrelated pre-existing
 test timing fragility: a successful real-pipe result also asserted a narrow
@@ -34,6 +34,10 @@ The test-only stabilization removes redundant elapsed-time assertions,
 serializes that real-window class with existing WPF coverage, and widens only
 the deadlock guard to 15 seconds. Product protocol timeouts are unchanged.
 Focused `33/33` and full local `1447/1447` reruns passed.
+The follow-up GitHub Actions run
+[`30938108523`](https://github.com/yaoziqin2020/codex-quota-hud/actions/runs/30938108523)
+passed its complete Test, Build, ephemeral package, and isolated installer
+smoke steps on `0f42c5d6b83b3ec97ba423ea8eaa20e9f8f9d010`.
 
 - Setup: 100,048,867 bytes / SHA-256
   `579C1CE73392970E93323C99600F013950CC463BC4BB5C4B305085584F743F80`
@@ -72,8 +76,11 @@ and sign-out/restart are still not exhaustively verified. On 2026-08-05, the
 user completed hands-on testing of this exact installed candidate, reported no
 issues, and accepted it for Git synchronization.
 
-The public `v1.2.3` tag, asset upload, and GitHub Release remain separate
-pending release actions.
+Annotated tag `v1.2.3` points to `0f42c5d6b83b3ec97ba423ea8eaa20e9f8f9d010`.
+The [public GitHub Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
+is Latest, non-draft, and non-prerelease. Setup, ZIP, and `SHA256SUMS.txt` have
+the exact local names and sizes above; downloading all three public assets and
+hashing them again reproduced every local SHA-256 value.
 
 ## v1.1.1 historical release
 
@@ -319,8 +326,8 @@ It does not call a private web endpoint directly.
 - Public source: GitHub `main`
 - Installed executable:
   `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`
-- Installed release: `v1.2.2`
-- Latest public release: `v1.2.2`
+- Installed release: `v1.2.3`
+- Latest public release: `v1.2.3`
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 

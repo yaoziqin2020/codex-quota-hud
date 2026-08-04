@@ -1,8 +1,8 @@
 # Current Task
 
-## v1.2.3 installed local candidate — user accepted; public release pending
+## v1.2.3 released — installed, accepted, and public assets verified
 
-The v1.2.3 candidate preserves every built-in skin's existing refresh-speed
+The v1.2.3 release preserves every built-in skin's existing refresh-speed
 profile and adds a shared 1.5-second post-refresh hold. Custom skins can use an
 absolute `0x..4x` refresh multiplier and a `0..3` second hold. Older packages
 without either property default to `2x` and `1.5` seconds. Re-refresh restarts
@@ -34,7 +34,13 @@ real-window activation class in the existing serial WPF collection, and uses a
 15-second deadlock guard without changing any product timeout. Focused tests
 passed `33/33`; the unchanged full Release suite passed `1447/1447` locally.
 
-The canonical local candidate files are:
+GitHub Actions run
+[`30938108523`](https://github.com/yaoziqin2020/codex-quota-hud/actions/runs/30938108523)
+then passed on commit `0f42c5d6b83b3ec97ba423ea8eaa20e9f8f9d010`.
+Its complete Test and Build steps passed, the ephemeral CI candidates built,
+and the isolated installer smoke matrix completed successfully.
+
+The canonical release files are:
 
 - Setup: `artifacts\release\CodexQuotaHud-Setup-v1.2.3.exe` — 100,048,867
   bytes — SHA-256
@@ -81,8 +87,13 @@ sign-out/restart remains partial or not run. On 2026-08-05, the user completed
 hands-on testing of this exact installed candidate, reported no issues, and
 accepted it for Git synchronization.
 
-The public `v1.2.3` tag, asset upload, and GitHub Release remain separate
-pending release actions.
+Annotated tag `v1.2.3` points to `0f42c5d6b83b3ec97ba423ea8eaa20e9f8f9d010`.
+The [public GitHub Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
+is Latest, non-draft, and non-prerelease. Its three uploaded assets have the
+exact local names and sizes above. A fresh public download of all three files
+reproduced their local SHA-256 values exactly. GitHub `main` and the retained
+feature branch were fast-forwarded directly without a pull request; the
+release tag remains fixed at the tested release-evidence commit.
 
 ## v1.2.2 skin metadata correction — released
 
