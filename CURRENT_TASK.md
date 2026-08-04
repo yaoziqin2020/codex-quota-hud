@@ -1,15 +1,15 @@
 # Current Task
 
-## v1.2.1 animation correction — release in progress
+## v1.2.1 animation correction — local release candidate verified
 
 The user approved a v1.2.1 patch after direct visual inspection in the source
 Designer. The custom quota-ring glow peak is capped below the solid progress
 arc, and decoration floating now has practical travel and timing across the
 existing 0–1 control range. The `.cqskin` schema, current skin parameters,
 installer component boundary, and ordinary-user shortcut behavior are
-unchanged. Production packaging, local upgrade acceptance, push, tag, and
-GitHub Release remain in progress and must use the new `1.2.1` version; the
-published v1.2.0 assets and tag must remain unchanged.
+unchanged. Production packaging and local upgrade acceptance are complete.
+Push, tag, and GitHub Release remain in progress and must use the new `1.2.1`
+version; the published v1.2.0 assets and tag must remain unchanged.
 
 Serial Release verification passed Core `75/75`, Skins `335/335`, App/UI
 `609/609`, and Designer `348/348`, totaling `1367/1367` with zero skipped.
@@ -20,6 +20,38 @@ The current `柔光玫瑰` parameters were exported to
 from `theme.json`. Applying them to the installed v1.2.0 HUD updated the skin
 files and exercised catalog refresh successfully, but the formal visual still
 used the old animation formula because the installed executable was v1.2.0.
+
+The production v1.2.1 assets are:
+
+- Setup: `CodexQuotaHud-Setup-v1.2.1.exe` — 100,052,875 bytes — SHA-256
+  `E01E942A03B6F31BE66794997676A6C21DA73F54B838E11513226C888524F572`
+- ZIP: `CodexQuotaHud-v1.2.1-win-x64.zip` — 68,330,307 bytes — SHA-256
+  `36880B6D47AB731CC4B560D6E9CAA71BB7744C4081C6759189EFC0B721710F6F`
+- `SHA256SUMS.txt` — 196 bytes — SHA-256
+  `31EC5130D49BC6F000A5E9BFAC1A3B5A12BD3DD858D7FED2E8967BD67FDB507E`
+
+The ZIP has exactly the five approved fallback entries and contains no
+Designer. The Setup payload contains the normal HUD plus the optional Designer.
+The Setup and both executables are `NotSigned`. All seven normal isolated
+installer scenarios and both committed-cleanup failure scenarios passed and
+left no failed or active temporary root.
+
+The real local v1.2.0-to-v1.2.1 upgrade completed with exit code `0`. Installed
+App and Designer are version `1.2.1.0`, report product version
+`1.2.1+b1126e34f0a06a0e93458848ca347bce85d808bb`, and exactly match the packaged
+publish hashes. The uninstall entry is `1.2.1`; startup remains formal
+`--background`; normal and Designer Start-menu shortcuts exist; no normal
+desktop shortcut exists. The maintainer-only `Codex Quota HUD 开发预览` desktop
+shortcut was separately restored with `--preview`.
+
+The upgrade retained the selected `柔光玫瑰` skin, its assets/theme, the current
+draft and recovery document, and preview-window state. `settings.json` was
+normally re-saved when the v1.2.0 HUD exited, but its window position,
+animation flag, custom-skin selection, and refresh state remained intact. The
+installed formal HUD started and refreshed quota successfully. The installed
+Designer opened with the complete editor/preview surface and then closed
+normally. Source Designer motion was visually accepted; the installed
+transparent HUD could not be independently captured as a targetable window.
 
 ## v1.2.0 released — historical baseline
 

@@ -1,6 +1,6 @@
 # AI Change Log
 
-## 2026-08-04 — v1.2.1 animation correction prepared
+## 2026-08-04 — v1.2.1 animation correction locally verified
 
 - Reduced the custom quota-ring glow peak from `.15 + .75 * intensity` to
   `.15 + .25 * intensity`, while retaining the existing `.08` floor and
@@ -21,6 +21,23 @@
   `柔光玫瑰` parameters and refresh the running HUD. The still-old formal visual
   was expected because the installed v1.2.0 executable retained the old
   renderer; no additional same-selection live-reload defect was found.
+- Packaged production Setup, normal-HUD-only ZIP, and `SHA256SUMS.txt`. Setup
+  SHA-256 is `E01E942A03B6F31BE66794997676A6C21DA73F54B838E11513226C888524F572`;
+  ZIP SHA-256 is
+  `36880B6D47AB731CC4B560D6E9CAA71BB7744C4081C6759189EFC0B721710F6F`.
+  The ZIP contains exactly five approved entries; Setup contains the normal
+  HUD plus the optional Designer. Setup and both executables remain unsigned.
+- All seven normal isolated installer scenarios and both committed-cleanup
+  failure scenarios passed. The real v1.2.0-to-v1.2.1 upgrade then completed
+  with exit code `0`; installed App and Designer exactly match the publish
+  tree and report
+  `1.2.1+b1126e34f0a06a0e93458848ca347bce85d808bb`.
+- Retained the selected custom skin, its payload, the current Designer draft
+  and recovery document, and preview-window state. Formal startup remains
+  `--background`, ordinary-user Start-menu shortcuts are correct, and the
+  maintainer desktop was separately restored to only Developer Preview with
+  `--preview`. The installed formal HUD refreshed successfully and the
+  installed Designer opened and closed normally.
 
 ## 2026-08-04 — v1.2.0 released with optional Skin Designer
 

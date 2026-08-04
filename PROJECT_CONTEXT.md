@@ -136,8 +136,27 @@ The source Designer preview was visually accepted before packaging. Its current
 `柔光玫瑰` state was exported and the package's four animation values were read
 back successfully. Applying that draft to the installed v1.2.0 HUD updated and
 reloaded the installed skin, but the formal HUD correctly continued to show the
-old formula until its executable is upgraded. v1.2.1 production packaging,
-local upgrade acceptance, and public release evidence are pending.
+old formula until its executable was upgraded.
+
+The v1.2.1 production Setup is 100,052,875 bytes with SHA-256
+`E01E942A03B6F31BE66794997676A6C21DA73F54B838E11513226C888524F572`.
+The normal-HUD-only ZIP is 68,330,307 bytes with SHA-256
+`36880B6D47AB731CC4B560D6E9CAA71BB7744C4081C6759189EFC0B721710F6F`.
+`SHA256SUMS.txt` is 196 bytes with SHA-256
+`31EC5130D49BC6F000A5E9BFAC1A3B5A12BD3DD858D7FED2E8967BD67FDB507E`.
+The Setup and both packaged executables are unsigned. Seven normal isolated
+installer scenarios plus both committed-cleanup failure scenarios passed.
+
+The maintainer machine was upgraded in place from v1.2.0 to v1.2.1 with Setup
+exit code `0`. Installed App and Designer exactly match the publish tree and
+report `1.2.1+b1126e34f0a06a0e93458848ca347bce85d808bb`. Startup remains formal
+`--background`; the normal and Designer Start-menu entries exist; the desktop
+contains only the separately restored Developer Preview shortcut with
+`--preview`. The selected custom skin, installed skin payload, Designer draft
+and recovery document, and preview-window state were retained. The installed
+formal HUD started and refreshed successfully, and the installed Designer
+opened and closed normally. GitHub `main`, tag, Release, and online-asset
+verification remain pending.
 
 ## Product behavior
 
@@ -183,12 +202,13 @@ It does not call a private web endpoint directly.
 - Public source: GitHub `main`
 - Installed executable:
   `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`
-- Release: `v1.2.0`
+- Installed release candidate: `v1.2.1`
+- Latest public release until publication completes: `v1.2.0`
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 
-The real machine currently has the published `v1.2.0` package code from
-`7393ffc`. It includes the optional Designer, because that component was
+The real machine currently has the verified `v1.2.1` package code from
+`b1126e3`. It includes the optional Designer, because that component was
 selected for maintainer acceptance. The maintainer-only desktop Developer
 Preview shortcut is local customization and is not public Setup behavior.
 

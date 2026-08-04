@@ -296,9 +296,8 @@ two-direction handoff remains an optional manual UI check.
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
 
-`v1.2.0` 已从标签 `v1.2.0` 公开发布。后续生产打包必须使用新的明确版本号；
-不要再次用 `package-release.ps1 -Version 1.2.0` 生成不同二进制，也不要移动标签或
-替换现有 Release 资产，除非维护者明确批准一次新的修订发布。
+`v1.2.0` 的标签与发布资产保持不变。动画修正版使用新的 `v1.2.1` 版本；
+不要用已有版本号生成不同二进制，也不要移动历史标签或替换历史 Release 资产。
 
 ## 项目结构 / Project Structure
 
@@ -315,13 +314,13 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-`v1.2.0` 源码包含 1363 项自动化测试：
+`v1.2.1` 源码包含 1367 项自动化测试：
 
 - Core：75 项
-- Skins：331 项
+- Skins：335 项
 - App / UI：609 项
 - Skin Designer：348 项
-- Total：1363 项
+- Total：1367 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -332,14 +331,14 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 自包含发布检查。CI 包固定使用临时版本 `0.0.0`，只在 Runner 内做安装烟测，
 不会冒用或覆盖公开 Release 版本。
 
-最新串行 Release 测试为 `1363/1363`、跳过 `0`，Release build 为
+最新串行 Release 测试为 `1367/1367`、跳过 `0`，Release build 为
 `0` warnings / `0` errors；三套安全与回滚筛选分别为 `223/223`、`224/224`
 和 `116/116`。同一提交较早的一次完整测试曾出现 `1` 项未能复现、未能取得
 `result.Errors` 的存储删除失败，因此验证记录仍保留这项未解决的历史异常。详见
 [`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
 
-v1.2.0 的七个隔离安装/升级/组件/卸载场景及两个已提交清理失败场景全部通过。
-正式 Release 已公开，Setup、ZIP 与 `SHA256SUMS.txt` 的在线大小和摘要均已核对。
+v1.2.1 的七个隔离安装/升级/组件/卸载场景及两个已提交清理失败场景全部通过。
+本机 v1.2.0 到 v1.2.1 升级、安装文件一致性、启动项、快捷方式和用户数据保留均已核对。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and
 total `388/388`; the Release build completed with zero warnings and zero

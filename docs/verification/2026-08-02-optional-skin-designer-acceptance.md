@@ -8,6 +8,21 @@ The original Task 18 boundary authorized only an ephemeral internal `0.0.0` buil
 
 Evidence states are `PASS`, `PARTIAL`, `FAIL`, and `NOT RUN`. A row moves to `PASS` only from direct evidence collected for that exact row. Automated PASS cannot make the overall feature acceptance PASS.
 
+## 2026-08-04 v1.2.1 animation correction
+
+This patch keeps the v1.2.0 package/schema/installer boundary and changes only
+the shared runtime animation ranges. The source Designer motion was visually
+accepted before the production package was built.
+
+| Status | Date/time (Asia/Tokyo) | Command or action | Expected | Observed | Evidence |
+|---|---|---|---|---|---|
+| PASS | 2026-08-04 16:12 +09:00 | Serial Release project tests and solution build | All current tests pass with no skips; build has no warnings/errors | Core `75/75`, Skins `335/335`, App/UI `609/609`, Designer `348/348`; total `1367/1367`, skipped `0`; build `0` warnings / `0` errors | Fresh VSTest summaries and build stdout |
+| PASS | 2026-08-04 16:22 +09:00 | `package-release.ps1 -Version 1.2.1` | Setup, normal-only ZIP, and checksums are internally consistent | Setup `E01E942A03B6F31BE66794997676A6C21DA73F54B838E11513226C888524F572`; ZIP `36880B6D47AB731CC4B560D6E9CAA71BB7744C4081C6759189EFC0B721710F6F`; ZIP has exactly five approved entries | Fresh artifact metadata, archive entry list, and `SHA256SUMS.txt` readback |
+| PASS | 2026-08-04 16:31 +09:00 | Production installer isolated matrix | Seven normal scenarios and two committed-cleanup failure scenarios pass without touching production state | All scenario processes completed; no failed/active scenario root or installer process remained; success-only cleanup postconditions held | `scripts/test-installer.ps1` run plus checked temp/process postconditions |
+| PASS | 2026-08-04 16:34 +09:00 | Silent real upgrade from v1.2.0 with Designer + startup | Exit `0`; install v1.2.1; preserve user data; no ordinary desktop shortcut | Exit `0`; App/Designer `1.2.1+b1126e34f0a06a0e93458848ca347bce85d808bb`; both hashes match publish tree; uninstall entry `1.2.1`; startup `--background`; custom skin, draft/recovery, and preview state retained | Setup log, version/hash reads, HKCU reads, and before/after user-data checks |
+| PASS | 2026-08-04 16:37 +09:00 | Restore maintainer desktop and launch installed apps | Only Developer Preview desktop shortcut uses `--preview`; formal HUD and Designer start normally | Shortcut readback matched; formal installed process refreshed quota with selected `柔光玫瑰`; Designer exposed the complete editor/preview surface and closed normally | `.lnk` COM readback, process/settings evidence, and installed Designer screenshot/accessibility tree |
+| PARTIAL | 2026-08-04 16:37 +09:00 | Installed transparent-HUD motion review | Corrected glow/floating behavior matches accepted source preview | Installed executable is byte-identical to accepted packaged runtime and is running; transparent HUD was not targetable for independent automation capture | Source Designer visual acceptance plus binary identity; direct installed-HUD visual remains manual |
+
 ## 2026-08-04 follow-up candidate
 
 This section records what was then the `v1.2.0` local candidate and supersedes
