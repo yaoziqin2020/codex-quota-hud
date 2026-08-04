@@ -1,5 +1,27 @@
 # AI Change Log
 
+## 2026-08-04 — v1.2.1 animation correction prepared
+
+- Reduced the custom quota-ring glow peak from `.15 + .75 * intensity` to
+  `.15 + .25 * intensity`, while retaining the existing `.08` floor and
+  timing. At maximum intensity the full-ring glow now tops out at `.40`, so it
+  cannot visually compete with the solid progress arc and resemble 100%.
+- Replaced decoration floating's effectively invisible `±2 * intensity`
+  travel and `2.5 / intensity` half-cycle with a direct `±8 * intensity`
+  travel and `3.2 - 1.6 * intensity` half-cycle. The existing Gentle `.15`
+  and Noticeable `.25` presets now produce visible motion, while zero still
+  disables the animation.
+- Added focused motion-profile tests for approved glow and floating ranges.
+  The `.cqskin` schema and stored animation parameters remain unchanged;
+  existing packages pick up the new behavior from the upgraded runtime.
+- Serial Release verification passed Core `75/75`, Skins `335/335`, App/UI
+  `609/609`, and Designer `348/348`, totaling `1367/1367` with zero skipped.
+  The Release solution build completed with zero warnings and zero errors.
+- Confirmed the Designer's `应用到 HUD` operation did install the user's current
+  `柔光玫瑰` parameters and refresh the running HUD. The still-old formal visual
+  was expected because the installed v1.2.0 executable retained the old
+  renderer; no additional same-selection live-reload defect was found.
+
 ## 2026-08-04 — v1.2.0 released with optional Skin Designer
 
 - Completed the custom-skin workflow follow-up: imported skins appear without

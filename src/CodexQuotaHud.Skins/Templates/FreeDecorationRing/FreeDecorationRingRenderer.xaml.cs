@@ -342,10 +342,10 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
 
         if (settings.FloatingIntensity > 0)
         {
-            var floating = CreatePulse(new AnimationRange(
-                _decorationTransforms.BaseY - (2 * settings.FloatingIntensity),
-                _decorationTransforms.BaseY + (2 * settings.FloatingIntensity),
-                2.5 / settings.FloatingIntensity));
+            var floating = CreatePulse(
+                FreeDecorationRingMotionProfile.Floating(
+                    _decorationTransforms.BaseY,
+                    settings.FloatingIntensity));
             _animationTracks.Add(CreateTrack(
                 _decorationTransforms.Translate,
                 TranslateTransform.YProperty,

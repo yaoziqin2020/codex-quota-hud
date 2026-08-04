@@ -116,6 +116,29 @@ reopened-draft workflow now reaches overwrite confirmation and the success
 result, and the applied custom-skin directory contains the decoration asset and
 animation parameters from the saved draft.
 
+## v1.2.1 animation correction
+
+The approved v1.2.1 patch changes only the shared
+`free-decoration-ring` runtime motion profile. Full-ring glow opacity is capped
+at `.40` even at maximum animation intensity, keeping it visually subordinate
+to the solid progress arc. Decoration floating now maps the existing 0–1
+intensity to `±8 * intensity` pixels and a `3.2 - 1.6 * intensity` second
+half-cycle; zero remains disabled. No contract, schema, asset, manifest,
+installer component, shortcut, startup, storage, or import boundary changes.
+Existing `.cqskin` packages receive the corrected behavior when rendered by a
+v1.2.1 HUD.
+
+The v1.2.1 serial Release gate passed Core `75/75`, Skins `335/335`, App/UI
+`609/609`, and Designer `348/348`, totaling `1367/1367` with zero skipped. The
+Release solution build completed with zero warnings and zero errors.
+
+The source Designer preview was visually accepted before packaging. Its current
+`柔光玫瑰` state was exported and the package's four animation values were read
+back successfully. Applying that draft to the installed v1.2.0 HUD updated and
+reloaded the installed skin, but the formal HUD correctly continued to show the
+old formula until its executable is upgraded. v1.2.1 production packaging,
+local upgrade acceptance, and public release evidence are pending.
+
 ## Product behavior
 
 - WPF floating HUD with five animated skins.

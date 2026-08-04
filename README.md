@@ -19,10 +19,10 @@ and a numeric tray icon without scraping web pages or storing credentials.
 > This is an independent open-source project and is not an official OpenAI
 > product.
 
-## v1.2.0 installation / 安装
+## v1.2.1 installation / 安装
 
-Primary path: download `CodexQuotaHud-Setup-v1.2.0.exe` and double-click it.
-主要方式：下载 `CodexQuotaHud-Setup-v1.2.0.exe` 后直接双击运行。
+Primary path: download `CodexQuotaHud-Setup-v1.2.1.exe` and double-click it.
+主要方式：下载 `CodexQuotaHud-Setup-v1.2.1.exe` 后直接双击运行。
 
 Setup automatically offers Simplified Chinese or English, installs only for
 the current Windows user, and needs no administrator permission. It installs
@@ -49,12 +49,12 @@ Setup 的任务页包含开机启动和创建正式版桌面快捷方式，两�
 快捷方式均直接启动真实 HUD，不带 `--preview`。Setup 不提供开发预览入口；源码和 ZIP
 用户可明确运行 `CodexQuotaHud.App.exe --preview` 进入预览模式。
 
-Install `v1.2.0` directly over `v1.0.0`, `v1.1.0`, or `v1.1.1`; personal HUD
+Install `v1.2.1` directly over `v1.0.0`, `v1.1.0`, `v1.1.1`, or `v1.2.0`; personal HUD
 settings, installed custom skins, Designer drafts, and Developer Preview window
 state are retained by default. Normal uninstall preserves user data. Select the
 explicit purge option only to remove the exact approved product-data roots.
 
-可从 `v1.0.0`、`v1.1.0` 或 `v1.1.1` 直接升级，默认保留 HUD 设置、已安装皮肤、
+可从 `v1.0.0`、`v1.1.0`、`v1.1.1` 或 `v1.2.0` 直接升级，默认保留 HUD 设置、已安装皮肤、
 设计器草稿和开发预览窗口状态。普通卸载会保留用户数据；只有明确选择清除选项时，
 才会删除安装器批准的准确产品数据目录。
 
@@ -63,20 +63,20 @@ unknown-publisher warning. Verify its SHA-256 against `SHA256SUMS.txt` before
 running it:
 
 ```powershell
-Get-FileHash .\\CodexQuotaHud-Setup-v1.2.0.exe -Algorithm SHA256
+Get-FileHash .\\CodexQuotaHud-Setup-v1.2.1.exe -Algorithm SHA256
 ```
 
 当前 Setup 未签名，Windows SmartScreen 可能显示未知发布者提示。运行前请使用
 `SHA256SUMS.txt` 和上述命令核对 SHA-256。
 
-If Setup is unavailable, `CodexQuotaHud-v1.2.0-win-x64.zip` plus its bundled
+If Setup is unavailable, `CodexQuotaHud-v1.2.1-win-x64.zip` plus its bundled
 PowerShell script is the fallback. GitHub Packages is not used for this
 application or its release assets.
 
-若 Setup 不可用，`CodexQuotaHud-v1.2.0-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
+若 Setup 不可用，`CodexQuotaHud-v1.2.1-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
 本应用和发布资产均不使用 GitHub Packages。
 
-## v1.2.0 Skin Designer / 皮肤设计器
+## v1.2.x Skin Designer / 皮肤设计器
 
 Public `v1.2.0` adds safe data-only `.cqskin` import
 to the normal HUD, a shared `CodexQuotaHud.Skins` runtime library, and a
@@ -93,6 +93,16 @@ own application icon.
 预览的修复，以及启动读取额度后正式 HUD 自动显示的修复。设计器还新增了简化动画
 预设、可见的中心呼吸与额度环光晕、紧凑分组的预览控制、可读下拉框、即时自定义皮肤
 同步、共享文档交换目录和独立应用图标。
+
+`v1.2.1` corrects two runtime animation mappings without changing the
+`.cqskin` schema: the full-ring glow now remains visibly below the solid
+progress arc, and decoration floating uses a practical, responsive travel and
+timing range. Existing skin packages automatically use the corrected behavior
+after the HUD is upgraded.
+
+`v1.2.1` 在不改变 `.cqskin` 格式的前提下修正两项运行时动画：整圈光晕的峰值
+亮度不再接近真实进度弧，装饰浮动也改为清晰、响应及时的位移和速度范围。升级 HUD
+后，现有皮肤包会自动使用修正后的效果，无需重新制作。
 
 The Setup shows an optional component named **Install
 Skin Designer**, with this description: “Optional visual editor for creating
@@ -145,7 +155,7 @@ as completed acceptance in the release record.
 ## 下载与安装 / Download
 
 从 [最新 Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
-下载 ZIP 后备包 `CodexQuotaHud-v1.2.0-win-x64.zip`，解压后在该目录运行：
+下载 ZIP 后备包 `CodexQuotaHud-v1.2.1-win-x64.zip`，解压后在该目录运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1

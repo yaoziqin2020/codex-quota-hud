@@ -1,6 +1,27 @@
 # Current Task
 
-## v1.2.0 released — manual follow-ups remain
+## v1.2.1 animation correction — release in progress
+
+The user approved a v1.2.1 patch after direct visual inspection in the source
+Designer. The custom quota-ring glow peak is capped below the solid progress
+arc, and decoration floating now has practical travel and timing across the
+existing 0–1 control range. The `.cqskin` schema, current skin parameters,
+installer component boundary, and ordinary-user shortcut behavior are
+unchanged. Production packaging, local upgrade acceptance, push, tag, and
+GitHub Release remain in progress and must use the new `1.2.1` version; the
+published v1.2.0 assets and tag must remain unchanged.
+
+Serial Release verification passed Core `75/75`, Skins `335/335`, App/UI
+`609/609`, and Designer `348/348`, totaling `1367/1367` with zero skipped.
+The Release solution build passed with zero warnings and zero errors.
+
+The current `柔光玫瑰` parameters were exported to
+`Documents\\Codex Quota HUD Skins\\柔光玫瑰.cqskin` and independently read back
+from `theme.json`. Applying them to the installed v1.2.0 HUD updated the skin
+files and exercised catalog refresh successfully, but the formal visual still
+used the old animation formula because the installed executable was v1.2.0.
+
+## v1.2.0 released — historical baseline
 
 The current branch now includes the optional Skin Designer, the shared custom-
 skin runtime, a compact About window, the Designer preview recovery fix for
