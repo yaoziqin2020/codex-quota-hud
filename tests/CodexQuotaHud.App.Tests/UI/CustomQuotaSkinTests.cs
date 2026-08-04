@@ -63,6 +63,34 @@ public sealed class CustomQuotaSkinTests
             Assert.Equal((expected, enabled), renderer.LastAnimation);
         });
 
+    [Theory]
+    [InlineData(0d)]
+    [InlineData(2d)]
+    [InlineData(4d)]
+    public void AnimationSettings_ProvideHoldDurationAndAbsoluteRefreshSpeed(
+        double refreshSpeedMultiplier)
+        => RunSta(() =>
+        {
+            var renderer = new RecordingRenderer();
+            var theme = HudSkinCatalogTests.Theme() with
+            {
+                Animation = HudSkinCatalogTests.Theme().Animation with
+                {
+                    RefreshSpeedMultiplier = refreshSpeedMultiplier,
+                    RefreshHoldSeconds = 2.75d
+                }
+            };
+            var skin = new CustomQuotaSkin(SelectionKey, theme, renderer);
+
+            skin.ApplyAnimationState(OrbAnimationState.Refreshing, true);
+            skin.ApplyAnimationState(OrbAnimationState.Refreshing, true);
+
+            Assert.Equal(TimeSpan.FromSeconds(2.75d), skin.RefreshHoldDuration);
+            Assert.Equal(
+                [refreshSpeedMultiplier, refreshSpeedMultiplier],
+                renderer.RefreshSpeedMultipliers);
+        });
+
     [Fact]
     public void Adapter_WrapsAndRendersTheRealTask6Renderer() =>
         RunSta(() =>
@@ -181,12 +209,18 @@ public sealed class CustomQuotaSkinTests
             private set;
         }
 
+        public List<double> RefreshSpeedMultipliers { get; } = [];
+
         public override void Render(CustomSkinRenderState state) =>
             LastState = state;
 
         public override void ApplyAnimationState(
             CustomSkinAnimationState state,
-            bool globalAnimationsEnabled) =>
+            bool globalAnimationsEnabled,
+            double refreshSpeedMultiplier = 2d)
+        {
             LastAnimation = (state, globalAnimationsEnabled);
+            RefreshSpeedMultipliers.Add(refreshSpeedMultiplier);
+        }
     }
 }

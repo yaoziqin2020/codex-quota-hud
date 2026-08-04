@@ -12,5 +12,6 @@ public abstract class CustomSkinRenderer : UserControl
 
     public abstract void ApplyAnimationState(
         CustomSkinAnimationState state,
-        bool globalAnimationsEnabled);
+        bool globalAnimationsEnabled,
+        double refreshSpeedMultiplier = 2d);
 }

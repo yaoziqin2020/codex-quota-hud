@@ -12,6 +12,7 @@ public sealed class CustomQuotaSkin : IQuotaSkin, IOrbAnimationTarget
     private readonly CustomSkinRenderer _renderer;
     private readonly MediaColor _primaryColor;
     private readonly MediaColor _secondaryColor;
+    private readonly double _refreshSpeedMultiplier;
 
     public CustomQuotaSkin(
         string selectionKey,
@@ -24,11 +25,16 @@ public sealed class CustomQuotaSkin : IQuotaSkin, IOrbAnimationTarget
         _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
         _primaryColor = Parse(theme.PrimaryRingColor);
         _secondaryColor = Parse(theme.SecondaryRingColor);
+        _refreshSpeedMultiplier = theme.Animation.RefreshSpeedMultiplier;
+        RefreshHoldDuration = TimeSpan.FromSeconds(
+            theme.Animation.RefreshHoldSeconds);
     }
 
     public string SelectionKey { get; }
 
     public FrameworkElement View => _renderer;
+
+    public TimeSpan RefreshHoldDuration { get; }
 
     public void Render(QuotaSkinState state)
     {
@@ -60,7 +66,8 @@ public sealed class CustomQuotaSkin : IQuotaSkin, IOrbAnimationTarget
                 OrbAnimationState.Refreshing => CustomSkinAnimationState.Refreshing,
                 _ => CustomSkinAnimationState.Hidden
             },
-            animationsEnabled);
+            animationsEnabled,
+            _refreshSpeedMultiplier);
 
     private static MediaColor Parse(string value) =>
         (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString(value)!;

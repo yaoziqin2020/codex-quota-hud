@@ -517,8 +517,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
             viewModel.PropertyChanged -= propertyChangedHandler;
         }
 
-        animationController?.SetState(OrbAnimationState.Hidden);
-        animationController?.Attach(target: null);
+        animationController?.Dispose();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

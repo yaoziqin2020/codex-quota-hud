@@ -85,7 +85,8 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
 
     public override void ApplyAnimationState(
         CustomSkinAnimationState state,
-        bool globalAnimationsEnabled)
+        bool globalAnimationsEnabled,
+        double refreshSpeedMultiplier = 2d)
     {
         if (state == CustomSkinAnimationState.Hidden ||
             !globalAnimationsEnabled ||
@@ -98,7 +99,9 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         var desiredFrameRate = state == CustomSkinAnimationState.Refreshing
             ? RefreshingFrameRate
             : IdleFrameRate;
-        var speedRatio = state == CustomSkinAnimationState.Refreshing ? 2d : 1d;
+        var speedRatio = state == CustomSkinAnimationState.Refreshing
+            ? refreshSpeedMultiplier
+            : 1d;
         StartAnimations(desiredFrameRate, speedRatio);
     }
 
