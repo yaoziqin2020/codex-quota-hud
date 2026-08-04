@@ -298,6 +298,7 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
         SkinDraftDocument draft)
     {
         Images.NotifyStateChanged();
+        Animation.NotifyStateChanged();
         _previewUpdate(
             draft,
             new ReadOnlyDictionary<SkinAssetSlot, SkinAsset>(

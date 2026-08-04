@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using CodexQuotaHud.Skins.Contracts;
 
 namespace CodexQuotaHud.SkinDesigner.UI;
@@ -103,8 +104,33 @@ public sealed class TextEditorViewModel(
 }
 
 public sealed class AnimationEditorViewModel(
-    DesignerViewModel owner) : EditorSectionViewModel(owner, "动画")
+    DesignerViewModel owner) : EditorSectionViewModel(owner, "动画"),
+    INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public bool CanEditDecorationAnimation =>
+        Owner.Assets.ContainsKey(SkinAssetSlot.Decoration);
+
+    public string DecorationAnimationHint => CanEditDecorationAnimation
+        ? "装饰旋转和浮动会作用于当前透明装饰图。"
+        : "装饰旋转和浮动需要先添加透明装饰图。";
+
+    public string CurrentPresetName => AnimationPresets.DisplayName(
+        Owner.Current.Theme.Animation,
+        CanEditDecorationAnimation);
+
+    public EditorMutationResult ApplyPreset(AnimationPresetKind preset)
+    {
+        var settings = AnimationPresets.Resolve(
+            preset,
+            CanEditDecorationAnimation);
+        return Owner.Apply(draft => draft with
+        {
+            Theme = draft.Theme with { Animation = settings }
+        });
+    }
+
     public EditorMutationResult SetRotationIntensity(double value) =>
         Update(animation => animation with { RotationIntensity = value });
 
@@ -116,6 +142,19 @@ public sealed class AnimationEditorViewModel(
 
     public EditorMutationResult SetFloatingIntensity(double value) =>
         Update(animation => animation with { FloatingIntensity = value });
+
+    internal void NotifyStateChanged()
+    {
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(CanEditDecorationAnimation)));
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(DecorationAnimationHint)));
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(CurrentPresetName)));
+    }
 
     private EditorMutationResult Update(
         Func<SkinAnimationSettings, SkinAnimationSettings> edit) =>

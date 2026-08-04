@@ -1,4 +1,5 @@
 using CodexQuotaHud.SkinDesigner.Drafts;
+using CodexQuotaHud.SkinDesigner.Images;
 using CodexQuotaHud.SkinDesigner.UI;
 using CodexQuotaHud.Skins.Contracts;
 
@@ -165,6 +166,89 @@ public sealed class DesignerViewModelTests
             Assert.Same(before, session.Current);
             Assert.Empty(previewed);
         }
+    }
+
+    [Fact]
+    public void ApplyPreset_WithoutDecorationPublishesOneEffectiveUpdate()
+    {
+        using var sut = CreateViewModel(out var session, out var previewed);
+        var beforeRevision = session.Current.Revision;
+
+        var result = sut.Animation.ApplyPreset(AnimationPresetKind.Noticeable);
+
+        Assert.True(result.Succeeded, Format(result.Errors));
+        Assert.Equal(beforeRevision + 1, session.Current.Revision);
+        Assert.Equal(
+            new SkinAnimationSettings(0, .9, .9, 0),
+            session.Current.Theme.Animation);
+        Assert.Single(previewed);
+        Assert.Equal("明显", sut.Animation.CurrentPresetName);
+        Assert.False(sut.Animation.CanEditDecorationAnimation);
+        Assert.Contains("透明装饰图", sut.Animation.DecorationAnimationHint);
+    }
+
+    [Fact]
+    public void DecorationAvailability_RefreshesWithoutSilentlyRewritingAnimation()
+    {
+        var asset = new SkinAsset(
+            SkinAssetSlot.Decoration,
+            "assets/decoration.png",
+            [1, 2, 3],
+            PixelWidth: 1,
+            PixelHeight: 1,
+            HasAlpha: true);
+        var next = CreatedAt;
+        var session = new SkinDraftSession(
+            SkinDraftFactory.CreateNew(
+                Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                CreatedAt,
+                SemanticVersion.Parse("1.1.1")),
+            () => next = next.AddSeconds(1));
+        using var sut = new DesignerViewModel(
+            session,
+            new Dictionary<SkinAssetSlot, SkinAsset>
+            {
+                [SkinAssetSlot.Decoration] = asset
+            },
+            previewUpdate: null);
+        var changedProperties = new List<string?>();
+        sut.Animation.PropertyChanged += (_, args) =>
+            changedProperties.Add(args.PropertyName);
+
+        var preset = sut.Animation.ApplyPreset(AnimationPresetKind.Noticeable);
+        Assert.True(preset.Succeeded, Format(preset.Errors));
+        var configured = session.Current.Theme.Animation;
+        Assert.Equal(new SkinAnimationSettings(.8, .9, .9, .25), configured);
+        Assert.True(sut.Animation.CanEditDecorationAnimation);
+        Assert.Equal("明显", sut.Animation.CurrentPresetName);
+
+        changedProperties.Clear();
+        var committer = (IDesignerImageMutationCommitter)sut;
+        Assert.True(committer.TryRemove(SkinAssetSlot.Decoration));
+
+        Assert.Equal(configured, session.Current.Theme.Animation);
+        Assert.False(sut.Animation.CanEditDecorationAnimation);
+        Assert.Equal("自定义", sut.Animation.CurrentPresetName);
+        Assert.Contains(nameof(sut.Animation.CanEditDecorationAnimation),
+            changedProperties);
+        Assert.Contains(nameof(sut.Animation.DecorationAnimationHint),
+            changedProperties);
+        Assert.Contains(nameof(sut.Animation.CurrentPresetName),
+            changedProperties);
+
+        changedProperties.Clear();
+        Assert.True(committer.TryCommit(
+            asset,
+            new DraftAssetReference(
+                SkinAssetSlot.Decoration,
+                asset.RelativePath,
+                "decoration.png")));
+
+        Assert.True(sut.Animation.CanEditDecorationAnimation);
+        Assert.Equal("明显", sut.Animation.CurrentPresetName);
+        Assert.Contains(nameof(sut.Animation.CanEditDecorationAnimation),
+            changedProperties);
     }
 
     public static IEnumerable<object[]> NumericBoundaries()
