@@ -98,6 +98,19 @@ This visual fix supplies meaningful renderer behavior for the breathing and glow
 - ComboBox text must satisfy readable foreground/background contrast in normal, focused, selected, and opened states.
 - Preset selection, sliders, toggles, and placement commands remain keyboard-operable.
 
+## Skin Designer Application Icon
+
+The skin designer receives its own application icon instead of the generic Windows executable icon.
+
+- The icon remains visibly related to the main HUD icon by retaining the cyan double-ring motif and dark high-contrast base.
+- A compact design-tool mark, such as a brush or stylus, distinguishes the designer from the ordinary HUD application.
+- The icon contains no text and must remain legible at 16, 24, and 32 pixels for the title bar and taskbar.
+- The delivered `.ico` contains appropriate Windows icon sizes through 256 pixels.
+- The designer project embeds the icon as its `ApplicationIcon`; the main designer window uses the same icon.
+- Installed designer executables and any optional designer shortcuts inherit this dedicated icon. The ordinary HUD icon and ordinary-user shortcuts remain unchanged.
+
+An identical copy of the HUD icon was rejected because users could not reliably distinguish the two running applications. A visually unrelated icon was rejected because it would weaken the shared product identity.
+
 ## Testing
 
 Automated coverage must prove:
@@ -109,6 +122,7 @@ Automated coverage must prove:
 5. Disabling or hiding animations restores exact base transforms and hides the animated glow layer.
 6. Zero intensities create no channel track.
 7. Existing renderer, preview, import, and animation-precedence tests still pass.
+8. The designer project and main window both reference the dedicated icon resource.
 
 Manual installed-build verification must check:
 
@@ -118,6 +132,7 @@ Manual installed-build verification must check:
 - `明显` breathing and glow are unmistakable;
 - quota text remains stable;
 - global animation off stops all four channels cleanly.
+- the designer title bar, taskbar button, executable, and optional installed shortcut show the dedicated designer icon at normal Windows scaling.
 
 ## Out of Scope
 
