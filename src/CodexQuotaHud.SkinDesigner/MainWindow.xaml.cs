@@ -875,7 +875,8 @@ public partial class MainWindow : Window, IDesignerWindow
             _ => new EditorMutationResult(false, [])
         };
         PresentMutationResult(slider, result);
-        if (!result.Succeeded)
+        if (!result.Succeeded ||
+            field is "RefreshSpeedMultiplier" or "RefreshHoldSeconds")
         {
             RestoreEditorSlider(slider, field);
         }

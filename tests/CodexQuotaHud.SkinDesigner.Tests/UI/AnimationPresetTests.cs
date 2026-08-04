@@ -115,6 +115,42 @@ public sealed class AnimationPresetTests
         }
     }
 
+    [Theory]
+    [InlineData("speed", 2.05d, 2.1d)]
+    [InlineData("hold", 1.55d, 1.6d)]
+    public void RefreshAnimationEditors_NormalizeAcceptedInputToOneDecimalForPreview(
+        string field,
+        double input,
+        double expected)
+    {
+        var timestamp = DateTimeOffset.Parse("2026-08-04T00:00:00Z");
+        var session = new SkinDraftSession(
+            SkinDraftFactory.CreateNew(
+                Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                timestamp,
+                SemanticVersion.Parse("1.2.3")),
+            () => timestamp = timestamp.AddSeconds(1));
+        var previewed = new List<SkinDraftDocument>();
+        using var sut = new DesignerViewModel(session, previewed.Add);
+
+        var result = field == "speed"
+            ? sut.Animation.SetRefreshSpeedMultiplier(input)
+            : sut.Animation.SetRefreshHoldSeconds(input);
+
+        Assert.True(result.Succeeded, Format(result.Errors));
+        Assert.Equal(
+            expected,
+            field == "speed"
+                ? session.Current.Theme.Animation.RefreshSpeedMultiplier
+                : session.Current.Theme.Animation.RefreshHoldSeconds);
+        Assert.Equal(
+            expected,
+            field == "speed"
+                ? previewed.Single().Theme.Animation.RefreshSpeedMultiplier
+                : previewed.Single().Theme.Animation.RefreshHoldSeconds);
+    }
+
     private static string Format(IReadOnlyList<SkinValidationError> errors) =>
         string.Join("; ", errors.Select(error =>
             $"{error.Code}@{error.Location}"));

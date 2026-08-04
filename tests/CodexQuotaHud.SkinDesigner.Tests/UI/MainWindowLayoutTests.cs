@@ -433,6 +433,10 @@ public sealed class MainWindowLayoutTests
                 hold.Maximum);
             Assert.Equal(0.1, speed.SmallChange, precision: 6);
             Assert.Equal(0.1, hold.SmallChange, precision: 6);
+            Assert.Equal(0.1, speed.TickFrequency, precision: 6);
+            Assert.Equal(0.1, hold.TickFrequency, precision: 6);
+            Assert.True(speed.IsSnapToTickEnabled);
+            Assert.True(hold.IsSnapToTickEnabled);
             Assert.Equal("刷新速度", AutomationProperties.GetName(speed));
             Assert.Equal("加速延续", AutomationProperties.GetName(hold));
             Assert.Equal("2.0×", Assert.IsType<TextBlock>(
@@ -458,6 +462,23 @@ public sealed class MainWindowLayoutTests
             Assert.Equal(4, speed.Value);
             Assert.NotNull(speed.ToolTip);
             Assert.Same(Brushes.OrangeRed, speed.BorderBrush);
+
+            speed.Maximum = 4;
+            speed.Value = 2.051;
+            hold.Value = 1.551;
+
+            Assert.Equal(2.1, speed.Value, precision: 6);
+            Assert.Equal(2.1,
+                window.Editor.Current.Theme.Animation.RefreshSpeedMultiplier,
+                precision: 6);
+            Assert.Equal("2.1×", Assert.IsType<TextBlock>(
+                window.FindName("RefreshSpeedValueText")).Text);
+            Assert.Equal(1.6, hold.Value, precision: 6);
+            Assert.Equal(1.6,
+                window.Editor.Current.Theme.Animation.RefreshHoldSeconds,
+                precision: 6);
+            Assert.Equal("1.6 秒", Assert.IsType<TextBlock>(
+                window.FindName("RefreshHoldValueText")).Text);
             window.DisposeWithoutShowingForTesting();
         });
     }

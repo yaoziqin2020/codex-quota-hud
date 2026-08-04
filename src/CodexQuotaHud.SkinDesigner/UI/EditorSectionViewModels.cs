@@ -144,10 +144,22 @@ public sealed class AnimationEditorViewModel(
         Update(animation => animation with { FloatingIntensity = value });
 
     public EditorMutationResult SetRefreshSpeedMultiplier(double value) =>
-        Update(animation => animation with { RefreshSpeedMultiplier = value });
+        Update(animation => animation with
+        {
+            RefreshSpeedMultiplier = NormalizeRefreshValue(
+                value,
+                SkinPackageLimits.MinimumRefreshSpeedMultiplier,
+                SkinPackageLimits.MaximumRefreshSpeedMultiplier)
+        });
 
     public EditorMutationResult SetRefreshHoldSeconds(double value) =>
-        Update(animation => animation with { RefreshHoldSeconds = value });
+        Update(animation => animation with
+        {
+            RefreshHoldSeconds = NormalizeRefreshValue(
+                value,
+                SkinPackageLimits.MinimumRefreshHoldSeconds,
+                SkinPackageLimits.MaximumRefreshHoldSeconds)
+        });
 
     internal void NotifyStateChanged()
     {
@@ -171,4 +183,15 @@ public sealed class AnimationEditorViewModel(
                 Animation = edit(draft.Theme.Animation)
             }
         });
+
+    private static double NormalizeRefreshValue(
+        double value,
+        double minimum,
+        double maximum) =>
+        !double.IsFinite(value) || value < minimum || value > maximum
+            ? value
+            : (double)Math.Round(
+                (decimal)value,
+                decimals: 1,
+                MidpointRounding.AwayFromZero);
 }
