@@ -1,6 +1,6 @@
 # Current Task
 
-## Unreleased v1.2.0 local candidate — PARTIAL
+## v1.2.0 released — manual follow-ups remain
 
 The current branch now includes the optional Skin Designer, the shared custom-
 skin runtime, a compact About window, the Designer preview recovery fix for
@@ -13,21 +13,30 @@ synthetic-preview controls, readable light dropdowns, and a distinct Designer
 application icon. Reopened drafts now also promote their replacement editor as
 the owner for apply/export dialogs, so overwrite confirmation and result
 dialogs remain usable after `打开草稿`. It is installed on the maintainer
-machine as a local `1.2.0` acceptance candidate, but it is not tagged,
-uploaded, or published.
+machine and publicly released as `v1.2.0`.
 
-Source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` adds the shared
-custom-skin runtime/import path and a separate optional Skin Designer. It is
-unreleased and is not part of the installed or published `v1.1.1` build.
+Source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` is the shared
+custom-skin runtime/import and optional Skin Designer base. The final packaged
+code is `7393ffc4983d03552314295fe74061781e0b1318`; release tag `v1.2.0`
+points to evidence commit `4a7c4c150315a37807a97b17d5cb4605236bf84c`.
 
 ### Current status
 
-Automated evidence is `PASS with unresolved historical anomaly`; overall
-feature acceptance is **PARTIAL — no public release is authorized**. The latest
+Automated evidence is `PASS with unresolved historical anomaly`; remaining
+manual-matrix coverage is still **PARTIAL**, but the user explicitly authorized
+the public release after reviewing that scope. The latest
 serial Release runs passed Core `75/75`, Skins `331/331`, App/UI `609/609`, and
 Designer `348/348`, for `1363/1363` with `0` skipped. Release build passed with
 `0` warnings and `0` errors. The earlier exact security/rollback suites passed
 Skins `223/223`, App `224/224`, and Designer `116/116`.
+
+GitHub `main` was fast-forwarded to the tag commit without a PR. Public Release
+`v1.2.0` was published on 2026-08-04, is neither draft nor prerelease, and is
+the repository's Latest Release. Setup, ZIP, and `SHA256SUMS.txt` are all
+uploaded; GitHub's online asset sizes and SHA-256 digests match the local
+release files. Public `v1.1.1` assets were not replaced. Main-branch CI now
+uses version `0.0.0` for its ephemeral package/smoke candidate instead of
+mislabeling current source as `1.1.1`.
 
 The local `v1.2.0` Setup upgrade completed with exit code `0`. Installed App
 and Designer binaries are version `1.2.0.0`; both report product version
@@ -100,7 +109,7 @@ replaced by the verified local `1.2.0` candidate. Its obsolete Setup and ZIP
 were removed; its install log and the pre-install rollback backup were retained
 as evidence.
 
-The current local candidate artifacts are:
+The public v1.2.0 artifacts are:
 
 - Setup: `CodexQuotaHud-Setup-v1.2.0.exe` — SHA-256
   `A87631B96F21EF6C8E35B14F4ED64E411243D5DC071ABE680704C673225746DC`
@@ -133,10 +142,10 @@ from the manual matrix in
 `docs/verification/2026-08-02-optional-skin-designer-acceptance.md`. Every
 Designer layout/DPI/image/slot rows, fresh install without Designer, component
 removal, uninstall, sign-out, restart, and the real About-window visual row are
-not all complete. The authorized local version bump/package/install work is
-complete. It does not authorize a tag, upload, GitHub Release, or replacement
-of `v1.1.1` assets. The user separately authorized pushing this feature branch;
-do not create a PR and do not push `main` unless separately requested.
+not all complete. Version bump, package/install acceptance, `main` fast-forward,
+tag `v1.2.0`, and the public GitHub Release are complete. Do not move the tag or
+replace the three public assets; any correction must use an explicitly approved
+new version. No PR is needed for this completed release.
 
 If the storage Remove anomaly recurs, first preserve and expose the returned
 error code/location/message and failing temp-root evidence; do not add retries,

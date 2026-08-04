@@ -8,7 +8,7 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
-## v1.1.1 release
+## v1.1.1 historical release
 
 The primary distribution path is the current-user Inno Setup executable
 `CodexQuotaHud-Setup-v1.1.1.exe`; ZIP plus its PowerShell script is fallback
@@ -41,13 +41,14 @@ their hashes. After public-behavior acceptance, the maintainer machine was
 separately customized to keep only a local Developer Preview desktop shortcut;
 that local convenience is not Setup behavior.
 
-## Unreleased optional Skin Designer source
+## v1.2.0 release and optional Skin Designer
 
 Commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` is the base custom-skin
-runtime/Designer handoff. The current local candidate is packaged from
-`7393ffc4983d03552314295fe74061781e0b1318` and is installed on the
-maintainer machine as `1.2.0`; it is still not part of public `v1.1.1` and has
-no public tag, Setup, ZIP, or GitHub Release.
+runtime/Designer handoff. The final package is built from
+`7393ffc4983d03552314295fe74061781e0b1318`, installed on the maintainer
+machine as `1.2.0`, and published under tag `v1.2.0`. The tag points to
+evidence commit `4a7c4c150315a37807a97b17d5cb4605236bf84c`; `main` was
+fast-forwarded without a PR.
 
 Dependency direction is intentionally one-way:
 
@@ -80,7 +81,7 @@ The exact per-user storage boundary is:
 - user-facing package exchange directory:
   `%USERPROFILE%\Documents\Codex Quota HUD Skins`
 
-The unreleased Setup definition always includes normal HUD import/runtime
+The v1.2.0 Setup always includes normal HUD import/runtime
 support and exposes **Install Skin Designer / 安装皮肤设计器** as a visible,
 unchecked optional component. Selecting it adds the Designer below
 `%LOCALAPPDATA%\Programs\CodexQuotaHud\designer` and a Start-menu-only entry;
@@ -99,9 +100,14 @@ stress investigation did not reproduce it or capture `result.Errors`, so no
 root cause or source fix is claimed. The final local Setup and ZIP hashes are
 `A87631B96F21EF6C8E35B14F4ED64E411243D5DC071ABE680704C673225746DC`
 and `044BD0B844AC7922E76B9EDD1C143152194B39A33CF231F159DDF3FB53E02D4D`.
-The local install matches the packaged App/Designer hashes. Some manual
+The local install matches the packaged App/Designer hashes. GitHub Release
+`v1.2.0` is public, Latest, non-draft, and non-prerelease; Setup, ZIP, and
+`SHA256SUMS.txt` are uploaded and their online sizes/digests match the local
+files. Some manual
 layout/DPI/image, uninstall, sign-out, restart, and About-window rows remain
-unrun; overall acceptance is `PARTIAL — no public release is authorized`.
+unrun; the manual matrix remains `PARTIAL` and must not be described as fully
+accepted even though the user explicitly authorized the release with those
+gaps recorded.
 
 Designer output dialogs resolve against a shared loaded-window owner rather
 than `Application.MainWindow`. This is required because loading or creating a
@@ -154,13 +160,14 @@ It does not call a private web endpoint directly.
 - Public source: GitHub `main`
 - Installed executable:
   `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`
-- Release: `v1.1.1`
+- Release: `v1.2.0`
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 
-The real machine currently has the published `v1.1.1` build from tag commit
-`6515e7c`. It includes the installed-mode shutdown listener, so future
-two-direction preview handoff acceptance exercises graceful signalling.
+The real machine currently has the published `v1.2.0` package code from
+`7393ffc`. It includes the optional Designer, because that component was
+selected for maintainer acceptance. The maintainer-only desktop Developer
+Preview shortcut is local customization and is not public Setup behavior.
 
 Do not treat the old conversation worktree under
 `Documents\Codex\2026-07-27\new-chat` as the long-term project root.
@@ -177,14 +184,22 @@ Do not treat the old conversation worktree under
   total 387/387; build zero warnings and zero errors; four isolated installer
   scenarios and real-machine install/default-uninstall/purge-uninstall checks
   passed.
-- 2026-08-03 unreleased optional Designer evidence at `168bf8b`: current
+- 2026-08-03 pre-release optional Designer evidence at `168bf8b`: current
   per-project totals Core 75, Skins 325, App/UI 590, Designer 334; two
   trustworthy full reruns passed 1324/1324 after one unresolved earlier
   one-test storage failure. Security/rollback filters passed 223, 224, and 116
   tests; build was zero warnings/errors. Internal `0.0.0` Setup/ZIP inspection
-  passed without installation. Manual/real-Windows acceptance remains NOT RUN,
-  so this is not a release baseline.
-- GitHub Windows CI covers restore, test, build, and self-contained publish.
+  passed without installation. This historical gate did not itself authorize a
+  release.
+- 2026-08-04 v1.2.0 release baseline: Core 75/75, Skins 331/331, App/UI
+  609/609, Designer 348/348, total 1363/1363 with zero skipped; Release build
+  zero warnings/errors. Final Setup/ZIP hashes are recorded above, installer
+  scenarios passed, and GitHub online asset metadata matches local artifacts.
+  The documented manual matrix gaps and one unreproduced historical storage
+  anomaly remain open evidence.
+- GitHub Windows CI covers restore, test, build, and self-contained publish. Its
+  package/smoke candidate uses ephemeral version `0.0.0`, not a public release
+  version, and is not uploaded.
 - The asynchronous test wait helper is time-based to remain stable on slower
   GitHub Windows runners.
 
@@ -206,7 +221,7 @@ Do not treat the old conversation worktree under
 - The developer preview is entered only with `--preview`; it uses synthetic
   in-memory data and must never replace real app-server acceptance.
 - Run focused tests for changed behavior, then the current full solution suite;
-  do not reuse the historical `v1.1.1` 388-test count for unreleased source.
+  do not reuse the historical `v1.1.1` 388-test count for current source.
 - Use the Developer Preview sliders as the manual boundary and mixed-state
   tool for alert colors; inspect normal (`>20%`), Warning (`>10%..20%`), and
   Critical (`<=10%`) states independently for both quotas.

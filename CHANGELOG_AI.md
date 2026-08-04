@@ -1,6 +1,6 @@
 # AI Change Log
 
-## 2026-08-04 — v1.2.0 local candidate, About window, and preview recovery
+## 2026-08-04 — v1.2.0 released with optional Skin Designer
 
 - Completed the custom-skin workflow follow-up: imported skins appear without
   restart, custom names select directly while deletion remains a separate
@@ -58,7 +58,7 @@
   normal-only ZIP SHA-256 is
   `A99DB908F700E446A36BAD58655C79D583D658E4250A956ED2C01095239C6452`.
   Setup, App, and Designer remain `NotSigned`.
-- Replaced the earlier candidates with the current local package from
+- Replaced the earlier candidates with the final public package from
   `7393ffc`. Setup
   SHA-256 is
   `A87631B96F21EF6C8E35B14F4ED64E411243D5DC071ABE680704C673225746DC`;
@@ -101,8 +101,23 @@
   18 package was never run; a later production-structure candidate was
   mistakenly installed, then replaced by v1.2.0. Its obsolete Setup/ZIP were
   removed while its log and rollback backup were retained.
-- No tag, PR, GitHub Release, or replacement of public v1.1.1 assets was
-  performed. Only the authorized feature branch may be pushed.
+- Fast-forwarded GitHub `main` from `7783286` to evidence commit `4a7c4c1`
+  without a PR, created and pushed annotated tag `v1.2.0`, and published the
+  non-draft, non-prerelease Latest GitHub Release. Uploaded
+  `CodexQuotaHud-Setup-v1.2.0.exe` (100,049,805 bytes),
+  `CodexQuotaHud-v1.2.0-win-x64.zip` (68,329,992 bytes), and
+  `SHA256SUMS.txt` (196 bytes). GitHub's online SHA-256 digests for the two
+  packages match the final hashes recorded above. Existing public `v1.1.1`
+  assets were not replaced.
+- The release was explicitly authorized after the user reviewed the documented
+  verification scope. Remaining layout/DPI/image, component-removal,
+  uninstall, sign-out/restart, formal-HUD rotation, and real About-window
+  visual rows remain `NOT RUN`; the historical unreproduced storage anomaly is
+  still recorded and was not reclassified as fixed.
+- Changed main-branch CI packaging from the stale public version `1.1.1` to an
+  ephemeral `0.0.0` candidate. The runner still builds and smoke-tests the full
+  production package structure, but no longer gives current-source CI output a
+  previously released version number.
 
 ## 2026-08-03 — Unreleased optional Skin Designer automated handoff
 

@@ -19,10 +19,10 @@ and a numeric tray icon without scraping web pages or storing credentials.
 > This is an independent open-source project and is not an official OpenAI
 > product.
 
-## v1.1.1 installation / 安装
+## v1.2.0 installation / 安装
 
-Primary path: download `CodexQuotaHud-Setup-v1.1.1.exe` and double-click it.
-主要方式：下载 `CodexQuotaHud-Setup-v1.1.1.exe` 后直接双击运行。
+Primary path: download `CodexQuotaHud-Setup-v1.2.0.exe` and double-click it.
+主要方式：下载 `CodexQuotaHud-Setup-v1.2.0.exe` 后直接双击运行。
 
 Setup automatically offers Simplified Chinese or English, installs only for
 the current Windows user, and needs no administrator permission. It installs
@@ -37,59 +37,64 @@ shortcuts launch the real HUD without `--preview`. Developer Preview is not
 offered by Setup; source and ZIP users can launch it explicitly with
 `CodexQuotaHud.App.exe --preview`.
 
+Setup also offers **Install Skin Designer / 安装皮肤设计器** as an optional
+component. It is visible but unchecked by default. Selecting it adds only the
+Designer files and a Start-menu entry; the normal HUD can import and use
+`.cqskin` files without the Designer.
+
+Setup 还提供可选组件 **安装皮肤设计器**，默认不勾选。勾选后只增加设计器文件和
+开始菜单入口；不安装设计器的普通用户仍可在正式 HUD 中导入和使用 `.cqskin` 皮肤。
+
 Setup 的任务页包含开机启动和创建正式版桌面快捷方式，两项默认勾选。桌面和开始菜单
 快捷方式均直接启动真实 HUD，不带 `--preview`。Setup 不提供开发预览入口；源码和 ZIP
 用户可明确运行 `CodexQuotaHud.App.exe --preview` 进入预览模式。
 
-Install `v1.1.1` directly over `v1.0.0` or `v1.1.0`; personal HUD settings and Developer
-Preview window state are retained by default. Normal uninstall preserves those
-settings. Select the explicit purge option only to remove the exact
-`%LOCALAPPDATA%\\CodexQuotaHud` settings directory.
+Install `v1.2.0` directly over `v1.0.0`, `v1.1.0`, or `v1.1.1`; personal HUD
+settings, installed custom skins, Designer drafts, and Developer Preview window
+state are retained by default. Normal uninstall preserves user data. Select the
+explicit purge option only to remove the exact approved product-data roots.
 
-可从 `v1.0.0` 或 `v1.1.0` 直接升级，默认保留 HUD 设置和开发预览窗口状态。普通卸载会保留它们；只有明确选择
-清除选项时，才会删除 `%LOCALAPPDATA%\\CodexQuotaHud` 这一准确的设置目录。
+可从 `v1.0.0`、`v1.1.0` 或 `v1.1.1` 直接升级，默认保留 HUD 设置、已安装皮肤、
+设计器草稿和开发预览窗口状态。普通卸载会保留用户数据；只有明确选择清除选项时，
+才会删除安装器批准的准确产品数据目录。
 
 The release Setup is unsigned, so Windows SmartScreen may show an
 unknown-publisher warning. Verify its SHA-256 against `SHA256SUMS.txt` before
 running it:
 
 ```powershell
-Get-FileHash .\\CodexQuotaHud-Setup-v1.1.1.exe -Algorithm SHA256
+Get-FileHash .\\CodexQuotaHud-Setup-v1.2.0.exe -Algorithm SHA256
 ```
 
 当前 Setup 未签名，Windows SmartScreen 可能显示未知发布者提示。运行前请使用
 `SHA256SUMS.txt` 和上述命令核对 SHA-256。
 
-If Setup is unavailable, `CodexQuotaHud-v1.1.1-win-x64.zip` plus its bundled
+If Setup is unavailable, `CodexQuotaHud-v1.2.0-win-x64.zip` plus its bundled
 PowerShell script is the fallback. GitHub Packages is not used for this
 application or its release assets.
 
-若 Setup 不可用，`CodexQuotaHud-v1.1.1-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
+若 Setup 不可用，`CodexQuotaHud-v1.2.0-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
 本应用和发布资产均不使用 GitHub Packages。
 
-## Unreleased source status / 未发布源码状态
+## v1.2.0 Skin Designer / 皮肤设计器
 
-The current source after public `v1.1.1` adds safe data-only `.cqskin` import
+Public `v1.2.0` adds safe data-only `.cqskin` import
 to the normal HUD, a shared `CodexQuotaHud.Skins` runtime library, and a
-separate Skin Designer application. The current branch also adds an About
+separate Skin Designer application. It also adds an About
 window, fixes Designer preview recovery after selecting `None`, and restores
 formal-HUD automatic display after quota arrives during startup. The Designer
 now has simple animation presets, visibly separate center-breathing and ring-
 glow effects, compact grouped preview controls, readable dropdowns, immediate
 custom-skin synchronization, a shared Documents exchange directory, and its
-own application icon. These changes are **unreleased**: a local v1.2.0
-acceptance candidate is installed on the maintainer machine, but no new public
-Setup, ZIP, tag, or GitHub Release is claimed here.
+own application icon.
 
-当前源码在公开版 `v1.1.1` 之后新增了正式 HUD 的安全 `.cqskin` 导入、共享的
+公开版 `v1.2.0` 新增了正式 HUD 的安全 `.cqskin` 导入、共享的
 `CodexQuotaHud.Skins` 运行库、独立皮肤设计器、“关于”窗口、选择 `None` 后恢复
 预览的修复，以及启动读取额度后正式 HUD 自动显示的修复。设计器还新增了简化动画
 预设、可见的中心呼吸与额度环光晕、紧凑分组的预览控制、可读下拉框、即时自定义皮肤
-同步、共享文档交换目录和独立应用图标。这些变更**尚未公开发布**；
-维护者本机已安装 v1.2.0 验收候选，但本文不声称已有新的公开 Setup、ZIP、标签或
-GitHub Release。
+同步、共享文档交换目录和独立应用图标。
 
-The unreleased Setup definition shows an optional component named **Install
+The Setup shows an optional component named **Install
 Skin Designer**, with this description: “Optional visual editor for creating
 and exporting Codex Quota HUD skins. It is not required to run or import
 skins.” The Simplified-Chinese component is **安装皮肤设计器**：
@@ -106,7 +111,7 @@ PNG/JPEG assets. Validation rejects executable/script/XAML content, remote
 references, unsafe paths or links, malformed/oversized archives and images,
 and hash mismatches. The normal HUD never depends on the Designer executable.
 
-Run either unreleased application directly from source:
+Run either application directly from source:
 
 ```powershell
 dotnet run --project .\src\CodexQuotaHud.App\CodexQuotaHud.App.csproj
@@ -119,8 +124,8 @@ test failure that could not be reproduced or root-caused. The local v1.2.0
 upgrade and installed Designer's `None -> Dual/5h/Week` regression paths
 passed. Fresh install/component removal/uninstall, full layout/DPI/image
 matrices, sign-out/restart, and the real About-window visual check remain
-incomplete; overall status is therefore `PARTIAL — no public release is
-authorized`.
+incomplete. Those gaps remain documented as `NOT RUN`; they are not represented
+as completed acceptance in the release record.
 
 ![Codex Quota HUD overview](docs/assets/codex-quota-hud-overview.png)
 
@@ -140,7 +145,7 @@ authorized`.
 ## 下载与安装 / Download
 
 从 [最新 Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
-下载 ZIP 后备包 `CodexQuotaHud-v1.1.1-win-x64.zip`，解压后在该目录运行：
+下载 ZIP 后备包 `CodexQuotaHud-v1.2.0-win-x64.zip`，解压后在该目录运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
@@ -265,7 +270,7 @@ dotnet run --project .\src\CodexQuotaHud.App -- --preview
 
 On the maintainer's machine, a separately created **Codex Quota HUD Developer
 Preview** shortcut performs the opposite handoff: it closes installed mode
-before the preview HUD and control window open. The installed `v1.1.1` build exits through its normal cleanup
+before the preview HUD and control window open. The installed `v1.2.0` build exits through its normal cleanup
 path. Older builds use a fallback only when the running executable resolves to
 the exact standard installation path above; a same-name process at any other
 path is never force-closed. If replacement cannot be completed, the shortcut
@@ -281,12 +286,9 @@ two-direction handoff remains an optional manual UI check.
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
 
-当前 HEAD 包含 `v1.1.1` 之后的未发布功能。不要在当前 HEAD 上使用
-`publish.ps1` 的历史默认版本，也不要执行
-`package-release.ps1 -Version 1.1.1`；这会把未发布二进制错误标记为
-已公开的 `v1.1.1`。生产发布打包只能在新版本和发布动作被明确批准后
-由维护者执行。本次仅在独立系统临时目录中以 `0.0.0` 和
-`-InternalTestMode` 生成过一次内部验证候选，它已删除，不是可发布产物。
+`v1.2.0` 已从标签 `v1.2.0` 公开发布。后续生产打包必须使用新的明确版本号；
+不要再次用 `package-release.ps1 -Version 1.2.0` 生成不同二进制，也不要移动标签或
+替换现有 Release 资产，除非维护者明确批准一次新的修订发布。
 
 ## 项目结构 / Project Structure
 
@@ -303,7 +305,7 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前未发布源码包含 1363 项自动化测试：
+`v1.2.0` 源码包含 1363 项自动化测试：
 
 - Core：75 项
 - Skins：331 项
@@ -317,17 +319,17 @@ dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 ```
 
 GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
-自包含发布检查。
+自包含发布检查。CI 包固定使用临时版本 `0.0.0`，只在 Runner 内做安装烟测，
+不会冒用或覆盖公开 Release 版本。
 
 最新串行 Release 测试为 `1363/1363`、跳过 `0`，Release build 为
 `0` warnings / `0` errors；三套安全与回滚筛选分别为 `223/223`、`224/224`
 和 `116/116`。同一提交较早的一次完整测试曾出现 `1` 项未能复现、未能取得
-`result.Errors` 的存储删除失败，因此自动 gate 记录为带未解决异常的通过证据，
-而不是发布许可。详见
+`result.Errors` 的存储删除失败，因此验证记录仍保留这项未解决的历史异常。详见
 [`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
 
-本地 v1.2.0 候选的七个隔离安装/升级/组件/卸载场景及两个已提交清理失败场景
-全部通过；这仍只是本地候选证据，不代表已经公开发布。
+v1.2.0 的七个隔离安装/升级/组件/卸载场景及两个已提交清理失败场景全部通过。
+正式 Release 已公开，Setup、ZIP 与 `SHA256SUMS.txt` 的在线大小和摘要均已核对。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and
 total `388/388`; the Release build completed with zero warnings and zero

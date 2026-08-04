@@ -32,10 +32,10 @@ jobs:
         shell: powershell
         run: choco install innosetup --no-progress -y
 
-      - name: Build release candidates
+      - name: Build ephemeral CI candidates
         shell: powershell
-        run: .\scripts\package-release.ps1 -Version 1.1.1
+        run: .\scripts\package-release.ps1 -Version 0.0.0
 
       - name: Smoke-test isolated installer
         shell: powershell
-        run: .\scripts\test-installer.ps1 -Version 1.1.1 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.1.1.exe
+        run: .\scripts\test-installer.ps1 -Version 0.0.0 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v0.0.0.exe

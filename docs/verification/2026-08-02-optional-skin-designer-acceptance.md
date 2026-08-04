@@ -1,19 +1,19 @@
-# Optional Skin Designer Acceptance — Unreleased Source
+# Optional Skin Designer Acceptance — v1.2.0 Release Record
 
 ## Scope and release boundary
 
-This record covers the optional Skin Designer and safe `.cqskin` runtime/import work present in source after the public `v1.1.1` release. The `v1.1.1` Setup/ZIP names, sizes, hashes, tag, and release evidence elsewhere in this repository remain historical facts and are not evidence for this feature.
+This record covers the optional Skin Designer and safe `.cqskin` runtime/import work developed after the public `v1.1.1` release and later published as `v1.2.0`. The `v1.1.1` Setup/ZIP names, sizes, hashes, tag, and release evidence elsewhere in this repository remain historical facts and are not evidence for this feature.
 
-The only authorized package candidate is an ephemeral internal `0.0.0` build in a unique system-temporary directory. It must not be installed, signed, tagged, uploaded, published, or substituted for a public asset. GUI launch, the canonical/production Setup, real install/uninstall, sign-out, restart, and mutation of the maintainer installation or user data are outside this task's authorization.
+The original Task 18 boundary authorized only an ephemeral internal `0.0.0` build in a unique system-temporary directory. Later user instructions separately authorized GUI acceptance, the production `v1.2.0` package/install, and finally the public `main` fast-forward, tag, and GitHub Release. The current release decision near the end of this record supersedes the original authorization boundary without rewriting historical row results.
 
 Evidence states are `PASS`, `PARTIAL`, `FAIL`, and `NOT RUN`. A row moves to `PASS` only from direct evidence collected for that exact row. Automated PASS cannot make the overall feature acceptance PASS.
 
 ## 2026-08-04 follow-up candidate
 
-This section records the later `v1.2.0` local candidate and supersedes earlier
-counts/hashes only where explicitly stated. It does not convert the unreleased
-feature into a public release and does not authorize a tag, upload, GitHub
-Release, or replacement of `v1.1.1` assets.
+This section records what was then the `v1.2.0` local candidate and supersedes
+earlier counts/hashes only where explicitly stated. It did not itself authorize
+the later tag/upload; that authorization and completed public release are
+recorded in the final release decision.
 
 The user's installed screenshot exposed a structural bottom-control layout
 problem: two full-width percentage boxes dominated the row, display mode was
@@ -415,25 +415,45 @@ Each transition requires exact installed files, Start-menu/Desktop shortcut targ
 
 ## Release decision
 
-**PARTIAL — no release is authorized.**
+**RELEASED as `v1.2.0`; the remaining manual matrix is still PARTIAL.**
 
-Current automated evidence is `PASS with unresolved anomaly`: two trustworthy
-full-solution runs passed `1324/1324`, build and diff gates passed, all three
-attack/rollback suites passed, and the one internal `0.0.0` package was
-inspected and cleaned without running Setup. The original 20:43 storage
-failure remains direct contradictory evidence: its `result.Errors` was not
-printed, extensive follow-up did not reproduce it, and no root cause or fix is
-claimed. The polluted generated-assets batches are excluded from all totals.
+After reviewing the documented scope, the user explicitly authorized the
+public release on 2026-08-04. GitHub `main` was fast-forwarded without a PR;
+annotated tag `v1.2.0` points to
+`4a7c4c150315a37807a97b17d5cb4605236bf84c`. The public Release is Latest,
+non-draft, and non-prerelease. These assets are uploaded:
 
-Every manual Designer/HUD/real Setup/preservation/sign-out/restart row remains
-`NOT RUN`. No public version, tag, Setup, ZIP, GitHub Release, upload, push,
-installed state, or user data was changed. Automated evidence alone cannot
-promote this record to PASS or authorize release.
+- `CodexQuotaHud-Setup-v1.2.0.exe` — 100,049,805 bytes — SHA-256
+  `a87631b96f21ef6c8e35b14f4ed64e411243d5dc071abe680704c673225746dc`
+- `CodexQuotaHud-v1.2.0-win-x64.zip` — 68,329,992 bytes — SHA-256
+  `044bd0b844ac7922e76b9edd1c143152194b39a33cf231f159ddf3fb53e02d4d`
+- `SHA256SUMS.txt` — 196 bytes — SHA-256
+  `45031be6ff1cdf8e337099126f552a3d3b268ad375e541d840eb3ee5b26dbd71`
+
+GitHub reports all three assets as `uploaded`; its online digests match the
+local artifacts. Existing `v1.1.1` assets were not replaced.
+
+The release authorization does not convert unexecuted checks to PASS. Manual
+Designer layout/DPI/image/slot rows, fresh install without Designer, component
+removal, uninstall, sign-out/restart, formal-HUD rotation, and the real About-
+window visual row remain `NOT RUN`. The original storage failure remains an
+unresolved historical anomaly: later trustworthy runs and investigation did
+not reproduce it, but its `result.Errors` was not captured and no root cause or
+fix is claimed. Matrix rows above retain the status recorded when they were
+executed or deferred.
+
+### Superseded pre-authorization decision
+
+Before the user's explicit release instruction, this record's decision was
+`PARTIAL — no release is authorized`. At that time automated evidence alone did
+not authorize a public version, tag, upload, or Release. That historical gate
+is preserved here rather than rewritten as a completed manual acceptance.
 
 ## Earlier 2026-08-04 local v1.2.0 continuation (superseded above)
 
-This continuation supersedes only the local candidate evidence below; it does
-not convert the remaining manual matrix rows to PASS or authorize a release.
+This continuation supersedes only the local candidate evidence below; it did
+not convert the remaining manual matrix rows to PASS or itself authorize the
+later release.
 
 - Automated regression gate: Core `75/75`, Skins `325/325`, App/UI `609/609`,
   Designer `334/334`, total `1343/1343`, skipped `0`.
