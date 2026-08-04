@@ -43,7 +43,7 @@ public sealed class SkinImportPreviewWindowTests
             Assert.Equal(Visibility.Collapsed, window.KeepCopyButton.Visibility);
             Assert.Equal("取消", window.CancelButton.Content);
             Assert.Contains("无可选图片", window.AssetSummaryText.Text);
-            Assert.Contains("1.2.0", window.CompatibilityText.Text);
+            Assert.Contains("1.2.3", window.CompatibilityText.Text);
             Assert.DoesNotContain("1.1.1", window.CompatibilityText.Text);
             Assert.Equal(SkinCollisionDecision.Cancel, window.Decision);
         });
