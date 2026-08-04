@@ -110,7 +110,7 @@ chosen values are persisted on its next save, apply, or export.
 
 ### Contract and compatibility
 
-`SkinAnimationSettings` gains one value represented in `theme.json` as:
+`SkinAnimationSettings` gains two values represented in `theme.json` as:
 
 ```json
 {
@@ -119,20 +119,22 @@ chosen values are persisted on its next save, apply, or export.
     "breathingIntensity": 0.45,
     "glowIntensity": 0.55,
     "floatingIntensity": 0.15,
+    "refreshSpeedMultiplier": 2.0,
     "refreshHoldSeconds": 1.5
   }
 }
 ```
 
-Validation accepts `refreshHoldSeconds` from 0.0 through 3.0. Non-finite values
-are rejected.
+Validation accepts `refreshSpeedMultiplier` from 0.0 through 4.0 and
+`refreshHoldSeconds` from 0.0 through 3.0. Non-finite values are rejected.
 
-When the field is absent, the reader supplies 1.5. Therefore existing installed
-skins and old `.cqskin` files receive the newly
-approved 1.5-second hold after the HUD upgrade. New drafts use the same values.
-No existing skin package has to be rewritten. The writer emits the field for
-newly saved skins and for older skins that are subsequently saved, applied, or
-exported through the updated Designer.
+When the fields are absent, the reader supplies 2.0 for refresh speed and 1.5
+for the hold. Therefore the existing custom skin retains its current fixed 2x
+refresh behavior while receiving the newly approved 1.5-second hold after the
+HUD upgrade. New drafts use the same defaults. No existing skin package has to
+be rewritten. The writer emits both fields for newly saved skins and for older
+skins that are subsequently saved, applied, or exported through the updated
+Designer.
 
 Packages written with the new fields declare HUD v1.2.3 as their minimum.
 Older packages remain readable; no archive layout or asset boundary changes.
@@ -150,8 +152,10 @@ Idle -> Refreshing -> Hold -> Idle
              +----------+  a new refresh restarts refresh/hold timing
 ```
 
-- Entering `Refreshing` cancels any prior hold and applies the skin's existing
-  refresh-speed behavior. This feature does not alter or stack speed ratios.
+- Entering `Refreshing` cancels any prior hold and applies the selected skin's
+  refresh-speed behavior. Custom skins use their 0-4x package multiplier;
+  built-in skins use their unchanged existing per-skin profiles. Repeated
+  refreshes never stack speed ratios.
 - When the request stops refreshing, the effective state remains refreshing for
   the configured hold duration.
 - The hold starts after request completion. Even when a cached or fast request
@@ -167,10 +171,10 @@ Idle -> Refreshing -> Hold -> Idle
 - A zero-second hold restores idle immediately.
 
 All five built-in skins retain their existing per-skin refresh-speed profiles
-and receive the global 1.5-second hold. Custom skins retain their current fixed
-refresh speed and use their package hold value, with 1.5 as the fallback. The
-refresh timing changes only presentation; it never delays quota-result
-publication or changes network work.
+and receive the global 1.5-second hold. Custom skins use their package speed
+multiplier and hold duration; old packages fall back to the current 2x speed
+and the new 1.5-second hold. The refresh timing changes only presentation; it
+never delays quota-result publication or changes network work.
 
 The hold coordinator uses cancellation and an injectable delay/clock boundary
 so a stale completion cannot restore a newly selected skin or a newer refresh
@@ -178,7 +182,8 @@ cycle. UI state changes are marshalled to the owning Dispatcher.
 
 ## Data flow
 
-1. The Designer edits one numeric hold field in the current draft.
+1. The Designer edits the 0-4x refresh-speed multiplier and the 0-3 second hold
+   duration in the current draft.
 2. Draft validation and preview update run through the existing single mutation
    path.
 3. Save/apply/export serializes the field into `theme.json` and records HUD
@@ -211,7 +216,7 @@ Automated coverage will prove:
 - hover, pressed, focus, disabled, default, and cancel dialog behavior;
 - all former Designer `MessageBox` call sites use the themed dialog service;
 - native file pickers remain the only approved native dialogs;
-- old JSON without the hold field reads as 1.5;
+- old JSON without the new fields reads as 2x speed and a 1.5-second hold;
 - explicit boundary values round-trip and invalid values are rejected;
 - new drafts, saved drafts, apply, export, and package readback preserve values;
 - built-in and custom refresh state follows Idle -> Refreshing -> Hold -> Idle;
@@ -222,11 +227,11 @@ Automated coverage will prove:
 - full Core, Skins, App/UI, and Designer Release suites and solution build pass.
 
 Manual acceptance will open a native file picker and confirm that the disabled
-Designer buttons remain dark. It will also exercise each themed dialog shape
-and visually verify the existing accelerated profile followed by a 1.5-second
-hold on one built-in skin and one custom skin. A deliberately fast refresh must
-still show the full additional
-1.5-second accelerated phase before returning smoothly to idle.
+Designer buttons remain dark. It will also exercise each themed dialog shape,
+verify the unchanged accelerated profile followed by a 1.5-second hold on one
+built-in skin, and verify 0x, 2x, and 4x custom-skin settings followed by the
+configured hold. A deliberately fast refresh must still show the full
+additional 1.5-second accelerated phase before returning smoothly to idle.
 
 ## Release boundary
 
