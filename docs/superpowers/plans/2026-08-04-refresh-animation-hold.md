@@ -117,7 +117,6 @@ git commit -m "feat: target skin hold metadata at v1.2.3"
 
 **Files:**
 - Create: `src/CodexQuotaHud.App/UI/Animation/IAnimationDelay.cs`
-- Modify: `src/CodexQuotaHud.App/UI/Animation/IOrbAnimationTarget.cs`
 - Modify: `src/CodexQuotaHud.App/UI/Animation/OrbAnimationController.cs`
 - Modify: `src/CodexQuotaHud.App/UI/Skins/CustomQuotaSkin.cs`
 - Modify: `src/CodexQuotaHud.App/UI/QuotaOrbWindow.xaml.cs`
@@ -178,7 +177,7 @@ git commit -m "feat: hold refresh animation after completion"
 - Modify: `src/CodexQuotaHud.SkinDesigner/UI/EditorSectionViewModels.cs`
 - Modify: `src/CodexQuotaHud.SkinDesigner/MainWindow.xaml`
 - Modify: `src/CodexQuotaHud.SkinDesigner/MainWindow.xaml.cs`
-- Modify: `src/CodexQuotaHud.SkinDesigner/Preview/SyntheticPreviewViewModel.cs`
+- Modify: `src/CodexQuotaHud.SkinDesigner/UI/SyntheticPreviewViewModel.cs`
 - Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/UI/AnimationPresetTests.cs`
 - Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/UI/MainWindowLayoutTests.cs`
 - Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/UI/SyntheticPreviewViewModelTests.cs`
