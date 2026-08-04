@@ -873,6 +873,17 @@ public partial class MainWindow : Window, IDesignerWindow
         }
     }
 
+    private void AnimationPreset_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag } button ||
+            !Enum.TryParse<AnimationPresetKind>(tag, out var preset))
+        {
+            return;
+        }
+
+        PresentMutationResult(button, Editor.Animation.ApplyPreset(preset));
+    }
+
     private void TextWeight_OnSelectionChanged(
         object sender,
         SelectionChangedEventArgs e)

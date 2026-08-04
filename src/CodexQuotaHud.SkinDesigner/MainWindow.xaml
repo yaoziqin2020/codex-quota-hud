@@ -39,9 +39,6 @@
             <Setter Property="FocusVisualStyle"
                     Value="{StaticResource DesignerFocusVisualStyle}" />
         </Style>
-        <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource DesignerTextBrush}" />
-        </Style>
         <Style TargetType="Button">
             <Setter Property="FocusVisualStyle"
                     Value="{StaticResource DesignerFocusVisualStyle}" />
@@ -69,6 +66,21 @@
             <Setter Property="Background" Value="#FFF1F5F9" />
             <Setter Property="Padding" Value="8,6" />
             <Setter Property="MinHeight" Value="36" />
+        </Style>
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="#FF0B1220" />
+            <Setter Property="Background" Value="#FFF1F5F9" />
+            <Setter Property="Padding" Value="8,5" />
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter Property="Foreground" Value="#FF0B1220" />
+                    <Setter Property="Background" Value="#FFD7EAF3" />
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Foreground" Value="#FF0B1220" />
+                    <Setter Property="Background" Value="#FFBAE6F7" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
         <Style TargetType="CheckBox">
             <Setter Property="FocusVisualStyle"
@@ -364,28 +376,81 @@
 
                     <Expander x:Name="AnimationSection" Header="动画">
                         <StackPanel>
-                            <TextBlock Foreground="{DynamicResource DesignerMutedTextBrush}" TextWrapping="Wrap"
-                                       Text="关闭 Windows 动画时自动使用静态终态。" />
-                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="旋转强度 0–1" />
-                            <Slider Minimum="0" Maximum="1" Tag="RotationIntensity"
-                                    Value="{Binding Editor.Current.Theme.Animation.RotationIntensity, Mode=OneWay}"
-                                    ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="旋转动画强度" KeyboardNavigation.TabIndex="38" />
-                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="呼吸强度 0–1" />
-                            <Slider Minimum="0" Maximum="1" Tag="BreathingIntensity"
-                                    Value="{Binding Editor.Current.Theme.Animation.BreathingIntensity, Mode=OneWay}"
-                                    ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="呼吸动画强度" KeyboardNavigation.TabIndex="39" />
-                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="发光动画强度 0–1" />
-                            <Slider Minimum="0" Maximum="1" Tag="AnimationGlowIntensity"
-                                    Value="{Binding Editor.Current.Theme.Animation.GlowIntensity, Mode=OneWay}"
-                                    ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="发光动画强度" KeyboardNavigation.TabIndex="40" />
-                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="浮动强度 0–1" />
-                            <Slider Minimum="0" Maximum="1" Tag="FloatingIntensity"
-                                    Value="{Binding Editor.Current.Theme.Animation.FloatingIntensity, Mode=OneWay}"
-                                    ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="浮动动画强度" KeyboardNavigation.TabIndex="41" />
+                            <TextBlock Foreground="{DynamicResource DesignerMutedTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="先选一个看得见的效果，再按需要微调。关闭 Windows 动画时自动显示静态状态。" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                       Text="动画预设" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="AnimationStillPresetButton"
+                                        Grid.Column="0" Content="静止" Tag="Still"
+                                        Click="AnimationPreset_OnClick"
+                                        AutomationProperties.Name="使用静止动画预设"
+                                        KeyboardNavigation.TabIndex="38" />
+                                <Button x:Name="AnimationGentlePresetButton"
+                                        Grid.Column="1" Margin="6,0,0,0"
+                                        Content="柔和" Tag="Gentle"
+                                        Click="AnimationPreset_OnClick"
+                                        AutomationProperties.Name="使用柔和动画预设"
+                                        KeyboardNavigation.TabIndex="39" />
+                                <Button x:Name="AnimationNoticeablePresetButton"
+                                        Grid.Column="2" Margin="6,0,0,0"
+                                        Content="明显" Tag="Noticeable"
+                                        Click="AnimationPreset_OnClick"
+                                        AutomationProperties.Name="使用明显动画预设"
+                                        KeyboardNavigation.TabIndex="40" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,7,0,8">
+                                <TextBlock Foreground="{DynamicResource DesignerMutedTextBrush}"
+                                           Text="当前预设：" />
+                                <TextBlock x:Name="AnimationPresetStatusText"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding DataContext.Editor.Animation.CurrentPresetName, ElementName=DesignerWindow}" />
+                            </StackPanel>
+                            <Expander x:Name="AdvancedAnimationSection"
+                                      Header="高级细调" IsExpanded="False">
+                                <StackPanel>
+                                    <TextBlock x:Name="DecorationAnimationHintText"
+                                               Foreground="{DynamicResource DesignerMutedTextBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding DataContext.Editor.Animation.DecorationAnimationHint, ElementName=DesignerWindow}" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                               Text="装饰旋转 0–1" />
+                                    <Slider Minimum="0" Maximum="1" Tag="RotationIntensity"
+                                            IsEnabled="{Binding DataContext.Editor.Animation.CanEditDecorationAnimation, ElementName=DesignerWindow}"
+                                            Value="{Binding Editor.Current.Theme.Animation.RotationIntensity, Mode=OneWay}"
+                                            ValueChanged="EditorSlider_OnValueChanged"
+                                            AutomationProperties.Name="装饰旋转动画强度"
+                                            KeyboardNavigation.TabIndex="41" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                               Text="中心呼吸 0–1" />
+                                    <Slider Minimum="0" Maximum="1" Tag="BreathingIntensity"
+                                            Value="{Binding Editor.Current.Theme.Animation.BreathingIntensity, Mode=OneWay}"
+                                            ValueChanged="EditorSlider_OnValueChanged"
+                                            AutomationProperties.Name="中心呼吸动画强度"
+                                            KeyboardNavigation.TabIndex="42" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                               Text="额度环光晕 0–1" />
+                                    <Slider Minimum="0" Maximum="1" Tag="AnimationGlowIntensity"
+                                            Value="{Binding Editor.Current.Theme.Animation.GlowIntensity, Mode=OneWay}"
+                                            ValueChanged="EditorSlider_OnValueChanged"
+                                            AutomationProperties.Name="额度环光晕动画强度"
+                                            KeyboardNavigation.TabIndex="43" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                               Text="装饰浮动 0–1" />
+                                    <Slider Minimum="0" Maximum="1" Tag="FloatingIntensity"
+                                            IsEnabled="{Binding DataContext.Editor.Animation.CanEditDecorationAnimation, ElementName=DesignerWindow}"
+                                            Value="{Binding Editor.Current.Theme.Animation.FloatingIntensity, Mode=OneWay}"
+                                            ValueChanged="EditorSlider_OnValueChanged"
+                                            AutomationProperties.Name="装饰浮动动画强度"
+                                            KeyboardNavigation.TabIndex="44" />
+                                </StackPanel>
+                            </Expander>
                         </StackPanel>
                     </Expander>
                 </StackPanel>
@@ -422,71 +487,101 @@
                 CornerRadius="12"
                 AutomationProperties.Name="合成预览控制">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="130" />
-                    <ColumnDefinition Width="130" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <ComboBox x:Name="DisplayChoiceBox" Width="128" SelectedIndex="0"
-                          SelectionChanged="DisplayChoice_OnSelectionChanged"
-                          AutomationProperties.Name="额度显示模式"
-                          KeyboardNavigation.TabIndex="42">
-                    <ComboBoxItem Content="Dual" />
-                    <ComboBoxItem Content="5h" />
-                    <ComboBoxItem Content="Week" />
-                    <ComboBoxItem Content="None" />
-                </ComboBox>
-                <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                    <TextBlock Text="5h %" />
-                    <Slider x:Name="FiveHourPercentSlider" Minimum="0" Maximum="100"
-                            Value="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
-                            AutomationProperties.Name="五小时额度百分比"
-                            KeyboardNavigation.TabIndex="43" />
-                    <ComboBox ItemsSource="{Binding Synthetic.PercentPresets}"
-                              SelectedItem="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
-                              AutomationProperties.Name="五小时额度预设"
-                              KeyboardNavigation.TabIndex="44" />
-                </StackPanel>
-                <StackPanel Grid.Column="2" Margin="12,0,0,0">
-                    <TextBlock Text="Week %" />
-                    <Slider x:Name="WeeklyPercentSlider" Minimum="0" Maximum="100"
-                            Value="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
-                            AutomationProperties.Name="每周额度百分比"
-                            KeyboardNavigation.TabIndex="45" />
-                    <ComboBox ItemsSource="{Binding Synthetic.PercentPresets}"
-                              SelectedItem="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
-                              AutomationProperties.Name="每周额度预设"
-                              KeyboardNavigation.TabIndex="46" />
-                </StackPanel>
-                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="14,0">
-                    <CheckBox Content="详情" IsChecked="{Binding Synthetic.DetailsOpen, Mode=TwoWay}"
-                              AutomationProperties.Name="显示详情" KeyboardNavigation.TabIndex="47" />
-                    <CheckBox Margin="14,0,0,0" Content="动画"
-                              IsChecked="{Binding Synthetic.AnimationsEnabled, Mode=TwoWay}"
-                              AutomationProperties.Name="启用预览动画" KeyboardNavigation.TabIndex="48" />
-                    <CheckBox Margin="14,0,0,0" Content="刷新中"
-                              IsChecked="{Binding Synthetic.IsRefreshing, Mode=TwoWay}"
-                              AutomationProperties.Name="模拟刷新状态" KeyboardNavigation.TabIndex="49" />
-                </StackPanel>
-                <StackPanel Grid.Column="4" Orientation="Horizontal">
-                    <Button x:Name="PreviewLeftButton" Content="←" Padding="10,5"
-                            Command="{Binding Synthetic.PreviewLeftEdgeCommand}"
-                            AutomationProperties.Name="预览左边缘停靠" KeyboardNavigation.TabIndex="50" />
-                    <Button x:Name="PreviewRightButton" Content="→" Padding="10,5" Margin="5,0,0,0"
-                            Command="{Binding Synthetic.PreviewRightEdgeCommand}"
-                            AutomationProperties.Name="预览右边缘停靠" KeyboardNavigation.TabIndex="51" />
-                    <Button x:Name="PreviewTopButton" Content="↑" Padding="10,5" Margin="5,0,0,0"
-                            Command="{Binding Synthetic.PreviewTopEdgeCommand}"
-                            AutomationProperties.Name="预览上边缘停靠" KeyboardNavigation.TabIndex="52" />
-                    <Button x:Name="PreviewBottomButton" Content="↓" Padding="10,5" Margin="5,0,0,0"
-                            Command="{Binding Synthetic.PreviewBottomEdgeCommand}"
-                            AutomationProperties.Name="预览下边缘停靠" KeyboardNavigation.TabIndex="53" />
-                    <Button x:Name="ExpandPreviewButton" Content="展开" Margin="5,0,0,0"
-                            Command="{Binding Synthetic.ExpandCommand}"
-                            AutomationProperties.Name="展开预览 HUD" KeyboardNavigation.TabIndex="54" />
-                </StackPanel>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid x:Name="SyntheticQuotaRow">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="128" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Margin="0,0,0,5" Text="显示模式" />
+                        <ComboBox x:Name="DisplayChoiceBox" SelectedIndex="0"
+                                  SelectionChanged="DisplayChoice_OnSelectionChanged"
+                                  AutomationProperties.Name="额度显示模式"
+                                  KeyboardNavigation.TabIndex="45">
+                            <ComboBoxItem Content="Dual" />
+                            <ComboBoxItem Content="5h" />
+                            <ComboBoxItem Content="Week" />
+                            <ComboBoxItem Content="None" />
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                        <TextBlock Text="5 小时剩余" />
+                        <Slider x:Name="FiveHourPercentSlider"
+                                Minimum="0" Maximum="100"
+                                Value="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
+                                AutomationProperties.Name="五小时额度百分比"
+                                KeyboardNavigation.TabIndex="46" />
+                        <ComboBox x:Name="FiveHourPresetBox"
+                                  ItemsSource="{Binding Synthetic.PercentPresets}"
+                                  SelectedItem="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
+                                  AutomationProperties.Name="五小时额度预设"
+                                  KeyboardNavigation.TabIndex="47" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="12,0,0,0">
+                        <TextBlock Text="每周剩余" />
+                        <Slider x:Name="WeeklyPercentSlider"
+                                Minimum="0" Maximum="100"
+                                Value="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
+                                AutomationProperties.Name="每周额度百分比"
+                                KeyboardNavigation.TabIndex="48" />
+                        <ComboBox x:Name="WeeklyPresetBox"
+                                  ItemsSource="{Binding Synthetic.PercentPresets}"
+                                  SelectedItem="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
+                                  AutomationProperties.Name="每周额度预设"
+                                  KeyboardNavigation.TabIndex="49" />
+                    </StackPanel>
+                </Grid>
+                <Grid x:Name="SyntheticStateRow" Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <CheckBox Content="详情"
+                                  IsChecked="{Binding Synthetic.DetailsOpen, Mode=TwoWay}"
+                                  AutomationProperties.Name="显示详情"
+                                  KeyboardNavigation.TabIndex="50" />
+                        <CheckBox Margin="14,0,0,0" Content="动画"
+                                  IsChecked="{Binding Synthetic.AnimationsEnabled, Mode=TwoWay}"
+                                  AutomationProperties.Name="启用预览动画"
+                                  KeyboardNavigation.TabIndex="51" />
+                        <CheckBox Margin="14,0,0,0" Content="刷新中"
+                                  IsChecked="{Binding Synthetic.IsRefreshing, Mode=TwoWay}"
+                                  AutomationProperties.Name="模拟刷新状态"
+                                  KeyboardNavigation.TabIndex="52" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="PreviewLeftButton" Content="←" Padding="10,5"
+                                Command="{Binding Synthetic.PreviewLeftEdgeCommand}"
+                                AutomationProperties.Name="预览左边缘停靠"
+                                KeyboardNavigation.TabIndex="53" />
+                        <Button x:Name="PreviewRightButton" Content="→" Padding="10,5"
+                                Margin="5,0,0,0"
+                                Command="{Binding Synthetic.PreviewRightEdgeCommand}"
+                                AutomationProperties.Name="预览右边缘停靠"
+                                KeyboardNavigation.TabIndex="54" />
+                        <Button x:Name="PreviewTopButton" Content="↑" Padding="10,5"
+                                Margin="5,0,0,0"
+                                Command="{Binding Synthetic.PreviewTopEdgeCommand}"
+                                AutomationProperties.Name="预览上边缘停靠"
+                                KeyboardNavigation.TabIndex="55" />
+                        <Button x:Name="PreviewBottomButton" Content="↓" Padding="10,5"
+                                Margin="5,0,0,0"
+                                Command="{Binding Synthetic.PreviewBottomEdgeCommand}"
+                                AutomationProperties.Name="预览下边缘停靠"
+                                KeyboardNavigation.TabIndex="56" />
+                        <Button x:Name="ExpandPreviewButton" Content="展开"
+                                Margin="5,0,0,0"
+                                Command="{Binding Synthetic.ExpandCommand}"
+                                AutomationProperties.Name="展开预览 HUD"
+                                KeyboardNavigation.TabIndex="57" />
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
 
@@ -504,17 +599,17 @@
                     <Button x:Name="SaveDraftButton" Content="保存草稿"
                             Click="SaveDraftButton_OnClick"
                             AutomationProperties.Name="保存草稿"
-                            KeyboardNavigation.TabIndex="55" />
+                            KeyboardNavigation.TabIndex="58" />
                     <Button x:Name="ApplyToHudButton" Margin="8,0,0,0" Content="应用到 HUD"
                             Command="{Binding Editor.Output.ApplyCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="应用到 HUD"
-                            KeyboardNavigation.TabIndex="56" />
+                            KeyboardNavigation.TabIndex="59" />
                     <Button x:Name="ExportPackageButton" Margin="8,0,0,0" Content="导出皮肤包"
                             Command="{Binding Editor.Output.ExportCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="导出皮肤包"
-                            KeyboardNavigation.TabIndex="57" />
+                            KeyboardNavigation.TabIndex="60" />
                 </StackPanel>
             </Grid>
         </Border>

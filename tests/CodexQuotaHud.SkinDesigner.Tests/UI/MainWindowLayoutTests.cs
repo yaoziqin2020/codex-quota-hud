@@ -318,6 +318,91 @@ public sealed class MainWindowLayoutTests
     }
 
     [Fact]
+    public void RealWindow_OffersPresetsAndKeepsAdvancedDecorationMotionContextual()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var window = CreateWindow(temporary, out _);
+            Assert.IsType<Expander>(window.FindName("AnimationSection"))
+                .IsExpanded = true;
+            window.ApplyTemplate();
+            window.UpdateLayout();
+
+            var advanced = Assert.IsType<Expander>(
+                window.FindName("AdvancedAnimationSection"));
+            var status = Assert.IsType<TextBlock>(
+                window.FindName("AnimationPresetStatusText"));
+            var hint = Assert.IsType<TextBlock>(
+                window.FindName("DecorationAnimationHintText"));
+            var rotation = Descendants<Slider>(window)
+                .Single(control => Equals(control.Tag, "RotationIntensity"));
+            var floating = Descendants<Slider>(window)
+                .Single(control => Equals(control.Tag, "FloatingIntensity"));
+
+            Assert.False(advanced.IsExpanded);
+            Assert.Equal("柔和", status.Text);
+            Assert.False(rotation.IsEnabled);
+            Assert.False(floating.IsEnabled);
+            Assert.Contains("透明装饰图", hint.Text);
+
+            var revision = window.Editor.Current.Revision;
+            Assert.IsType<Button>(window.FindName(
+                    "AnimationNoticeablePresetButton"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+            Assert.Equal(revision + 1, window.Editor.Current.Revision);
+            Assert.Equal(
+                new SkinAnimationSettings(0, .9, .9, 0),
+                window.Editor.Current.Theme.Animation);
+            Assert.Equal("明显", status.Text);
+            window.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
+    public void RealWindow_UsesTwoReadableSyntheticRowsAtMinimumWidth()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var window = CreateWindow(temporary, out _);
+            window.AttachPreviewOwnerForTesting();
+            window.Width = 600;
+            window.Height = 720;
+            window.UpdateLayout();
+
+            var strip = Assert.IsType<Border>(
+                window.FindName("SyntheticPreviewStrip"));
+            var quotaRow = Assert.IsType<Grid>(
+                window.FindName("SyntheticQuotaRow"));
+            var stateRow = Assert.IsType<Grid>(
+                window.FindName("SyntheticStateRow"));
+            AssertFullyRenderedWithin(quotaRow, strip);
+            AssertFullyRenderedWithin(stateRow, strip);
+
+            var presets = Assert.IsType<ComboBox>(
+                window.FindName("FiveHourPresetBox"));
+            presets.SelectedItem = 68d;
+            presets.IsDropDownOpen = true;
+            window.UpdateLayout();
+            var item = Assert.IsType<ComboBoxItem>(
+                presets.ItemContainerGenerator.ContainerFromItem(68d));
+            var expected = Color.FromRgb(0x0B, 0x12, 0x20);
+            Assert.Equal(
+                expected,
+                Assert.IsType<SolidColorBrush>(item.Foreground).Color);
+            var renderedText = VisualDescendants<TextBlock>(item).ToArray();
+            Assert.NotEmpty(renderedText);
+            Assert.All(renderedText, block => Assert.Equal(
+                expected,
+                Assert.IsType<SolidColorBrush>(block.Foreground).Color));
+            presets.IsDropDownOpen = false;
+            window.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
     public void RealWindow_ProvidesAccessibleNamesTabOrderAndLongTextContainment()
     {
         RunSta(() =>
@@ -341,7 +426,7 @@ public sealed class MainWindowLayoutTests
                 Assert.False(string.IsNullOrWhiteSpace(
                     AutomationProperties.GetName(control))));
             var tabIndexes = controls.Select(KeyboardNavigation.GetTabIndex).ToArray();
-            Assert.Equal(Enumerable.Range(1, 57), tabIndexes);
+            Assert.Equal(Enumerable.Range(1, 60), tabIndexes);
             Assert.Equal(
                 "图片变换目标",
                 AutomationProperties.GetName(controls[15]));
@@ -350,10 +435,10 @@ public sealed class MainWindowLayoutTests
                 AutomationProperties.GetName(controls[23]));
             Assert.Equal(
                 "额度显示模式",
-                AutomationProperties.GetName(controls[41]));
+                AutomationProperties.GetName(controls[44]));
             Assert.Equal(
                 "保存草稿",
-                AutomationProperties.GetName(controls[54]));
+                AutomationProperties.GetName(controls[57]));
             var projectName = Assert.IsType<TextBox>(
                 window.FindName("ProjectNameTextBox"));
             var displayName = Assert.IsType<TextBox>(
@@ -1133,6 +1218,24 @@ public sealed class MainWindowLayoutTests
             }
 
             foreach (var descendant in Descendants<T>(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static IEnumerable<T> VisualDescendants<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+            {
+                yield return match;
+            }
+
+            foreach (var descendant in VisualDescendants<T>(child))
             {
                 yield return descendant;
             }
