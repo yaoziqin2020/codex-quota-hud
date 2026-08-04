@@ -13,7 +13,7 @@ animation-programming environment:
    replace its Windows-default message boxes with Designer-themed dialogs.
 2. Make refresh animation timing visible and useful by retaining the accelerated
    state for 1.5 seconds after a refresh completes, while allowing custom-skin
-   authors to configure the refresh speed multiplier and completion hold time.
+   authors to configure only the completion hold time.
 
 ## Scope
 
@@ -25,10 +25,9 @@ animation-programming environment:
   warning, and failure dialogs.
 - Native Windows file-open and file-save pickers remain native.
 - A global 1.5-second post-refresh hold for all five built-in skins.
-- An automatic 2.0× / 1.5-second fallback for existing custom skins, without
+- An automatic 1.5-second fallback for existing custom skins, without
   requiring migration, re-export, or reinstallation of those skin packages.
-- Refresh speed and hold authoring settings for new or subsequently edited
-  custom skins.
+- Refresh-hold authoring settings for new or subsequently edited custom skins.
 - Backward-compatible defaults for custom skins that predate the new fields.
 - Live Designer preview of the refresh and post-refresh-hold phases.
 - Serialization, validation, runtime, Designer, and regression tests.
@@ -90,12 +89,11 @@ disabled appearance defined above.
 ### User-facing settings
 
 The existing four animation intensities remain unchanged. A separate
-“刷新状态” group in the Animation editor exposes:
+“刷新状态” group in the Animation editor exposes one setting:
 
-- Refresh speed multiplier: range 1.0–4.0, default 2.0.
 - Completion hold: range 0.0–3.0 seconds, default 1.5 seconds.
 
-The controls display their current numeric values. The existing “刷新中”
+The control displays its current numeric value. The existing “刷新中”
 synthetic-preview checkbox remains the direct preview trigger:
 
 - checking it enters accelerated refresh animation immediately;
@@ -103,16 +101,16 @@ synthetic-preview checkbox remains the direct preview trigger:
   configured hold time;
 - after the hold, preview animation returns to ordinary speed.
 
-These controls are an authoring option, not a prerequisite for receiving the
+This control is an authoring option, not a prerequisite for receiving the
 runtime correction. A newly created skin can be tuned while its refresh state
-is previewed. An older installed or imported skin also receives the 2.0× /
-1.5-second fallback immediately in the upgraded HUD; if an author later opens
-that skin in the new Designer, the same controls become available and the
+is previewed. An older installed or imported skin also receives the 1.5-second
+fallback immediately in the upgraded HUD; if an author later opens
+that skin in the new Designer, the same control becomes available and the
 chosen values are persisted on its next save, apply, or export.
 
 ### Contract and compatibility
 
-`SkinAnimationSettings` gains two values represented in `theme.json` as:
+`SkinAnimationSettings` gains one value represented in `theme.json` as:
 
 ```json
 {
@@ -121,19 +119,18 @@ chosen values are persisted on its next save, apply, or export.
     "breathingIntensity": 0.45,
     "glowIntensity": 0.55,
     "floatingIntensity": 0.15,
-    "refreshSpeedMultiplier": 2.0,
     "refreshHoldSeconds": 1.5
   }
 }
 ```
 
-Validation accepts `refreshSpeedMultiplier` from 1.0 through 4.0 and
-`refreshHoldSeconds` from 0.0 through 3.0. Non-finite values are rejected.
+Validation accepts `refreshHoldSeconds` from 0.0 through 3.0. Non-finite values
+are rejected.
 
-When either field is absent, the reader supplies 2.0 and 1.5 respectively.
-Therefore existing installed skins and old `.cqskin` files receive the newly
+When the field is absent, the reader supplies 1.5. Therefore existing installed
+skins and old `.cqskin` files receive the newly
 approved 1.5-second hold after the HUD upgrade. New drafts use the same values.
-No existing skin package has to be rewritten. The writer emits both fields for
+No existing skin package has to be rewritten. The writer emits the field for
 newly saved skins and for older skins that are subsequently saved, applied, or
 exported through the updated Designer.
 
@@ -153,8 +150,8 @@ Idle -> Refreshing -> Hold -> Idle
              +----------+  a new refresh restarts refresh/hold timing
 ```
 
-- Entering `Refreshing` cancels any prior hold and applies the configured speed
-  multiplier once. Multipliers never stack.
+- Entering `Refreshing` cancels any prior hold and applies the skin's existing
+  refresh-speed behavior. This feature does not alter or stack speed ratios.
 - When the request stops refreshing, the effective state remains refreshing for
   the configured hold duration.
 - The hold starts after request completion. Even when a cached or fast request
@@ -170,10 +167,10 @@ Idle -> Refreshing -> Hold -> Idle
 - A zero-second hold restores idle immediately.
 
 All five built-in skins retain their existing per-skin refresh-speed profiles
-and receive the global 1.5-second hold. They are not flattened to one common
-speed. Custom skins use their package multiplier and hold values, with 2.0 and
-1.5 as the fallback. The refresh timing changes only presentation; it never
-delays quota-result publication or changes network work.
+and receive the global 1.5-second hold. Custom skins retain their current fixed
+refresh speed and use their package hold value, with 1.5 as the fallback. The
+refresh timing changes only presentation; it never delays quota-result
+publication or changes network work.
 
 The hold coordinator uses cancellation and an injectable delay/clock boundary
 so a stale completion cannot restore a newly selected skin or a newer refresh
@@ -181,10 +178,10 @@ cycle. UI state changes are marshalled to the owning Dispatcher.
 
 ## Data flow
 
-1. The Designer edits two numeric fields in the current draft.
+1. The Designer edits one numeric hold field in the current draft.
 2. Draft validation and preview update run through the existing single mutation
    path.
-3. Save/apply/export serializes both fields into `theme.json` and records HUD
+3. Save/apply/export serializes the field into `theme.json` and records HUD
    v1.2.3 compatibility.
 4. The HUD reader supplies defaults for old packages and validates explicit
    values for new packages.
@@ -214,7 +211,7 @@ Automated coverage will prove:
 - hover, pressed, focus, disabled, default, and cancel dialog behavior;
 - all former Designer `MessageBox` call sites use the themed dialog service;
 - native file pickers remain the only approved native dialogs;
-- old JSON without the two fields reads as 2.0 and 1.5;
+- old JSON without the hold field reads as 1.5;
 - explicit boundary values round-trip and invalid values are rejected;
 - new drafts, saved drafts, apply, export, and package readback preserve values;
 - built-in and custom refresh state follows Idle -> Refreshing -> Hold -> Idle;
@@ -227,8 +224,8 @@ Automated coverage will prove:
 Manual acceptance will open a native file picker and confirm that the disabled
 Designer buttons remain dark. It will also exercise each themed dialog shape
 and visually verify the existing accelerated profile followed by a 1.5-second
-hold on one built-in skin, plus a 2.0× refresh followed by the same hold on one
-custom skin. A deliberately fast refresh must still show the full additional
+hold on one built-in skin and one custom skin. A deliberately fast refresh must
+still show the full additional
 1.5-second accelerated phase before returning smoothly to idle.
 
 ## Release boundary
