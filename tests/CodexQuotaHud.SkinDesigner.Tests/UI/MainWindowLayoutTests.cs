@@ -398,8 +398,39 @@ public sealed class MainWindowLayoutTests
             AssertFullyRenderedWithin(quotaRow, strip);
             AssertFullyRenderedWithin(stateRow, strip);
 
+            var stateGroup = Assert.IsType<Border>(
+                window.FindName("SyntheticStateGroup"));
+            var dockGroup = Assert.IsType<Border>(
+                window.FindName("SyntheticDockGroup"));
+            AssertFullyRenderedWithin(stateGroup, stateRow);
+            AssertFullyRenderedWithin(dockGroup, stateRow);
+            Assert.True(
+                dockGroup.TranslatePoint(new Point(), stateRow).X <=
+                stateGroup.ActualWidth + 16);
+
             var presets = Assert.IsType<ComboBox>(
                 window.FindName("FiveHourPresetBox"));
+            Assert.Equal(84, presets.Width);
+            Assert.Equal(
+                84,
+                Assert.IsType<ComboBox>(
+                    window.FindName("WeeklyPresetBox")).Width);
+            Assert.Equal(
+                "左",
+                Assert.IsType<Button>(
+                    window.FindName("PreviewLeftButton")).Content);
+            Assert.Equal(
+                "右",
+                Assert.IsType<Button>(
+                    window.FindName("PreviewRightButton")).Content);
+            Assert.Equal(
+                "上",
+                Assert.IsType<Button>(
+                    window.FindName("PreviewTopButton")).Content);
+            Assert.Equal(
+                "下",
+                Assert.IsType<Button>(
+                    window.FindName("PreviewBottomButton")).Content);
             presets.SelectedItem = 68d;
             presets.IsDropDownOpen = true;
             window.UpdateLayout();

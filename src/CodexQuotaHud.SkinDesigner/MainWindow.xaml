@@ -510,78 +510,130 @@
                             <ComboBoxItem Content="None" />
                         </ComboBox>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                        <TextBlock Text="5 小时剩余" />
+                    <Grid Grid.Column="1" Margin="14,0,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="5 小时剩余" />
+                            <ComboBox x:Name="FiveHourPresetBox"
+                                      Grid.Column="1" Width="84"
+                                      ItemsSource="{Binding Synthetic.PercentPresets}"
+                                      SelectedItem="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
+                                      AutomationProperties.Name="五小时额度预设"
+                                      KeyboardNavigation.TabIndex="46" />
+                        </Grid>
                         <Slider x:Name="FiveHourPercentSlider"
+                                Grid.Row="1" Margin="0,5,0,0"
                                 Minimum="0" Maximum="100"
                                 Value="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
                                 AutomationProperties.Name="五小时额度百分比"
-                                KeyboardNavigation.TabIndex="46" />
-                        <ComboBox x:Name="FiveHourPresetBox"
-                                  ItemsSource="{Binding Synthetic.PercentPresets}"
-                                  SelectedItem="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
-                                  AutomationProperties.Name="五小时额度预设"
-                                  KeyboardNavigation.TabIndex="47" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Margin="12,0,0,0">
-                        <TextBlock Text="每周剩余" />
+                                KeyboardNavigation.TabIndex="47" />
+                    </Grid>
+                    <Grid Grid.Column="2" Margin="14,0,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="每周剩余" />
+                            <ComboBox x:Name="WeeklyPresetBox"
+                                      Grid.Column="1" Width="84"
+                                      ItemsSource="{Binding Synthetic.PercentPresets}"
+                                      SelectedItem="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
+                                      AutomationProperties.Name="每周额度预设"
+                                      KeyboardNavigation.TabIndex="48" />
+                        </Grid>
                         <Slider x:Name="WeeklyPercentSlider"
+                                Grid.Row="1" Margin="0,5,0,0"
                                 Minimum="0" Maximum="100"
                                 Value="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
                                 AutomationProperties.Name="每周额度百分比"
-                                KeyboardNavigation.TabIndex="48" />
-                        <ComboBox x:Name="WeeklyPresetBox"
-                                  ItemsSource="{Binding Synthetic.PercentPresets}"
-                                  SelectedItem="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
-                                  AutomationProperties.Name="每周额度预设"
-                                  KeyboardNavigation.TabIndex="49" />
-                    </StackPanel>
+                                KeyboardNavigation.TabIndex="49" />
+                    </Grid>
                 </Grid>
                 <Grid x:Name="SyntheticStateRow" Grid.Row="1" Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Orientation="Horizontal">
-                        <CheckBox Content="详情"
-                                  IsChecked="{Binding Synthetic.DetailsOpen, Mode=TwoWay}"
-                                  AutomationProperties.Name="显示详情"
-                                  KeyboardNavigation.TabIndex="50" />
-                        <CheckBox Margin="14,0,0,0" Content="动画"
-                                  IsChecked="{Binding Synthetic.AnimationsEnabled, Mode=TwoWay}"
-                                  AutomationProperties.Name="启用预览动画"
-                                  KeyboardNavigation.TabIndex="51" />
-                        <CheckBox Margin="14,0,0,0" Content="刷新中"
-                                  IsChecked="{Binding Synthetic.IsRefreshing, Mode=TwoWay}"
-                                  AutomationProperties.Name="模拟刷新状态"
-                                  KeyboardNavigation.TabIndex="52" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <Button x:Name="PreviewLeftButton" Content="←" Padding="10,5"
-                                Command="{Binding Synthetic.PreviewLeftEdgeCommand}"
-                                AutomationProperties.Name="预览左边缘停靠"
-                                KeyboardNavigation.TabIndex="53" />
-                        <Button x:Name="PreviewRightButton" Content="→" Padding="10,5"
-                                Margin="5,0,0,0"
-                                Command="{Binding Synthetic.PreviewRightEdgeCommand}"
-                                AutomationProperties.Name="预览右边缘停靠"
-                                KeyboardNavigation.TabIndex="54" />
-                        <Button x:Name="PreviewTopButton" Content="↑" Padding="10,5"
-                                Margin="5,0,0,0"
-                                Command="{Binding Synthetic.PreviewTopEdgeCommand}"
-                                AutomationProperties.Name="预览上边缘停靠"
-                                KeyboardNavigation.TabIndex="55" />
-                        <Button x:Name="PreviewBottomButton" Content="↓" Padding="10,5"
-                                Margin="5,0,0,0"
-                                Command="{Binding Synthetic.PreviewBottomEdgeCommand}"
-                                AutomationProperties.Name="预览下边缘停靠"
-                                KeyboardNavigation.TabIndex="56" />
-                        <Button x:Name="ExpandPreviewButton" Content="展开"
-                                Margin="5,0,0,0"
-                                Command="{Binding Synthetic.ExpandCommand}"
-                                AutomationProperties.Name="展开预览 HUD"
-                                KeyboardNavigation.TabIndex="57" />
-                    </StackPanel>
+                    <WrapPanel Orientation="Horizontal">
+                        <Border x:Name="SyntheticStateGroup"
+                                Padding="10,6"
+                                Background="{DynamicResource DesignerRaisedBrush}"
+                                BorderBrush="{DynamicResource DesignerBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Margin="0,0,12,0"
+                                           VerticalAlignment="Center"
+                                           FontWeight="SemiBold"
+                                           Text="预览状态" />
+                                <CheckBox Content="详情"
+                                          IsChecked="{Binding Synthetic.DetailsOpen, Mode=TwoWay}"
+                                          AutomationProperties.Name="显示详情"
+                                          KeyboardNavigation.TabIndex="50" />
+                                <CheckBox Margin="12,0,0,0" Content="动画"
+                                          IsChecked="{Binding Synthetic.AnimationsEnabled, Mode=TwoWay}"
+                                          AutomationProperties.Name="启用预览动画"
+                                          KeyboardNavigation.TabIndex="51" />
+                                <CheckBox Margin="12,0,0,0" Content="刷新中"
+                                          IsChecked="{Binding Synthetic.IsRefreshing, Mode=TwoWay}"
+                                          AutomationProperties.Name="模拟刷新状态"
+                                          KeyboardNavigation.TabIndex="52" />
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="SyntheticDockGroup"
+                                Margin="8,0,0,0"
+                                Padding="10,6"
+                                Background="{DynamicResource DesignerRaisedBrush}"
+                                BorderBrush="{DynamicResource DesignerBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Margin="0,0,12,0"
+                                           VerticalAlignment="Center"
+                                           FontWeight="SemiBold"
+                                           Text="停靠预览" />
+                                <Button x:Name="PreviewLeftButton" Content="左"
+                                        MinWidth="38" MinHeight="30" Padding="8,4"
+                                        Command="{Binding Synthetic.PreviewLeftEdgeCommand}"
+                                        AutomationProperties.Name="预览左边缘停靠"
+                                        KeyboardNavigation.TabIndex="53" />
+                                <Button x:Name="PreviewRightButton" Content="右"
+                                        MinWidth="38" MinHeight="30" Padding="8,4"
+                                        Margin="4,0,0,0"
+                                        Command="{Binding Synthetic.PreviewRightEdgeCommand}"
+                                        AutomationProperties.Name="预览右边缘停靠"
+                                        KeyboardNavigation.TabIndex="54" />
+                                <Button x:Name="PreviewTopButton" Content="上"
+                                        MinWidth="38" MinHeight="30" Padding="8,4"
+                                        Margin="4,0,0,0"
+                                        Command="{Binding Synthetic.PreviewTopEdgeCommand}"
+                                        AutomationProperties.Name="预览上边缘停靠"
+                                        KeyboardNavigation.TabIndex="55" />
+                                <Button x:Name="PreviewBottomButton" Content="下"
+                                        MinWidth="38" MinHeight="30" Padding="8,4"
+                                        Margin="4,0,0,0"
+                                        Command="{Binding Synthetic.PreviewBottomEdgeCommand}"
+                                        AutomationProperties.Name="预览下边缘停靠"
+                                        KeyboardNavigation.TabIndex="56" />
+                                <Button x:Name="ExpandPreviewButton" Content="展开"
+                                        MinHeight="30" Padding="10,4"
+                                        Margin="4,0,0,0"
+                                        Command="{Binding Synthetic.ExpandCommand}"
+                                        AutomationProperties.Name="展开预览 HUD"
+                                        KeyboardNavigation.TabIndex="57" />
+                            </StackPanel>
+                        </Border>
+                    </WrapPanel>
                 </Grid>
             </Grid>
         </Border>
