@@ -25,3 +25,16 @@
   the public installer contract.
 - Installer acceptance must verify user-facing intent, not merely consistency
   between code and tests.
+
+## Timing-test stability
+
+- Verify timeout, cancellation, commit, and Dispatcher behavior from explicit
+  state transitions or completion signals whenever possible. Do not use a
+  narrow wall-clock threshold as a second correctness assertion after the
+  result already proves the protocol outcome.
+- Tests that must exercise real pipes, timers, threads, or WPF Dispatchers may
+  keep a generously padded upper bound only as a deadlock guard. Treat Windows,
+  .NET, runner load, and cross-project parallelism as variable; do not encode
+  scheduler speed as product behavior.
+- A repeated CI timing failure must be root-caused and stabilized. Do not keep
+  rerunning the same commit until one attempt happens to pass.

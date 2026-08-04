@@ -355,16 +355,11 @@ public sealed class LocalControlServerTests
                 return new LocalControlResponse(true, null, null);
             });
         server.Start();
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         var response = await new LocalControlClient(pipeName).SendAsync(Request);
-        stopwatch.Stop();
 
         Assert.True(response.Succeeded);
         Assert.Equal(1, Volatile.Read(ref commits));
-        Assert.True(
-            stopwatch.Elapsed < TimeSpan.FromMilliseconds(1900),
-            $"Response took {stopwatch.Elapsed}.");
     }
 
     [Fact]
@@ -383,18 +378,13 @@ public sealed class LocalControlServerTests
                 return new LocalControlResponse(true, null, null);
             });
         server.Start();
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         var response = await new LocalControlClient(pipeName).SendAsync(Request);
-        stopwatch.Stop();
 
         Assert.False(response.Succeeded);
         Assert.Equal("control.timeout", response.ErrorCode);
         Assert.Equal("The local-control request timed out.", response.Message);
         Assert.Equal(0, Volatile.Read(ref commits));
-        Assert.True(
-            stopwatch.Elapsed < TimeSpan.FromMilliseconds(1900),
-            $"Response took {stopwatch.Elapsed}.");
     }
 
     [Fact]
@@ -422,16 +412,11 @@ public sealed class LocalControlServerTests
                 return new LocalControlResponse(true, null, null);
             });
         server.Start();
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         var response = await new LocalControlClient(pipeName).SendAsync(Request);
-        stopwatch.Stop();
 
         Assert.True(response.Succeeded);
         Assert.Equal(1, Volatile.Read(ref commits));
-        Assert.True(
-            stopwatch.Elapsed < TimeSpan.FromMilliseconds(1900),
-            $"Response took {stopwatch.Elapsed}.");
     }
 
     [Fact]

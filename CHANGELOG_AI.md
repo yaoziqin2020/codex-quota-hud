@@ -56,6 +56,14 @@
   timing across all skin combinations, every dialog variant, legacy-package
   output, and sign-out/restart remain partial or `NOT RUN`. The public
   `v1.2.3` tag, asset upload, and GitHub Release remain separate pending steps.
+- The first two post-acceptance CI attempts exposed two pre-existing timing
+  assumptions under Runner load: a successful real-pipe result failed a
+  redundant `<1.9 s` wall-clock assertion at `2.815 s`, then a real-WPF test
+  exceeded its three-second cleanup guard. Test-only stabilization removes the
+  redundant elapsed assertions, places the real-window activation class in the
+  existing serial WPF collection, and uses a 15-second deadlock guard. Product
+  timeout behavior is unchanged. Focused tests passed `33/33`; the full local
+  Release suite passed `1447/1447`.
 
 ## 2026-08-04 — v1.2.2 skin metadata correction released
 

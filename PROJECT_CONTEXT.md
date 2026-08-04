@@ -27,6 +27,14 @@ totaling `1447/1447`, with zero failed or skipped. Release build is zero
 warnings/errors and `git diff --check` passes. The final production-structure
 package workflow created these local-only files:
 
+After user acceptance, two GitHub CI attempts exposed unrelated pre-existing
+test timing fragility: a successful real-pipe result also asserted a narrow
+wall-clock duration, and a real-WPF cleanup used a three-second shutdown guard.
+The test-only stabilization removes redundant elapsed-time assertions,
+serializes that real-window class with existing WPF coverage, and widens only
+the deadlock guard to 15 seconds. Product protocol timeouts are unchanged.
+Focused `33/33` and full local `1447/1447` reruns passed.
+
 - Setup: 100,048,867 bytes / SHA-256
   `579C1CE73392970E93323C99600F013950CC463BC4BB5C4B305085584F743F80`
 - normal-HUD-only ZIP: 68,335,551 bytes / SHA-256

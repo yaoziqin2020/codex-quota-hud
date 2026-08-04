@@ -15,8 +15,11 @@ using System.Windows.Threading;
 
 namespace CodexQuotaHud.App.Tests.Infrastructure.LocalControl;
 
+[Collection(global::CodexQuotaHud.App.Tests.UI.WpfUiCollection.Name)]
 public sealed class LocalControlActivationHandlerTests
 {
+    private static readonly TimeSpan WpfDeadlockGuard = TimeSpan.FromSeconds(15);
+
     private const string SelectionKey =
         "custom:11111111-1111-1111-1111-111111111111";
 
@@ -166,7 +169,7 @@ public sealed class LocalControlActivationHandlerTests
         ProductionFixture? fixture = null;
         try
         {
-            fixture = await ready.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            fixture = await ready.Task.WaitAsync(WpfDeadlockGuard);
             InstallCustomSkin(root.Paths);
 
             var response = await fixture.Handler.HandleAsync(
@@ -193,9 +196,9 @@ public sealed class LocalControlActivationHandlerTests
                     DispatcherPriority.Send).Task;
             }
 
-            var failure = await stopped.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            var failure = await stopped.Task.WaitAsync(WpfDeadlockGuard);
             Assert.Null(failure);
-            Assert.True(thread.Join(TimeSpan.FromSeconds(2)));
+            Assert.True(thread.Join(WpfDeadlockGuard));
         }
     }
 

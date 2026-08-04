@@ -25,6 +25,15 @@ installed Designer left open for GUI handoff held the product single-instance
 mutex, causing exactly three guard tests to fail. After closing that exact
 installed process, the unchanged full Release command passed `1447/1447`.
 
+The first post-acceptance GitHub CI attempt exposed a pre-existing narrow
+wall-clock assertion in a real-pipe test; the protocol result succeeded, but a
+loaded Runner took `2.815 s` against a redundant `<1.9 s` assertion. A rerun
+then exposed a different real-WPF shutdown guard fixed at three seconds. The
+test-only stabilization removes redundant elapsed-time assertions, places the
+real-window activation class in the existing serial WPF collection, and uses a
+15-second deadlock guard without changing any product timeout. Focused tests
+passed `33/33`; the unchanged full Release suite passed `1447/1447` locally.
+
 The canonical local candidate files are:
 
 - Setup: `artifacts\release\CodexQuotaHud-Setup-v1.2.3.exe` — 100,048,867
