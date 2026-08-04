@@ -73,14 +73,19 @@ The current source after public `v1.1.1` adds safe data-only `.cqskin` import
 to the normal HUD, a shared `CodexQuotaHud.Skins` runtime library, and a
 separate Skin Designer application. The current branch also adds an About
 window, fixes Designer preview recovery after selecting `None`, and restores
-formal-HUD automatic display after quota arrives during startup. These changes
-are **unreleased**: a local v1.2.0 acceptance candidate is installed on the
-maintainer machine, but no new public Setup, ZIP, tag, or GitHub Release is
-claimed here.
+formal-HUD automatic display after quota arrives during startup. The Designer
+now has simple animation presets, visibly separate center-breathing and ring-
+glow effects, compact grouped preview controls, readable dropdowns, immediate
+custom-skin synchronization, a shared Documents exchange directory, and its
+own application icon. These changes are **unreleased**: a local v1.2.0
+acceptance candidate is installed on the maintainer machine, but no new public
+Setup, ZIP, tag, or GitHub Release is claimed here.
 
 当前源码在公开版 `v1.1.1` 之后新增了正式 HUD 的安全 `.cqskin` 导入、共享的
 `CodexQuotaHud.Skins` 运行库、独立皮肤设计器、“关于”窗口、选择 `None` 后恢复
-预览的修复，以及启动读取额度后正式 HUD 自动显示的修复。这些变更**尚未公开发布**；
+预览的修复，以及启动读取额度后正式 HUD 自动显示的修复。设计器还新增了简化动画
+预设、可见的中心呼吸与额度环光晕、紧凑分组的预览控制、可读下拉框、即时自定义皮肤
+同步、共享文档交换目录和独立应用图标。这些变更**尚未公开发布**；
 维护者本机已安装 v1.2.0 验收候选，但本文不声称已有新的公开 Setup、ZIP、标签或
 GitHub Release。
 
@@ -298,13 +303,13 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前未发布源码包含 1341 项自动化测试：
+当前未发布源码包含 1362 项自动化测试：
 
 - Core：75 项
-- Skins：325 项
-- App / UI：607 项
-- Skin Designer：334 项
-- Total：1341 项
+- Skins：331 项
+- App / UI：609 项
+- Skin Designer：347 项
+- Total：1362 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -314,12 +319,15 @@ dotnet build .\CodexQuotaHud.sln -c Release --no-restore
 GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构建和 Windows
 自包含发布检查。
 
-最新完整解法测试为 `1343/1343`、跳过 `0`，Release build 为
+最新串行 Release 测试为 `1362/1362`、跳过 `0`，Release build 为
 `0` warnings / `0` errors；三套安全与回滚筛选分别为 `223/223`、`224/224`
 和 `116/116`。同一提交较早的一次完整测试曾出现 `1` 项未能复现、未能取得
 `result.Errors` 的存储删除失败，因此自动 gate 记录为带未解决异常的通过证据，
 而不是发布许可。详见
 [`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
+
+本地 v1.2.0 候选的七个隔离安装/升级/组件/卸载场景及两个已提交清理失败场景
+全部通过；这仍只是本地候选证据，不代表已经公开发布。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and
 total `388/388`; the Release build completed with zero warnings and zero

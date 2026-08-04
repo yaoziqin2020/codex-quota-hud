@@ -2,6 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Implementation status (2026-08-04):** Implemented and serially verified in
+local candidate `6348c6a`. The checklist below remains the original execution
+record; unchecked boxes are not retroactively converted into evidence. The
+installed-layout follow-up replaced the initial split control strip with fixed-
+width value boxes and adjacent `预览状态` / `停靠预览` task groups. Exact final
+test, package, installer, and local-install evidence is recorded in
+`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`.
+
 **Goal:** Finish the reported custom-skin import and preview regressions, add understandable animation presets, make breathing and glow visibly match their names, repair the synthetic-preview controls, and give the optional Skin Designer a dedicated application icon.
 
 **Architecture:** Keep the `.cqskin` schema unchanged. Put preset resolution and motion-range calculation in small pure helpers, expose preset/decorative-image state through the existing Designer view model, keep WPF event handlers thin, and render glow through a dedicated visual layer. Preserve the existing App/Designer/Skins project boundaries and package the Designer icon inside the Designer executable.

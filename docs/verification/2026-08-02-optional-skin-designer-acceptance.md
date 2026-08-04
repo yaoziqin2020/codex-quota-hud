@@ -8,6 +8,41 @@ The only authorized package candidate is an ephemeral internal `0.0.0` build in 
 
 Evidence states are `PASS`, `PARTIAL`, `FAIL`, and `NOT RUN`. A row moves to `PASS` only from direct evidence collected for that exact row. Automated PASS cannot make the overall feature acceptance PASS.
 
+## 2026-08-04 follow-up candidate
+
+This section records the later `v1.2.0` local candidate and supersedes earlier
+counts/hashes only where explicitly stated. It does not convert the unreleased
+feature into a public release and does not authorize a tag, upload, GitHub
+Release, or replacement of `v1.1.1` assets.
+
+The user's installed screenshot exposed a structural bottom-control layout
+problem: two full-width percentage boxes dominated the row, display mode was
+visually isolated, and state/dock controls were pushed to opposite edges.
+
+![Installed Designer bottom controls before compact grouping](assets/2026-08-04-designer-bottom-controls-before.png)
+
+The corrected layout keeps only sliders elastic, places each fixed-width value
+box beside its label, and groups `预览状态` with adjacent `停靠预览` text buttons.
+At narrow width the two task groups wrap instead of overflowing. Screenshot
+evidence confirms the original defect; the corrected installed window was
+captured and inspected in the same session, while final subjective user
+acceptance remains separate.
+
+| Status | Date/time (Asia/Tokyo) | Command or action | Expected | Observed | Evidence |
+|---|---|---|---|---|---|
+| PASS | 2026-08-04 11:02 +09:00 | Serial Release project tests | Every current assembly executes with zero failures/skips | Core `75/75`, Skins `331/331`, App/UI `609/609`, Designer `347/347`; total `1362/1362`, skipped `0` | Fresh four-project VSTest summaries |
+| PASS | 2026-08-04 11:04 +09:00 | `dotnet build .\CodexQuotaHud.sln -c Release --no-restore` | Zero warnings/errors | Build succeeded with `0` warnings and `0` errors | Fresh build stdout, exit `0` |
+| PASS | 2026-08-04 11:20 +09:00 | Production installer isolated matrix | Seven normal scenarios and two committed-cleanup failure scenarios pass without touching the maintainer install | All nine scenarios passed; every unique temp root reported checked cleanup | `scripts/test-installer.ps1` stdout, exit `0` |
+| PASS | 2026-08-04 11:35 +09:00 | Final package from `6348c6a` | Setup, normal-only ZIP, and checksum manifest are created | Setup `5EB8150C695274D33DCB465E352C0564B6FF7FFF3B4D4914426D487620FD571B`; ZIP `EEA235CA10F3F3EF6717CF36D252B7CB615080DCFC0C15C951371BE7202A50C9` | Fresh package stdout and matching `SHA256SUMS.txt`; installer matrix was not repeated after the later XAML-only layout change |
+| PASS | 2026-08-04 11:37 +09:00 | Silent local upgrade with Designer + startup | Exit `0`; exact final payload installed; no normal desktop shortcut | Exit `0`; App/Designer product version `1.2.0+6348c6a4e4e7341ed26b33e9cab01f162f0e2d4b`; both hashes match publish tree; startup is `--background`; normal and Designer Start-menu links exist | Setup log, file versions/hashes, HKCU startup/uninstall reads |
+| PASS | 2026-08-04 11:37 +09:00 | Restore maintainer-only desktop state | Exactly one Developer Preview shortcut with `--preview`; no normal desktop shortcut | Target is installed App, arguments `--preview`, working directory is exact install root; normal desktop shortcut absent | Fresh `.lnk` COM readback |
+| PARTIAL | 2026-08-04 11:38 +09:00 | Installed compact-control visual review | Value boxes compact, task groups adjacent, directions readable | Agent screenshot inspection passed the stated layout contract; user has the corrected installed window open for direct review | Current installed window; user acceptance not yet recorded |
+
+Accessibility evidence for this follow-up is limited to automated WPF
+containment at 600 px, sequential tab indexes, accessible names, focus styling,
+contrast checks, and readable dropdown item foregrounds. It does not claim full
+screen-reader, zoom, or all-DPI manual compliance.
+
 ### Superseded attempt history — not current gate evidence
 
 The first Task 18 attempt tested `659d927f593afdc4f2de551e5188f4d1004a4797`. Its required Designer filter reported `114` passed, `2` failed, `0` skipped, total `116`: `ProductionOutputCompositionTests.RealMainWindow_WiresEnabledOutputCommandsFromDesignerOnlyServices` hit a WPF `PackagePart` `NullReferenceException`, and `MainWindowLayoutTests.CorruptRecoveryDiscard_ShowsActionableWarningAndKeepsRealWindowOpen` timed out waiting for the close lifecycle. The root-cause test stabilization is commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` (`test: stabilize designer WPF coverage`). Every current gate below was reset to `NOT RUN`; no PASS/FAIL from the superseded attempt is reused.
@@ -390,7 +425,7 @@ Every manual Designer/HUD/real Setup/preservation/sign-out/restart row remains
 installed state, or user data was changed. Automated evidence alone cannot
 promote this record to PASS or authorize release.
 
-## 2026-08-04 local v1.2.0 continuation
+## Earlier 2026-08-04 local v1.2.0 continuation (superseded above)
 
 This continuation supersedes only the local candidate evidence below; it does
 not convert the remaining manual matrix rows to PASS or authorize a release.

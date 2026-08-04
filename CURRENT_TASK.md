@@ -5,8 +5,13 @@
 The current branch now includes the optional Skin Designer, the shared custom-
 skin runtime, a compact About window, the Designer preview recovery fix for
 `None -> Dual/5h/Week`, and the formal-HUD startup visibility regression fix.
-It is installed on the maintainer machine as a local `1.2.0` acceptance
-candidate, but it is not tagged, uploaded, or published.
+It also includes immediate custom-skin catalog synchronization, the shared
+`Documents\Codex Quota HUD Skins` exchange directory, direct custom-skin
+selection, visible center-breathing and dedicated ring-glow animation, simple
+`静止 / 柔和 / 明显` presets with collapsed advanced controls, compact grouped
+synthetic-preview controls, readable light dropdowns, and a distinct Designer
+application icon. It is installed on the maintainer machine as a local `1.2.0`
+acceptance candidate, but it is not tagged, uploaded, or published.
 
 Source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` adds the shared
 custom-skin runtime/import path and a separate optional Skin Designer. It is
@@ -16,21 +21,22 @@ unreleased and is not part of the installed or published `v1.1.1` build.
 
 Automated evidence is `PASS with unresolved historical anomaly`; overall
 feature acceptance is **PARTIAL — no public release is authorized**. The latest
-full-solution run passed Core `75/75`, Skins `325/325`, App/UI `609/609`, and
-Designer `334/334`, for `1343/1343` with `0` skipped. Release build passed with
+serial Release runs passed Core `75/75`, Skins `331/331`, App/UI `609/609`, and
+Designer `347/347`, for `1362/1362` with `0` skipped. Release build passed with
 `0` warnings and `0` errors. The earlier exact security/rollback suites passed
 Skins `223/223`, App `224/224`, and Designer `116/116`.
 
 The local `v1.2.0` Setup upgrade completed with exit code `0`. Installed App
-and Designer binaries are version `1.2.0.0`; the App reports product version
-`1.2.0+c3d545ea0cd709d291d22fa8486ca5f270695b20`, and installed binaries
+and Designer binaries are version `1.2.0.0`; both report product version
+`1.2.0+6348c6a4e4e7341ed26b33e9cab01f162f0e2d4b`, and installed binaries
 exactly match the packaged publish hashes. The uninstall entry reports
 `1.2.0`; formal startup remains
-`CodexQuotaHud.App.exe --background`. Setup created only the ordinary-user
-normal desktop/Start-menu shortcuts and the optional Designer Start-menu
-shortcut. After that product acceptance, the maintainer desktop was separately
-restored to only `Codex Quota HUD 开发预览` with `--preview`; this is local state,
-not Setup behavior.
+`CodexQuotaHud.App.exe --background`. This local install selected startup and
+the optional Designer, created the normal and Designer Start-menu shortcuts,
+and created no normal desktop shortcut. After that product acceptance, the
+maintainer desktop was separately restored to only
+`Codex Quota HUD 开发预览` with `--preview`; this is local state, not Setup
+behavior.
 
 Installed-Designer GUI acceptance passed the user-reported regression paths:
 selecting `None` hid the preview and each direct return to `Dual`, `5h`, and
@@ -57,9 +63,9 @@ formal window finishes construction. Both arrival orders failed focused tests
 before their fixes and now pass. A temporary opt-in runtime trace recorded the
 real startup transition from hidden data to `model=True`, followed by
 `Show()`, `IsVisible=True`, `Visibility=Visible`, and a nonzero WPF handle.
-The temporary trace code and files were removed; the installed formal process
-is now running from the packaged `c3d545e` executable. The user directly
-confirmed that the formal HUD is visible after the final reinstall.
+The temporary trace code and files were removed. The same startup fix remains
+in the final packaged `6348c6a` executable, and the user directly confirmed
+that the formal HUD is visible after the earlier diagnostic reinstall.
 
 One earlier full-solution run at the same commit remains an unresolved anomaly:
 `SkinPackageInstallerTests.Remove_DeletesExactlyOneCanonicalCustomDirectoryAndPreservesSiblings`
@@ -94,19 +100,29 @@ as evidence.
 The current local candidate artifacts are:
 
 - Setup: `CodexQuotaHud-Setup-v1.2.0.exe` — SHA-256
-  `869D197E530053313E9EB54F41FB239551BBF35177A381C9A69C0E88A0C0E576`
+  `5EB8150C695274D33DCB465E352C0564B6FF7FFF3B4D4914426D487620FD571B`
 - ZIP: `CodexQuotaHud-v1.2.0-win-x64.zip` — SHA-256
-  `A99DB908F700E446A36BAD58655C79D583D658E4250A956ED2C01095239C6452`
+  `EEA235CA10F3F3EF6717CF36D252B7CB615080DCFC0C15C951371BE7202A50C9`
+
+The production installer was also exercised through all seven isolated
+install/upgrade/component/uninstall scenarios and both committed-cleanup
+failure scenarios; every scenario passed and its temporary root was removed.
+The final local reinstall completed with exit code `0`. The installed App and
+Designer hashes match the final publish tree, startup is still `--background`,
+normal and Designer Start-menu shortcuts exist, and the maintainer desktop was
+restored to only `Codex Quota HUD 开发预览` with `--preview`.
 
 ### Next continuation point
 
-Continue from the manual matrix in
+The compact installed Designer layout is open for the user's direct visual
+inspection. Continue from the manual matrix in
 `docs/verification/2026-08-02-optional-skin-designer-acceptance.md`. Every
 Designer layout/DPI/image/slot rows, fresh install without Designer, component
 removal, uninstall, sign-out, restart, and the real About-window visual row are
-still `NOT RUN`. The authorized local version bump/package/install work is now
-complete. It does not authorize a tag, upload, GitHub Release, replacement of
-`v1.1.1` assets, or push.
+not all complete. The authorized local version bump/package/install work is
+complete. It does not authorize a tag, upload, GitHub Release, or replacement
+of `v1.1.1` assets. The user separately authorized pushing this feature branch;
+do not create a PR and do not push `main` unless separately requested.
 
 If the storage Remove anomaly recurs, first preserve and expose the returned
 error code/location/message and failing temp-root evidence; do not add retries,

@@ -43,10 +43,11 @@ that local convenience is not Setup behavior.
 
 ## Unreleased optional Skin Designer source
 
-Source commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` contains an
-unreleased custom-skin runtime and separate Skin Designer. This work is not
-part of `v1.1.1`, has not been installed on the maintainer machine, and has no
-public tag, Setup, ZIP, or GitHub Release.
+Commit `168bf8b2a58062f86c35b203eff6cf269b52bad9` is the base custom-skin
+runtime/Designer handoff. The current local candidate is packaged from
+`6348c6a4e4e7341ed26b33e9cab01f162f0e2d4b` and is installed on the
+maintainer machine as `1.2.0`; it is still not part of public `v1.1.1` and has
+no public tag, Setup, ZIP, or GitHub Release.
 
 Dependency direction is intentionally one-way:
 
@@ -76,6 +77,8 @@ The exact per-user storage boundary is:
 - named and recovery documents: `draft.json` and `recovery.json` inside that
   exact draft directory
 - bounded import/install operation storage: `%LOCALAPPDATA%\CodexQuotaHud\imports`
+- user-facing package exchange directory:
+  `%USERPROFILE%\Documents\Codex Quota HUD Skins`
 
 The unreleased Setup definition always includes normal HUD import/runtime
 support and exposes **Install Skin Designer / 安装皮肤设计器** as a visible,
@@ -85,15 +88,20 @@ it adds no Designer desktop shortcut or startup value. Rerun removal preserves
 settings, installed skins, drafts/recovery, and imports. The fallback ZIP stays
 normal-HUD-only and still supports `.cqskin` validation/import/rendering.
 
-Current automated evidence is `PASS with unresolved anomaly`: trustworthy
-full-solution reruns passed `1324/1324`, the Release build reported zero
-warnings/errors, and the three explicit security/rollback filters passed
-`223/223`, `224/224`, and `116/116`. One earlier full run at the same commit
-failed a single exact-directory Remove assertion; isolated, class, project,
-parallel, cross-project, and 1000-operation stress investigation did not
-reproduce it or capture `result.Errors`, so no root cause or source fix is
-claimed. Every GUI, real Setup, sign-out, and restart row remains `NOT RUN`.
-Overall acceptance is `PARTIAL — no release is authorized`.
+Current automated evidence is `PASS with unresolved historical anomaly`:
+serial Release runs passed Core `75/75`, Skins `331/331`, App/UI `609/609`,
+and Designer `347/347`, totaling `1362/1362`; the Release build reported zero
+warnings/errors. The production installer passed seven isolated normal
+install/upgrade/component/uninstall scenarios plus two committed-cleanup
+failure scenarios. One earlier full run failed a single exact-directory Remove
+assertion; isolated, class, project, parallel, cross-project, and 1000-operation
+stress investigation did not reproduce it or capture `result.Errors`, so no
+root cause or source fix is claimed. The final local Setup and ZIP hashes are
+`5EB8150C695274D33DCB465E352C0564B6FF7FFF3B4D4914426D487620FD571B`
+and `EEA235CA10F3F3EF6717CF36D252B7CB615080DCFC0C15C951371BE7202A50C9`.
+The local install matches the packaged App/Designer hashes. Some manual
+layout/DPI/image, uninstall, sign-out, restart, and About-window rows remain
+unrun; overall acceptance is `PARTIAL — no public release is authorized`.
 
 ## Product behavior
 

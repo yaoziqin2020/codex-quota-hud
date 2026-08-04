@@ -1,7 +1,7 @@
 # Skin Designer Visual Fixes Design
 
 **Date:** 2026-08-04  
-**Status:** Approved in conversation; written review pending  
+**Status:** Implemented; awaiting final installed user review
 **Related design:** `2026-08-04-animation-controls-design.md`
 
 ## Goal
@@ -44,13 +44,18 @@ The existing strip remains one bordered region but becomes two rows.
 
 - Display mode appears first with a Chinese field label.
 - Five-hour quota and weekly quota each receive a flexible-width group.
-- Each quota group contains its label, slider, and preset selector.
+- Each quota group places a fixed-width preset selector beside its label and
+  gives the slider its own row. Preset selectors must never stretch across the
+  group.
 - The two quota groups divide the remaining width evenly.
 
 ### Second row: state and placement
 
-- The left side contains the three state toggles: details, animations, and refreshing.
-- The right side contains the four edge-placement actions and the expand action.
+- A compact `预览状态` group contains details, animations, and refreshing.
+- An adjacent `停靠预览` group contains text buttons `左 / 右 / 上 / 下` plus
+  the expand action. Direction-only arrow glyphs are not used.
+- The two task groups remain together at normal width and wrap as whole groups
+  at narrow width; they are not pushed to opposite screen edges.
 - Existing commands and synthetic-preview semantics remain unchanged.
 
 At the minimum supported window width, both rows must remain inside the strip without horizontal clipping. The strip may grow vertically; it must not add a horizontal scrollbar.
