@@ -1,0 +1,97 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="DesignerBackgroundBrush" Color="#FF08111F" />
+    <SolidColorBrush x:Key="DesignerSurfaceBrush" Color="#FF111D2E" />
+    <SolidColorBrush x:Key="DesignerRaisedBrush" Color="#FF17263A" />
+    <SolidColorBrush x:Key="DesignerTextBrush" Color="#FFF1F5F9" />
+    <SolidColorBrush x:Key="DesignerMutedTextBrush" Color="#FFA9B8CC" />
+    <SolidColorBrush x:Key="DesignerBorderBrush" Color="#FF33445B" />
+    <SolidColorBrush x:Key="DesignerAccentBrush" Color="#FF38BDF8" />
+    <SolidColorBrush x:Key="DesignerAccentTextBrush" Color="#FF03121D" />
+
+    <Style x:Key="DesignerFocusVisualStyle" TargetType="Control">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border BorderBrush="{DynamicResource DesignerAccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="5"
+                            Margin="-3" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="Button">
+        <Setter Property="FocusVisualStyle"
+                Value="{StaticResource DesignerFocusVisualStyle}" />
+        <Setter Property="Foreground" Value="{DynamicResource DesignerTextBrush}" />
+        <Setter Property="Background" Value="{DynamicResource DesignerRaisedBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DesignerBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="DesignerButtonBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="5"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"
+                                          RecognizesAccessKey="True"
+                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="Background"
+                                    Value="#FF203A52" />
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource DesignerAccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="Background"
+                                    Value="{DynamicResource DesignerBackgroundBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource DesignerAccentBrush}" />
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="BorderThickness"
+                                    Value="2" />
+                        </Trigger>
+                        <Trigger Property="IsDefault" Value="True">
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource DesignerAccentBrush}" />
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="BorderThickness"
+                                    Value="2" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="Background"
+                                    Value="{DynamicResource DesignerRaisedBrush}" />
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource DesignerBorderBrush}" />
+                            <Setter TargetName="DesignerButtonBorder"
+                                    Property="Opacity"
+                                    Value="0.55" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

@@ -36,6 +36,31 @@ public sealed class MainWindowLayoutTests
     }
 
     [Fact]
+    public void MainWindowButton_UsesDesignerTemplateAndKeepsRaisedSurfaceWhenDisabled()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var window = CreateWindow(temporary, out _);
+            var button = Assert.IsType<Button>(window.FindName("NewDraftButton"));
+
+            window.AttachPreviewOwnerForTesting();
+            button.ApplyTemplate();
+            var templateRoot = Assert.IsType<Border>(
+                button.Template.FindName("DesignerButtonBorder", button));
+
+            window.IsEnabled = false;
+            window.UpdateLayout();
+
+            Assert.Same(
+                window.FindResource("DesignerRaisedBrush"),
+                templateRoot.Background);
+            Assert.Equal(0.55, templateRoot.Opacity, precision: 2);
+            window.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
     public void RealWindow_ExposesDocumentCommandsAndFailedOpenPreservesCurrentSession()
     {
         RunSta(() =>

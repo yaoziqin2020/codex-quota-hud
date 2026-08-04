@@ -88,6 +88,65 @@ public sealed class ProjectBoundaryTests
         Assert.Equal([16, 24, 32, 48, 64, 128, 256], sizes);
     }
 
+    [Fact]
+    public void DesignerTheme_OwnsSharedPaletteAndImplicitButtonTemplate()
+    {
+        var root = FindRepositoryRoot();
+        var theme = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CodexQuotaHud.SkinDesigner",
+            "UI",
+            "DesignerTheme.xaml"));
+        var mainWindow = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CodexQuotaHud.SkinDesigner",
+            "MainWindow.xaml"));
+
+        foreach (var key in new[]
+                 {
+                     "DesignerBackgroundBrush",
+                     "DesignerSurfaceBrush",
+                     "DesignerRaisedBrush",
+                     "DesignerTextBrush",
+                     "DesignerMutedTextBrush",
+                     "DesignerBorderBrush",
+                     "DesignerAccentBrush",
+                     "DesignerAccentTextBrush",
+                     "DesignerFocusVisualStyle"
+                 })
+        {
+            Assert.Contains($"x:Key=\"{key}\"", theme, StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                $"x:Key=\"{key}\"",
+                mainWindow,
+                StringComparison.Ordinal);
+        }
+
+        Assert.Contains("<Style TargetType=\"Button\">", theme, StringComparison.Ordinal);
+        Assert.Contains(
+            "<ControlTemplate TargetType=\"Button\">",
+            theme,
+            StringComparison.Ordinal);
+        foreach (var binding in new[]
+                 {
+                     "TextElement.Foreground=\"{TemplateBinding Foreground}\"",
+                     "Background=\"{TemplateBinding Background}\"",
+                     "BorderBrush=\"{TemplateBinding BorderBrush}\"",
+                     "BorderThickness=\"{TemplateBinding BorderThickness}\"",
+                     "Padding=\"{TemplateBinding Padding}\""
+                 })
+        {
+            Assert.Contains(binding, theme, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain(
+            "<Style TargetType=\"Button\">",
+            mainWindow,
+            StringComparison.Ordinal);
+    }
+
     private static IReadOnlyList<string> EvaluatedReferences(
         string root,
         string project)
