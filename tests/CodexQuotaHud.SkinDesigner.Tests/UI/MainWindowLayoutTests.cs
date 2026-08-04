@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
+using CodexQuotaHud.SkinDesigner.Output;
 using CodexQuotaHud.SkinDesigner.Tests.Preview;
 using CodexQuotaHud.SkinDesigner.UI;
 using CodexQuotaHud.Skins.Contracts;
@@ -864,6 +865,33 @@ public sealed class MainWindowLayoutTests
     }
 
     [Fact]
+    public void SuccessfulReplacement_PromotesLoadedEditorAsOutputDialogOwner()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var owner = new DesignerWindowOwner();
+            var window = CreateWindow(
+                temporary,
+                out _,
+                outputWindowOwner: owner);
+            window.AttachPreviewOwnerForTesting();
+            Assert.Same(window, owner.Current);
+
+            Assert.IsType<Button>(window.FindName("NewDraftButton"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            PumpUntil(() => window.DocumentOperationForTesting.IsCompleted);
+            DrainDispatcher();
+
+            Assert.False(window.IsLoaded);
+            var replacement = Assert.IsType<MainWindow>(owner.Current);
+            Assert.NotSame(window, replacement);
+            Assert.True(replacement.IsLoaded);
+            replacement.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
     public void UnsavedDiscardError_KeepsCurrentDocumentAndShowsActionableStatus()
     {
         RunSta(() =>
@@ -1017,7 +1045,8 @@ public sealed class MainWindowLayoutTests
         DesignerDocumentService? documents = null,
         IDesignerDocumentRequestSource? requests = null,
         Func<DesignerDocumentResult, IDesignerWindow>? createReplacementWindow = null,
-        Action<Action>? systemEventDispatcherPost = null)
+        Action<Action>? systemEventDispatcherPost = null,
+        DesignerWindowOwner? outputWindowOwner = null)
     {
         var paths = new SkinStoragePaths(temporary.Path);
         var draft = SkinDraftFactory.CreateNew(
@@ -1037,7 +1066,8 @@ public sealed class MainWindowLayoutTests
             createReplacementWindow,
             draftStore: draftStore,
             recovery: recovery,
-            systemEventDispatcherPost: systemEventDispatcherPost);
+            systemEventDispatcherPost: systemEventDispatcherPost,
+            outputWindowOwner: outputWindowOwner);
     }
 
     private static DesignerDocumentService CreateDocumentService(

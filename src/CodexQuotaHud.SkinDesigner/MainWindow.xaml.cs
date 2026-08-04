@@ -30,6 +30,7 @@ public partial class MainWindow : Window, IDesignerWindow
     private readonly DesignerDocumentService _documents;
     private readonly IDesignerDocumentRequestSource _documentRequests;
     private readonly DesignerOutputServices? _outputServices;
+    private readonly DesignerWindowOwner? _outputWindowOwner;
     private readonly Func<DesignerDocumentResult, IDesignerWindow>
         _createReplacementWindow;
     private readonly IDesignerMonitorWorkAreaSource _monitorWorkArea;
@@ -92,7 +93,8 @@ public partial class MainWindow : Window, IDesignerWindow
         DraftStore? draftStore = null,
         DraftRecoveryService? recovery = null,
         Action<Action>? systemEventDispatcherPost = null,
-        DesignerOutputServices? outputServices = null)
+        DesignerOutputServices? outputServices = null,
+        DesignerWindowOwner? outputWindowOwner = null)
     {
         Draft = draft ?? throw new ArgumentNullException(nameof(draft));
         ArgumentNullException.ThrowIfNull(assets);
@@ -102,6 +104,7 @@ public partial class MainWindow : Window, IDesignerWindow
         _documentRequests = documentRequests ??
             throw new ArgumentNullException(nameof(documentRequests));
         _outputServices = outputServices;
+        _outputWindowOwner = outputWindowOwner;
         _paths = paths;
         _dialog = dialog;
         _createReplacementWindow = createReplacementWindow ?? (result =>
@@ -112,7 +115,8 @@ public partial class MainWindow : Window, IDesignerWindow
                 dialog,
                 documents,
                 documentRequests,
-                outputServices: outputServices));
+                outputServices: outputServices,
+                outputWindowOwner: outputWindowOwner));
         _monitorWorkArea = monitorWorkArea ??
             new WindowsDesignerMonitorWorkAreaSource();
         _systemEventDispatcherPost = systemEventDispatcherPost ?? (action =>
@@ -407,6 +411,7 @@ public partial class MainWindow : Window, IDesignerWindow
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        _outputWindowOwner?.Promote(this);
         AttachSystemEvents();
         ReapplyCurrentMonitorLayout();
         AttachPreviewOwner();

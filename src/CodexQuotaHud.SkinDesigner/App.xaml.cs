@@ -23,6 +23,7 @@ public partial class App : System.Windows.Application
         var dialog = new WindowsUnsavedChangesDialog();
         var requests = new WindowsDesignerDocumentRequestSource(paths);
         var hudVersion = SemanticVersion.Parse("1.1.1");
+        var outputWindowOwner = new DesignerWindowOwner();
 
         _composition = DesignerStartupComposition.TryCreate(
             new DesignerStartupFactories(
@@ -39,7 +40,7 @@ public partial class App : System.Windows.Application
                         catalog,
                         reader);
                     var outputDialogs = new WindowsSkinOutputDialogs(
-                        () => Current?.MainWindow);
+                        () => outputWindowOwner.Current);
                     var builder = new DraftPackageBuilder(hudVersion);
                     var installer = new SkinPackageInstaller(paths, hudVersion);
                     var apply = new SkinApplyService(
@@ -72,7 +73,8 @@ public partial class App : System.Windows.Application
                     dialog,
                     workspace.Documents,
                     requests,
-                    outputServices: workspace.OutputServices)));
+                    outputServices: workspace.OutputServices,
+                    outputWindowOwner: outputWindowOwner)));
         if (_composition is null)
         {
             Shutdown();
