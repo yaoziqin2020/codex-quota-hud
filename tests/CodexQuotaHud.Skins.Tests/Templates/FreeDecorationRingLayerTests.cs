@@ -1,6 +1,9 @@
+using System.Collections;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using CodexQuotaHud.Core.Models;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Templates;
@@ -326,6 +329,85 @@ public sealed class FreeDecorationRingLayerTests
     }
 
     [Fact]
+    public void ZeroRefreshSpeed_PausesFullIntensityTrackAndIdleResumes()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var renderer = CreateRenderer(
+                AllSlots,
+                theme => theme with
+                {
+                    Animation = CreateAnimationSettings(
+                        AnimationChannel.Rotation,
+                        selectedValue: 1,
+                        otherValue: 0)
+                });
+
+            renderer.ApplyAnimationState(
+                CustomSkinAnimationState.Refreshing,
+                globalAnimationsEnabled: true,
+                refreshSpeedMultiplier: 0);
+
+            var paused = Assert.Single(ActiveAnimationClocks(renderer));
+            Assert.True(renderer.AnimationsPaused);
+            Assert.True(renderer.HasActiveAnimations);
+            Assert.Equal(24, renderer.DesiredFrameRate);
+            Assert.True(paused.Controller!.SpeedRatio > 0);
+
+            renderer.ApplyAnimationState(
+                CustomSkinAnimationState.Idle,
+                globalAnimationsEnabled: true,
+                refreshSpeedMultiplier: 0);
+
+            var resumed = Assert.Single(ActiveAnimationClocks(renderer));
+            Assert.False(renderer.AnimationsPaused);
+            Assert.True(renderer.HasActiveAnimations);
+            Assert.Equal(4, renderer.DesiredFrameRate);
+            Assert.Equal(1d, resumed.CurrentGlobalSpeed);
+        });
+    }
+
+    [Theory]
+    [InlineData(2d, 1d, 2d)]
+    [InlineData(4d, 1d, 4d)]
+    [InlineData(2d, 0.5d, 1.5d)]
+    [InlineData(4d, 0.5d, 2.5d)]
+    public void PositiveRefreshSpeed_UsesIntensityWeightedAbsoluteRatioWithoutStacking(
+        double refreshSpeedMultiplier,
+        double intensity,
+        double expectedSpeedRatio)
+    {
+        WpfTestThread.Run(() =>
+        {
+            var renderer = CreateRenderer(
+                AllSlots,
+                theme => theme with
+                {
+                    Animation = CreateAnimationSettings(
+                        AnimationChannel.Rotation,
+                        intensity,
+                        otherValue: 0)
+                });
+
+            renderer.ApplyAnimationState(
+                CustomSkinAnimationState.Refreshing,
+                globalAnimationsEnabled: true,
+                refreshSpeedMultiplier);
+            Assert.Equal(
+                expectedSpeedRatio,
+                Assert.Single(ActiveAnimationClocks(renderer)).CurrentGlobalSpeed);
+
+            renderer.ApplyAnimationState(
+                CustomSkinAnimationState.Refreshing,
+                globalAnimationsEnabled: true,
+                refreshSpeedMultiplier);
+            Assert.Equal(
+                expectedSpeedRatio,
+                Assert.Single(ActiveAnimationClocks(renderer)).CurrentGlobalSpeed);
+        });
+    }
+
+    [Fact]
     public void ZeroAnimationIntensities_CreateNoTracks()
     {
         WpfTestThread.Run(() =>
@@ -504,6 +586,29 @@ public sealed class FreeDecorationRingLayerTests
                     Assert.IsType<double>(property.Target.GetValue(property.Property)));
             }
         }
+    }
+
+    private static IReadOnlyList<ClockGroup> ActiveAnimationClocks(
+        FreeDecorationRingRenderer renderer)
+    {
+        var field = Assert.IsAssignableFrom<FieldInfo>(
+            typeof(FreeDecorationRingRenderer).GetField(
+                "_animationTracks",
+                BindingFlags.Instance | BindingFlags.NonPublic));
+        var tracks = Assert.IsAssignableFrom<IEnumerable>(field.GetValue(renderer));
+        var clocks = new List<ClockGroup>();
+
+        foreach (var track in tracks)
+        {
+            var activeClock = Assert.IsType<ClockGroup>(
+                track.GetType()
+                    .GetProperty("ActiveClock")!
+                    .GetValue(track));
+            Assert.NotNull(activeClock.Controller);
+            clocks.Add(activeClock);
+        }
+
+        return clocks;
     }
 
     private static IReadOnlyDictionary<AnimationChannel, AnimationProperty[]>

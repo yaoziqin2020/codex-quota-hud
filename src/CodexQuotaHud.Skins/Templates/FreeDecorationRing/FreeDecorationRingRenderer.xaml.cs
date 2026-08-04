@@ -24,6 +24,7 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
     private readonly SlotTransforms _centerTransforms;
     private readonly SlotTransforms _decorationTransforms;
     private bool _animationsStarted;
+    private bool _animationsPaused;
 
     internal FreeDecorationRingRenderer(SkinPackageDocument package)
     {
@@ -58,6 +59,8 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         _animationTracks
             .Select(track => Timeline.GetDesiredFrameRate(track.Storyboard))
             .ToArray();
+
+    internal bool AnimationsPaused => _animationsPaused;
 
     public override void Render(CustomSkinRenderState state)
     {
@@ -99,10 +102,13 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         var desiredFrameRate = state == CustomSkinAnimationState.Refreshing
             ? RefreshingFrameRate
             : IdleFrameRate;
-        var speedRatio = state == CustomSkinAnimationState.Refreshing
+        var pauseAnimations = state == CustomSkinAnimationState.Refreshing &&
+            refreshSpeedMultiplier == 0;
+        var speedRatio = state == CustomSkinAnimationState.Refreshing &&
+            !pauseAnimations
             ? refreshSpeedMultiplier
             : 1d;
-        StartAnimations(desiredFrameRate, speedRatio);
+        StartAnimations(desiredFrameRate, speedRatio, pauseAnimations);
     }
 
     private void ApplyTheme(SkinTheme theme)
@@ -382,7 +388,10 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
             [new AnimationBinding(target, property, animation)]);
     }
 
-    private void StartAnimations(int desiredFrameRate, double speedRatio)
+    private void StartAnimations(
+        int desiredFrameRate,
+        double speedRatio,
+        bool pauseAnimations)
     {
         if (_animationsStarted)
         {
@@ -415,9 +424,14 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
             clockGroup.Controller.SeekAlignedToLastTick(
                 TimeSpan.Zero,
                 TimeSeekOrigin.BeginTime);
+            if (pauseAnimations)
+            {
+                clockGroup.Controller.Pause();
+            }
         }
 
         _animationsStarted = true;
+        _animationsPaused = pauseAnimations;
         HasActiveAnimations = true;
         DesiredFrameRate = desiredFrameRate;
     }
@@ -430,6 +444,7 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         }
 
         _animationsStarted = false;
+        _animationsPaused = false;
         HasActiveAnimations = false;
         DesiredFrameRate = null;
         ResetTransforms();
