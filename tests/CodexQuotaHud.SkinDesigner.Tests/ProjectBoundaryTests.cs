@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace CodexQuotaHud.SkinDesigner.Tests;
@@ -45,6 +46,46 @@ public sealed class ProjectBoundaryTests
         Assert.Equal(
             "CodexQuotaHud.SkinDesigner",
             properties.GetProperty("TargetName").GetString());
+    }
+
+    [Fact]
+    public void DesignerProject_UsesDistinctMultiSizeApplicationIcon()
+    {
+        var root = FindRepositoryRoot();
+        using var document = Evaluate(
+            root,
+            "src/CodexQuotaHud.SkinDesigner/CodexQuotaHud.SkinDesigner.csproj",
+            "-getProperty:ApplicationIcon",
+            "-getProperty:OutputType");
+        var icon = document.RootElement.GetProperty("Properties")
+            .GetProperty("ApplicationIcon").GetString();
+
+        Assert.Equal("Assets\\DesignerIcon.ico", icon);
+        var designerPath = Path.Combine(
+            root,
+            "src",
+            "CodexQuotaHud.SkinDesigner",
+            "Assets",
+            "DesignerIcon.ico");
+        var hudPath = Path.Combine(
+            root,
+            "src",
+            "CodexQuotaHud.App",
+            "Assets",
+            "AppIcon.ico");
+        Assert.True(File.Exists(designerPath));
+        Assert.NotEqual(
+            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(hudPath))),
+            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(designerPath))));
+
+        var bytes = File.ReadAllBytes(designerPath);
+        Assert.Equal(7, BitConverter.ToUInt16(bytes, 4));
+        var sizes = Enumerable.Range(0, 7)
+            .Select(index => bytes[6 + (index * 16)] is 0
+                ? 256
+                : bytes[6 + (index * 16)])
+            .ToArray();
+        Assert.Equal([16, 24, 32, 48, 64, 128, 256], sizes);
     }
 
     private static IReadOnlyList<string> EvaluatedReferences(

@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CodexQuotaHud.Skins\CodexQuotaHud.Skins.csproj" />
     <ProjectReference Include="..\CodexQuotaHud.App\CodexQuotaHud.App.csproj" />
+    <Resource Include="Assets\DesignerIcon.ico" />
   </ItemGroup>
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -9,5 +10,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\DesignerIcon.ico</ApplicationIcon>
   </PropertyGroup>
 </Project>

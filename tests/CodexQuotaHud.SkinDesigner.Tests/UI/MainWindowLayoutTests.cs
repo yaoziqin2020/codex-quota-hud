@@ -18,6 +18,23 @@ namespace CodexQuotaHud.SkinDesigner.Tests.UI;
 public sealed class MainWindowLayoutTests
 {
     [Fact]
+    public void RealWindow_LoadsDesignerSpecificIcon()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var window = CreateWindow(temporary, out _);
+
+            Assert.NotNull(window.Icon);
+            Assert.Contains(
+                "DesignerIcon.ico",
+                window.Icon.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+            window.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
     public void RealWindow_ExposesDocumentCommandsAndFailedOpenPreservesCurrentSession()
     {
         RunSta(() =>
