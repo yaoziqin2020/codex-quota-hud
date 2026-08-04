@@ -1,6 +1,6 @@
 # Current Task
 
-## v1.2.3 installed local candidate — user practical acceptance pending
+## v1.2.3 installed local candidate — user accepted; public release pending
 
 The v1.2.3 candidate preserves every built-in skin's existing refresh-speed
 profile and adds a shared 1.5-second post-refresh hold. Custom skins can use an
@@ -68,11 +68,12 @@ Installed Designer GUI smoke passed the default `2.0×`/`1.5 秒` display,
 all three presets, one dark unsaved dialog, dark disabled background controls,
 and a native file picker rooted at the Designer drafts directory. GUI coverage
 of exact motion timing, all dialog variants, legacy-package output, and
-sign-out/restart remains partial or not run. The current handoff is for the
-user to inspect this exact installed candidate.
+sign-out/restart remains partial or not run. On 2026-08-05, the user completed
+hands-on testing of this exact installed candidate, reported no issues, and
+accepted it for Git synchronization.
 
-No push, `main` movement, tag, upload, or GitHub Release action has occurred or
-is authorized before explicit user acceptance.
+The public `v1.2.3` tag, asset upload, and GitHub Release remain separate
+pending release actions.
 
 ## v1.2.2 skin metadata correction — released
 

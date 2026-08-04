@@ -21,15 +21,13 @@ and a numeric tray icon without scraping web pages or storing credentials.
 
 ## v1.2.3 candidate installation / 候选安装
 
-After local acceptance and public release authorization, the primary path is
-`CodexQuotaHud-Setup-v1.2.3.exe`. The current v1.2.3 artifacts are local
-release candidates only. The exact final candidate is installed on the
-maintainer machine for hands-on acceptance; the latest public release remains
-v1.2.2.
+After public release authorization, the primary path is
+`CodexQuotaHud-Setup-v1.2.3.exe`. The current v1.2.3 artifacts remain local
+release candidates. The exact final candidate is installed and has passed
+maintainer hands-on acceptance; the latest public release remains v1.2.2.
 
-完成本机验收并明确授权公开发布后，主要安装文件为
-`CodexQuotaHud-Setup-v1.2.3.exe`。当前 v1.2.3 资产仅为本地候选；最新公开版仍是
-v1.2.2。
+明确授权公开发布后，主要安装文件为 `CodexQuotaHud-Setup-v1.2.3.exe`。当前
+v1.2.3 资产已通过本机实操验收但仍是本地候选；最新公开版仍是 v1.2.2。
 
 Setup automatically offers Simplified Chinese or English, installs only for
 the current Windows user, and needs no administrator permission. It installs
@@ -330,7 +328,7 @@ two-direction handoff remains an optional manual UI check.
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
 
-元数据修正版已从标签 `v1.2.2` 发布。v1.2.3 本地候选已完成安装，仍等待用户实操验收，尚未
+元数据修正版已从标签 `v1.2.2` 发布。v1.2.3 本地候选已完成安装和用户实操验收，尚未
 创建标签或公开 Release。不要移动 `v1.2.0`、`v1.2.1`、`v1.2.2` 历史标签，也不要
 替换其 Release 资产。
 
@@ -370,13 +368,13 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 为 `0` warnings / `0` errors。刷新时序、旧包默认值、0x 暂停、对话框契约与
 Designer 控件均有自动化覆盖；最终 Setup 已本地安装，安装后身份/哈希/数据保留、
 正式启动和核心 Designer GUI 冒烟通过。精确 GUI 动画时序、全部对话框类型、旧包
-输出、重启矩阵与用户实操验收仍为 `PARTIAL` 或 `NOT RUN`，不能由自动化结果代替。
+输出与重启矩阵仍为 `PARTIAL` 或 `NOT RUN`；用户已对最终安装候选完成实操验收。
 历史 v1.2.0 的未复现存储异常仍按原记录保留。详见
 [`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
 
-v1.2.3 候选的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态和本地安装证据已完整记录在
-验收文档中。现有正式安装为本地 v1.2.3 候选；未获用户验收前不会推送、移动 `main`、创建
-`v1.2.3` 标签、上传资产或发布 GitHub Release。
+v1.2.3 候选的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已
+完整记录在验收文档中。现有正式安装为本地 v1.2.3 候选；`v1.2.3` 标签、资产上传和
+GitHub Release 仍是后续独立发布步骤。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and
 total `388/388`; the Release build completed with zero warnings and zero

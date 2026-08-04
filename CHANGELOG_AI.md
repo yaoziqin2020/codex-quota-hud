@@ -1,6 +1,6 @@
 # AI Change Log
 
-## 2026-08-05 — v1.2.3 final local candidate installed; user acceptance pending
+## 2026-08-05 — v1.2.3 final local candidate installed and user-accepted
 
 - Added a shared requested/effective refresh animation state machine. Built-in
   skin speed profiles are unchanged and receive a 1.5-second completion hold.
@@ -51,10 +51,11 @@
   controls, and the native picker rooted at the drafts directory. The smoke
   modified only an unnamed temporary draft and restored a new default draft;
   no user skin was saved, applied, exported, or overwritten.
-- Exact motion timing across all skin combinations, every dialog variant,
-  legacy-package output, sign-out/restart, and user practical acceptance remain
-  partial or `NOT RUN`. No push, `main` movement, tag, upload, release, or
-  publication was performed or authorized.
+- The user completed hands-on testing of the exact installed candidate,
+  reported no issues, and accepted it for Git synchronization. Exact motion
+  timing across all skin combinations, every dialog variant, legacy-package
+  output, and sign-out/restart remain partial or `NOT RUN`. The public
+  `v1.2.3` tag, asset upload, and GitHub Release remain separate pending steps.
 
 ## 2026-08-04 — v1.2.2 skin metadata correction released
 

@@ -8,7 +8,7 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
-## v1.2.3 installed local candidate — user acceptance pending
+## v1.2.3 installed local candidate — user accepted; public release pending
 
 The v1.2.3 work combines two approved corrections. Skin Designer-owned
 messages now use accessible dark-themed WPF dialogs and a shared Designer
@@ -60,11 +60,12 @@ presets preserving speed/hold, a dark unsaved-change dialog, dark disabled
 owner buttons, and the native picker opening at the Designer drafts directory.
 The formal installed HUD process is running. Exact motion timing across every
 built-in/custom combination, old-package save/apply/export, every dialog kind,
-sign-out/restart, and user practical acceptance are still not fully verified.
+and sign-out/restart are still not exhaustively verified. On 2026-08-05, the
+user completed hands-on testing of this exact installed candidate, reported no
+issues, and accepted it for Git synchronization.
 
-v1.2.3 has not been tagged, uploaded, pushed, merged to `main`, or published.
-Remote release work remains forbidden until the user explicitly accepts this
-exact installed candidate.
+The public `v1.2.3` tag, asset upload, and GitHub Release remain separate
+pending release actions.
 
 ## v1.1.1 historical release
 

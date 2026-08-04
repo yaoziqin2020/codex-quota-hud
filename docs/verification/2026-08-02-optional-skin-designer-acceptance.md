@@ -8,14 +8,14 @@ The original Task 18 boundary authorized only an ephemeral internal `0.0.0` buil
 
 Evidence states are `PASS`, `PARTIAL`, `FAIL`, and `NOT RUN`. A row moves to `PASS` only from direct evidence collected for that exact row. Automated PASS cannot make the overall feature acceptance PASS.
 
-## 2026-08-05 v1.2.3 final local candidate — installed, user gate pending
+## 2026-08-05 v1.2.3 final local candidate — installed and user-accepted
 
 This candidate combines the themed Designer dialogs and refresh-animation
 timing plans. Final source is
 `c66cf9d5d135b864ad90af5c74455177902c7c04`. Local installation and bounded
-GUI smoke are now complete, but the binding release gate still stops before all
-remote actions. Automated evidence does not promote unperformed GUI or user
-acceptance rows.
+GUI smoke are complete. The user then tested the exact installed candidate,
+reported no issues, and authorized Git synchronization. Automated or practical
+acceptance does not promote unperformed exhaustive GUI rows.
 
 | Status | Date/time (Asia/Tokyo) | Command or action | Expected | Observed | Evidence |
 |---|---|---|---|---|---|
@@ -43,11 +43,12 @@ acceptance rows.
 | PASS | 2026-08-05 +09:00 | Native picker with disabled Designer owner | Owner buttons remain dark while disabled; native picker behavior is unchanged | Installed native picker opened at `%LOCALAPPDATA%\CodexQuotaHud\designer\drafts`; Designer owner and all buttons remained dark/dimmed, then cancellation returned cleanly | Installed GUI screenshot/accessibility tree plus automated shared-template coverage |
 | PARTIAL | 2026-08-05 +09:00 | Unsaved, export-replace, collision, success, warning, and failure themed dialogs | Dialogs are centered, dark-themed, accessible, correctly ordered, and preserve Enter/Escape/close semantics | Installed unsaved-change dialog was centered, dark, accessible, and left owner buttons dark while disabled; Keep editing and Discard/New paths returned cleanly. Other dialog kinds and physical Enter/Escape semantics were not all exercised manually | Installed GUI screenshot/accessibility tree plus full automated dialog/window/adapter coverage |
 | PASS | 2026-08-05 +09:00 | Install v1.2.3 on maintainer machine | Installed App/Designer report 1.2.3, match publish hashes, retain data, startup/shortcuts, and formal HUD behavior | Exit `0`; identities/hashes/data/startup/shortcuts passed; formal installed process is running; Designer launched and completed bounded GUI smoke | Setup log, hashes, registry/shortcut/process evidence, Computer Use screenshots |
-| NOT RUN | — | User practical acceptance | User accepts the exact installed candidate before any remote release action | Exact candidate is installed and ready for the user's hands-on check; the user has not yet accepted it | None |
+| PASS | 2026-08-05 02:55 +09:00 | User practical acceptance | User accepts the exact installed candidate before any remote release action | User reported no issues after hands-on testing of the installed candidate and instructed the Agent to push Git | Current user acceptance statement |
 
-**Current v1.2.3 decision: PARTIAL — source, package, installer matrix, real
-installation, and bounded GUI smoke PASS/PARTIAL; user practical acceptance is
-still NOT RUN. No remote release is authorized.**
+**Current v1.2.3 decision: ACCEPTED — source, package, installer matrix, real
+installation, bounded GUI smoke, and user practical acceptance are sufficient
+for the authorized Git synchronization. Exhaustive manual matrices remain
+honestly PASS/PARTIAL/NOT RUN; public tag and Release publication are separate.**
 
 ## 2026-08-04 v1.2.2 skin metadata correction
 
