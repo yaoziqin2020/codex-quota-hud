@@ -136,10 +136,7 @@ public sealed class SkinManagementController
             ShowErrors(installed.Errors);
         }
 
-        var snapshot = _catalog.Refresh();
-        ReplaceCatalogWithFallback(snapshot);
-        _entries = BuildEntries(snapshot);
-        RaiseCatalogChanged();
+        _ = SynchronizeCatalog(_catalog.Refresh());
         return Task.FromResult(new SkinImportResult(
             Succeeded: true,
             Cancelled: false,
@@ -220,11 +217,21 @@ public sealed class SkinManagementController
             return Task.FromResult(false);
         }
 
-        var snapshot = _catalog.Refresh();
-        ReplaceCatalogWithFallback(snapshot);
+        _ = SynchronizeCatalog(_catalog.Refresh());
+        return Task.FromResult(true);
+    }
+
+    internal bool SynchronizeCatalog(HudSkinCatalogSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (!ReplaceCatalogWithFallback(snapshot))
+        {
+            return false;
+        }
+
         _entries = BuildEntries(snapshot);
         RaiseCatalogChanged();
-        return Task.FromResult(true);
+        return true;
     }
 
     public bool OpenDesigner()

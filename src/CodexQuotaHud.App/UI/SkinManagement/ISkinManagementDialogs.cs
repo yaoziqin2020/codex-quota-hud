@@ -28,6 +28,7 @@ internal sealed class SkinManagementDialogs(Func<Window?> owner) :
         {
             Title = "导入皮肤",
             Filter = "Codex Quota HUD 皮肤 (*.cqskin)|*.cqskin",
+            InitialDirectory = SkinPackageExchangeDirectory.EnsureExists(),
             CheckFileExists = true,
             Multiselect = false
         };

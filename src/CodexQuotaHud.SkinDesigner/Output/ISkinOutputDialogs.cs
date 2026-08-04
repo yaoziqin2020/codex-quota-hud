@@ -35,7 +35,10 @@ internal sealed class WindowsSkinOutputDialogs(Func<Window?> owner) :
 
     public string? ChooseExportPath(string suggestedFileName) =>
         InvokeOnDesigner(ownerWindow =>
-            _actions.ChooseExportPath(ownerWindow, suggestedFileName));
+            _actions.ChooseExportPath(
+                ownerWindow,
+                SkinPackageExchangeDirectory.SuggestedExportPath(
+                    suggestedFileName)));
 
     public bool ConfirmExportReplace(string destinationPath) =>
         InvokeOnDesigner(ownerWindow =>

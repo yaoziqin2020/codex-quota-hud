@@ -282,6 +282,8 @@ public sealed class SyntheticPreviewCompositionTests
             var activeRenderer = Assert.IsType<FreeDecorationRingRenderer>(
                 composition.HudWindow.SkinHost.Content);
 
+            Assert.True(activeRenderer.HasActiveAnimations);
+            Assert.Equal(4, activeRenderer.DesiredFrameRate);
             composition.Session.SetAnimationsEnabled(false);
             Assert.Equal(4, activeRenderer.AnimationTrackCount);
             Assert.False(activeRenderer.HasActiveAnimations);

@@ -61,7 +61,7 @@ public sealed class TraySkinMenuTests
                 () => trayCalls.Add("designer"));
 
             Assert.Equal(
-                ["HUD 科技仪表", "双彩能量环", "流体玻璃球", "克制极光", "液位储能舱", "Ocean", "|", "导入皮肤…", "打开皮肤设计器"],
+                ["HUD 科技仪表", "双彩能量环", "流体玻璃球", "克制极光", "液位储能舱", "Ocean", "|", "删除自定义皮肤", "导入皮肤…", "打开皮肤设计器"],
                 WpfLabels(wpfRoot));
             Assert.Equal(WpfLabels(wpfRoot), TrayLabels(trayRoot));
             Assert.DoesNotContain(
@@ -71,22 +71,22 @@ public sealed class TraySkinMenuTests
 
             ((MenuItem)wpfRoot.Items[0]).RaiseEvent(
                 new RoutedEventArgs(MenuItem.ClickEvent));
-            var wpfCustom = (MenuItem)wpfRoot.Items[5];
-            ((MenuItem)wpfCustom.Items[0]).RaiseEvent(
+            ((MenuItem)wpfRoot.Items[5]).RaiseEvent(
                 new RoutedEventArgs(MenuItem.ClickEvent));
-            ((MenuItem)wpfCustom.Items[1]).RaiseEvent(
-                new RoutedEventArgs(MenuItem.ClickEvent));
-            ((MenuItem)wpfRoot.Items[7]).RaiseEvent(
+            var wpfRemove = (MenuItem)wpfRoot.Items[7];
+            ((MenuItem)wpfRemove.Items[0]).RaiseEvent(
                 new RoutedEventArgs(MenuItem.ClickEvent));
             ((MenuItem)wpfRoot.Items[8]).RaiseEvent(
                 new RoutedEventArgs(MenuItem.ClickEvent));
+            ((MenuItem)wpfRoot.Items[9]).RaiseEvent(
+                new RoutedEventArgs(MenuItem.ClickEvent));
 
             ((Forms.ToolStripMenuItem)trayRoot.DropDownItems[0]).PerformClick();
-            var trayCustom = (Forms.ToolStripMenuItem)trayRoot.DropDownItems[5];
-            ((Forms.ToolStripMenuItem)trayCustom.DropDownItems[0]).PerformClick();
-            ((Forms.ToolStripMenuItem)trayCustom.DropDownItems[1]).PerformClick();
-            ((Forms.ToolStripMenuItem)trayRoot.DropDownItems[7]).PerformClick();
+            ((Forms.ToolStripMenuItem)trayRoot.DropDownItems[5]).PerformClick();
+            var trayRemove = (Forms.ToolStripMenuItem)trayRoot.DropDownItems[7];
+            ((Forms.ToolStripMenuItem)trayRemove.DropDownItems[0]).PerformClick();
             ((Forms.ToolStripMenuItem)trayRoot.DropDownItems[8]).PerformClick();
+            ((Forms.ToolStripMenuItem)trayRoot.DropDownItems[9]).PerformClick();
 
             var expectedCalls = new[]
             {
@@ -226,8 +226,7 @@ public sealed class TraySkinMenuTests
 
                 var customKey = $"custom:{importedId:D}";
                 var wpfCustom = Assert.IsType<MenuItem>(wpfRoot.Items[5]);
-                ((MenuItem)wpfCustom.Items[0]).RaiseEvent(
-                    new RoutedEventArgs(MenuItem.ClickEvent));
+                wpfCustom.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
 
                 Assert.Equal(customKey, fixture.ViewModel.SelectedSkinKey);
                 Assert.Equal(

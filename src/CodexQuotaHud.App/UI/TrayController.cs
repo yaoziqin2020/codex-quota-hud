@@ -165,24 +165,29 @@ public sealed class TrayController : IDisposable
                 CheckOnClick = false,
                 Tag = entry.SelectionKey
             };
-            if (entry.CanRemove)
-            {
-                var selectItem = new Forms.ToolStripMenuItem("选择");
-                selectItem.Click += (_, _) => select(entry.SelectionKey);
-                var removeItem = new Forms.ToolStripMenuItem("删除");
-                removeItem.Click += async (_, _) => await remove(entry.SelectionKey);
-                item.DropDownItems.Add(selectItem);
-                item.DropDownItems.Add(removeItem);
-            }
-            else
-            {
-                item.Click += (_, _) => select(entry.SelectionKey);
-            }
+            item.Click += (_, _) => select(entry.SelectionKey);
 
             root.DropDownItems.Add(item);
         }
 
         root.DropDownItems.Add(new Forms.ToolStripSeparator());
+        var removable = entries.Where(entry => entry.CanRemove).ToArray();
+        if (removable.Length > 0)
+        {
+            var removeRoot = new Forms.ToolStripMenuItem("删除自定义皮肤");
+            foreach (var entry in removable)
+            {
+                var removeItem = new Forms.ToolStripMenuItem(entry.DisplayName)
+                {
+                    Tag = entry.SelectionKey
+                };
+                removeItem.Click += async (_, _) => await remove(entry.SelectionKey);
+                removeRoot.DropDownItems.Add(removeItem);
+            }
+
+            root.DropDownItems.Add(removeRoot);
+        }
+
         var importItem = new Forms.ToolStripMenuItem("导入皮肤…");
         importItem.Click += async (_, _) => await import();
         root.DropDownItems.Add(importItem);

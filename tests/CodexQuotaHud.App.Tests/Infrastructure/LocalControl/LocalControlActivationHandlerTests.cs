@@ -2,6 +2,7 @@ using System.Diagnostics;
 using CodexQuotaHud.App.Infrastructure;
 using CodexQuotaHud.App.Infrastructure.LocalControl;
 using CodexQuotaHud.App.UI;
+using CodexQuotaHud.App.UI.SkinManagement;
 using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Refresh;
 using CodexQuotaHud.Core.Settings;
@@ -76,7 +77,6 @@ public sealed class LocalControlActivationHandlerTests
     public async Task ProductionAppPath_ReloadsCatalogPreparesSavesAndActivatesRealWindow()
     {
         using var root = new TemporaryRoot();
-        InstallCustomSkin(root.Paths);
         var ready = new TaskCompletionSource<ProductionFixture>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var stopped = new TaskCompletionSource<Exception?>(
@@ -100,7 +100,19 @@ public sealed class LocalControlActivationHandlerTests
                 var controller = new SkinController(
                     catalog,
                     SkinTemplateRegistry.CreateDefault());
-                var window = new QuotaOrbWindow(viewModel, controller);
+                var management = new SkinManagementController(
+                    new SkinPackageInstaller(root.Paths, HudVersion),
+                    catalog,
+                    viewModel,
+                    controller,
+                    new DesignerLauncher(
+                        root.Path,
+                        _ => false,
+                        _ => throw new InvalidOperationException()),
+                    new SilentSkinManagementDialogs(),
+                    HudVersion,
+                    new InlineDispatcher());
+                var window = new QuotaOrbWindow(viewModel, controller, management);
                 var handler = new LocalControlActivationHandler(
                     key => catalog.Refresh().Healthy.Any(descriptor =>
                         string.Equals(
@@ -126,6 +138,10 @@ public sealed class LocalControlActivationHandlerTests
                         settings.Load().SelectedSkinKey,
                         viewModel.SelectedSkinKey,
                         controller.CurrentDescriptor.SelectionKey,
+                        management.Entries.Any(entry => string.Equals(
+                            entry.SelectionKey,
+                            SelectionKey,
+                            StringComparison.Ordinal)),
                         ReferenceEquals(
                             controller.CurrentView,
                             Assert.IsType<ContentControl>(
@@ -151,6 +167,7 @@ public sealed class LocalControlActivationHandlerTests
         try
         {
             fixture = await ready.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            InstallCustomSkin(root.Paths);
 
             var response = await fixture.Handler.HandleAsync(
                 Request(SelectionKey),
@@ -164,6 +181,7 @@ public sealed class LocalControlActivationHandlerTests
             Assert.Equal(SelectionKey, snapshot.PersistedSelectionKey);
             Assert.Equal(SelectionKey, snapshot.ViewModelSelectionKey);
             Assert.Equal(SelectionKey, snapshot.ControllerSelectionKey);
+            Assert.True(snapshot.MenuContainsSelection);
             Assert.True(snapshot.ViewMatchesController);
         }
         finally
@@ -426,7 +444,22 @@ public sealed class LocalControlActivationHandlerTests
         string PersistedSelectionKey,
         string ViewModelSelectionKey,
         string ControllerSelectionKey,
+        bool MenuContainsSelection,
         bool ViewMatchesController);
+
+    private sealed class SilentSkinManagementDialogs : ISkinManagementDialogs
+    {
+        public string? ChoosePackagePath() => null;
+
+        public SkinCollisionDecision ShowImportPreview(SkinInstallPreview preview) =>
+            SkinCollisionDecision.Cancel;
+
+        public bool ConfirmRemoval(SkinMenuEntry entry) => false;
+
+        public void ShowError(string message)
+        {
+        }
+    }
 
     private sealed class RecordingSettingsStore(AppSettings initial) : ISettingsStore
     {

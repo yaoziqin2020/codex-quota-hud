@@ -12,7 +12,11 @@ public sealed class WindowsSkinOutputDialogsTests
     public async Task ChooseExportPath_RunsOnExactDesignerOwnerDispatcherFromWorkerThread()
     {
         const string suggested = "Ocean Ring.cqskin";
-        const string selected = @"C:\exports\Ocean Ring.cqskin";
+        var expectedSuggestion = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "Codex Quota HUD Skins",
+            suggested);
+        var selected = expectedSuggestion;
         var ready = new TaskCompletionSource<DialogFixture>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
@@ -24,7 +28,7 @@ public sealed class WindowsSkinOutputDialogsTests
                 {
                     Assert.Same(owner, actualOwner);
                     Assert.True(dispatcher.CheckAccess());
-                    Assert.Equal(suggested, actualSuggested);
+                    Assert.Equal(expectedSuggestion, actualSuggested);
                     return selected;
                 },
                 (_, _) => throw new InvalidOperationException(),

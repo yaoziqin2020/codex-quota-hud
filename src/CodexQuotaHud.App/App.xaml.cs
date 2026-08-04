@@ -307,7 +307,8 @@ public partial class App : System.Windows.Application
                 descriptor.SelectionKey,
                 selectionKey,
                 StringComparison.Ordinal)) ||
-            !skinController.ReplaceCatalog(snapshot, out _))
+            !ReferenceEquals(window.SkinController, skinController) ||
+            !window.SynchronizeSkinCatalog(snapshot))
         {
             return false;
         }

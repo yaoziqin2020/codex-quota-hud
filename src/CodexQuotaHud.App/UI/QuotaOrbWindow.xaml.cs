@@ -197,6 +197,11 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
 
     internal SkinController SkinController => _skinController;
 
+    internal bool SynchronizeSkinCatalog(HudSkinCatalogSnapshot snapshot) =>
+        _skinManagement is null
+            ? _skinController.ReplaceCatalog(snapshot, out _)
+            : _skinManagement.SynchronizeCatalog(snapshot);
+
     internal IQuotaSkin? ActiveSyntheticSkin => _activeSyntheticSkin?.Skin;
 
     internal SkinPresentation? ActiveSyntheticPresentation =>
@@ -418,6 +423,7 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
         if (!IsVisible && _viewModel.IsVisible)
         {
             Show();
+            ApplyAnimationState();
         }
     }
 
@@ -826,24 +832,30 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
                 IsChecked = entry.IsSelected,
                 Tag = entry.SelectionKey
             };
-            if (entry.CanRemove)
-            {
-                var selectItem = new MenuItem { Header = "选择" };
-                selectItem.Click += (_, _) => select(entry.SelectionKey);
-                var removeItem = new MenuItem { Header = "删除" };
-                removeItem.Click += async (_, _) => await remove(entry.SelectionKey);
-                item.Items.Add(selectItem);
-                item.Items.Add(removeItem);
-            }
-            else
-            {
-                item.Click += (_, _) => select(entry.SelectionKey);
-            }
+            item.Click += (_, _) => select(entry.SelectionKey);
 
             root.Items.Add(item);
         }
 
         root.Items.Add(new System.Windows.Controls.Separator());
+        var removable = entries.Where(entry => entry.CanRemove).ToArray();
+        if (removable.Length > 0)
+        {
+            var removeRoot = new MenuItem { Header = "删除自定义皮肤" };
+            foreach (var entry in removable)
+            {
+                var removeItem = new MenuItem
+                {
+                    Header = entry.DisplayName,
+                    Tag = entry.SelectionKey
+                };
+                removeItem.Click += async (_, _) => await remove(entry.SelectionKey);
+                removeRoot.Items.Add(removeItem);
+            }
+
+            root.Items.Add(removeRoot);
+        }
+
         var importItem = new MenuItem { Header = "导入皮肤…" };
         importItem.Click += async (_, _) => await import();
         root.Items.Add(importItem);
