@@ -19,10 +19,15 @@ and a numeric tray icon without scraping web pages or storing credentials.
 > This is an independent open-source project and is not an official OpenAI
 > product.
 
-## v1.2.2 installation / 安装
+## v1.2.3 candidate installation / 候选安装
 
-Primary path: download `CodexQuotaHud-Setup-v1.2.2.exe` and double-click it.
-主要方式：下载 `CodexQuotaHud-Setup-v1.2.2.exe` 后直接双击运行。
+After local acceptance and public release authorization, the primary path is
+`CodexQuotaHud-Setup-v1.2.3.exe`. The current v1.2.3 artifacts are local
+release candidates only; the latest public release remains v1.2.2.
+
+完成本机验收并明确授权公开发布后，主要安装文件为
+`CodexQuotaHud-Setup-v1.2.3.exe`。当前 v1.2.3 资产仅为本地候选；最新公开版仍是
+v1.2.2。
 
 Setup automatically offers Simplified Chinese or English, installs only for
 the current Windows user, and needs no administrator permission. It installs
@@ -49,31 +54,32 @@ Setup 的任务页包含开机启动和创建正式版桌面快捷方式，两�
 快捷方式均直接启动真实 HUD，不带 `--preview`。Setup 不提供开发预览入口；源码和 ZIP
 用户可明确运行 `CodexQuotaHud.App.exe --preview` 进入预览模式。
 
-Install `v1.2.2` directly over `v1.0.0`, `v1.1.0`, `v1.1.1`, `v1.2.0`, or `v1.2.1`; personal HUD
+Install `v1.2.3` directly over `v1.0.0`, `v1.1.0`, `v1.1.1`, `v1.2.0`,
+`v1.2.1`, or `v1.2.2`; personal HUD
 settings, installed custom skins, Designer drafts, and Developer Preview window
 state are retained by default. Normal uninstall preserves user data. Select the
 explicit purge option only to remove the exact approved product-data roots.
 
-可从 `v1.0.0`、`v1.1.0`、`v1.1.1`、`v1.2.0` 或 `v1.2.1` 直接升级，默认保留 HUD 设置、已安装皮肤、
-设计器草稿和开发预览窗口状态。普通卸载会保留用户数据；只有明确选择清除选项时，
-才会删除安装器批准的准确产品数据目录。
+可从 `v1.0.0`、`v1.1.0`、`v1.1.1`、`v1.2.0`、`v1.2.1` 或 `v1.2.2`
+直接升级，默认保留 HUD 设置、已安装皮肤、设计器草稿和开发预览窗口状态。
+普通卸载会保留用户数据；只有明确选择清除选项时，才会删除安装器批准的准确产品数据目录。
 
 The release Setup is unsigned, so Windows SmartScreen may show an
 unknown-publisher warning. Verify its SHA-256 against `SHA256SUMS.txt` before
 running it:
 
 ```powershell
-Get-FileHash .\\CodexQuotaHud-Setup-v1.2.2.exe -Algorithm SHA256
+Get-FileHash .\\CodexQuotaHud-Setup-v1.2.3.exe -Algorithm SHA256
 ```
 
 当前 Setup 未签名，Windows SmartScreen 可能显示未知发布者提示。运行前请使用
 `SHA256SUMS.txt` 和上述命令核对 SHA-256。
 
-If Setup is unavailable, `CodexQuotaHud-v1.2.2-win-x64.zip` plus its bundled
+If Setup is unavailable, `CodexQuotaHud-v1.2.3-win-x64.zip` plus its bundled
 PowerShell script is the fallback. GitHub Packages is not used for this
 application or its release assets.
 
-若 Setup 不可用，`CodexQuotaHud-v1.2.2-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
+若 Setup 不可用，`CodexQuotaHud-v1.2.3-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
 本应用和发布资产均不使用 GitHub Packages。
 
 ## v1.2.x Skin Designer / 皮肤设计器
@@ -113,6 +119,21 @@ and packages that recorded `1.1.1` are normalized when edited or displayed.
 `v1.2.2` 修正皮肤包元数据的显示与生成方式，不改变 `.cqskin` 格式。导入预览不再
 显示并不存在的作者身份验证状态；内置模板会自动声明真实最低兼容版本 HUD `1.2.0`。
 旧草稿和旧皮肤包中误写的 `1.1.1` 会在编辑或显示时自动纠正。
+
+`v1.2.3` keeps each built-in skin's existing refresh-speed profile and holds
+the effective accelerated state for 1.5 seconds after refresh completion.
+Custom skins can set an absolute `0x..4x` refresh multiplier and a `0..3`
+second hold. Older packages without either field continue as `2x` and `1.5`
+seconds. Re-refresh restarts one hold; hiding the HUD, disabling animation,
+switching skins, detaching, or disposing cancels it immediately. The Skin
+Designer also replaces its native message boxes with accessible dark-themed
+dialogs while retaining native Windows open/save pickers.
+
+`v1.2.3` 保留五套内置皮肤原有的刷新速度特征，并在刷新完成后继续保持 1.5 秒
+加速状态。自定义皮肤可设置绝对 `0x..4x` 刷新倍速与 `0..3` 秒延续时间；旧皮肤包
+缺少字段时仍按 `2x` 与 `1.5` 秒运行。重复刷新只会重启一个延续计时；隐藏浮窗、
+关闭动画、切换皮肤、解绑或退出都会立即取消。皮肤设计器也已用可访问的深色主题
+对话框替代自身原生消息框，同时保留 Windows 原生打开/保存文件选择器。
 
 The Setup shows an optional component named **Install
 Skin Designer**, with this description: “Optional visual editor for creating
@@ -155,7 +176,7 @@ as completed acceptance in the release record.
 - 后台每 60 秒刷新，双击浮窗可立即刷新
 - 单击查看重置时间、最近更新时间和当前剩余比例
 - 五套动态皮肤：科技仪表、双彩能量环、流体玻璃球、克制极光、液位储能舱
-- 读取期间动画加速，空闲时低帧率缓慢运行，隐藏后停止动画
+- 读取期间动画加速，完成后默认延续 1.5 秒；空闲时低帧率缓慢运行，隐藏后停止动画
 - 拖到显示器外侧边缘后自动收起为对应皮肤的额度进度条
 - 多显示器与不同 DPI 下按当前工作区保存和恢复位置
 - 托盘图标直接显示当前剩余百分比，并提供刷新、皮肤、动画、关于和退出菜单
@@ -164,8 +185,9 @@ as completed acceptance in the release record.
 
 ## 下载与安装 / Download
 
-从 [最新 Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
-下载 ZIP 后备包 `CodexQuotaHud-v1.2.2-win-x64.zip`，解压后在该目录运行：
+在 v1.2.3 完成本机验收并获准公开发布后，从
+[最新 Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
+下载 ZIP 后备包 `CodexQuotaHud-v1.2.3-win-x64.zip`，解压后在该目录运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
@@ -306,8 +328,9 @@ two-direction handoff remains an optional manual UI check.
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
 
-元数据修正版从标签 `v1.2.2` 发布，`v1.2.0` 与 `v1.2.1` 的标签和发布资产保持不变。
-不要用已有版本号生成不同二进制，也不要移动历史标签或替换历史 Release 资产。
+元数据修正版已从标签 `v1.2.2` 发布。v1.2.3 本地候选仍等待安装与用户验收，尚未
+创建标签或公开 Release。不要移动 `v1.2.0`、`v1.2.1`、`v1.2.2` 历史标签，也不要
+替换其 Release 资产。
 
 ## 项目结构 / Project Structure
 
@@ -324,13 +347,13 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-`v1.2.2` 源码包含 1367 项自动化测试：
+当前 v1.2.3 候选源码包含 1441 项自动化测试：
 
 - Core：75 项
-- Skins：335 项
-- App / UI：609 项
-- Skin Designer：348 项
-- Total：1367 项
+- Skins：355 项
+- App / UI：622 项
+- Skin Designer：389 项
+- Total：1441 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -341,16 +364,16 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 自包含发布检查。CI 包固定使用临时版本 `0.0.0`，只在 Runner 内做安装烟测，
 不会冒用或覆盖公开 Release 版本。
 
-最新串行 Release 测试为 `1367/1367`、跳过 `0`，Release build 为
-`0` warnings / `0` errors；三套安全与回滚筛选分别为 `223/223`、`224/224`
-和 `116/116`。同一提交较早的一次完整测试曾出现 `1` 项未能复现、未能取得
-`result.Errors` 的存储删除失败，因此验证记录仍保留这项未解决的历史异常。详见
+当前 v1.2.3 候选的 fresh Release 测试为 `1441/1441`、跳过 `0`，Release build
+为 `0` warnings / `0` errors。刷新时序、旧包默认值、0x 暂停、对话框契约与
+Designer 控件均有自动化覆盖；真实 GUI 时序、对话框视觉、安装后启动与用户实用
+验收仍明确为 `NOT RUN`，不能由自动化结果代替。历史 v1.2.0 的未复现存储异常仍按
+原记录保留。详见
 [`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
 
-v1.2.2 的七个隔离安装/升级/组件/卸载场景及两个已提交清理失败场景全部通过。
-本机 v1.2.1 到 v1.2.2 升级、安装文件一致性、启动项、快捷方式和用户数据保留均已核对。
-GitHub `main` 的发布门槛 CI 全绿；v1.2.2 是 Latest、非草稿、非预发布，Setup、ZIP
-与 `SHA256SUMS.txt` 的线上大小和 SHA-256 均与本地发布文件一致。
+v1.2.3 候选的 Setup/ZIP 结构、隔离安装器矩阵、哈希和签名状态已完整记录在
+验收文档中。现有正式安装仍为 v1.2.2；未获用户验收前不会推送、移动 `main`、创建
+`v1.2.3` 标签、上传资产或发布 GitHub Release。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and
 total `388/388`; the Release build completed with zero warnings and zero

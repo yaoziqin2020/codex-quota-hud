@@ -8,6 +8,43 @@ The original Task 18 boundary authorized only an ephemeral internal `0.0.0` buil
 
 Evidence states are `PASS`, `PARTIAL`, `FAIL`, and `NOT RUN`. A row moves to `PASS` only from direct evidence collected for that exact row. Automated PASS cannot make the overall feature acceptance PASS.
 
+## 2026-08-04 v1.2.3 local candidate — automated gate only
+
+This candidate combines the themed Designer dialogs and refresh-animation
+timing plans. The binding release gate stops before production installation and
+all remote actions. Automated evidence below does not promote any GUI or user
+acceptance row.
+
+| Status | Date/time (Asia/Tokyo) | Command or action | Expected | Observed | Evidence |
+|---|---|---|---|---|---|
+| PASS | 2026-08-04 23:32 +09:00 | `dotnet test .\CodexQuotaHud.sln -c Release` | All current projects execute with zero failures/skips | Core `75/75`, Skins `355/355`, App/UI `622/622`, Designer `389/389`; total `1441/1441`, failed `0`, skipped `0`; elapsed `170.7 s` | Fresh complete VSTest summaries, exit `0`; first restricted restore was excluded after `NU1301`, then the exact authorized rerun passed |
+| PASS | 2026-08-04 23:33 +09:00 | `dotnet build .\CodexQuotaHud.sln -c Release --no-restore` and `git diff --check` | Build and source formatting gate pass | Build `0` warnings / `0` errors; diff check had no output | Fresh stdout and exit `0` |
+| PASS | 2026-08-04 23:38 +09:00 | `.\scripts\package-release.ps1 -Version 1.2.3` | Canonical Setup, normal-only ZIP, and checksum manifest are created from v1.2.3 publish output | Inno Setup `6.7.3` compiled successfully; first restricted publish was excluded after `NU1301` and checked failure cleanup; exact authorized rerun exited `0` | Packaging stdout, artifact inventory, and checksum readback |
+| PASS | 2026-08-04 23:57 +09:00 | `.\scripts\test-installer.ps1 -Version 1.2.3 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.2.3.exe` | Seven normal plus two committed-cleanup failure scenarios pass without changing production state | All nine passed in `1027.3 s`; every successful GUID root was removed with checked postconditions; production registry snapshots remained unchanged | Full scenario stdout and exit `0` |
+| PARTIAL | 2026-08-04 23:40 +09:00 | First restricted installer-smoke attempt | Test must have permission to create only its isolated HKCU test key | `fresh-default` reached the GUID-scoped registry write, then Inno received error 5 because the sandbox denied `HKCU\Software\CodexQuotaHud.Tests\<guid>\Run`; it rolled back and was not counted as product evidence | Preserved `clean-install.log`; exact diagnostic temp root later removed with `ExistsAfter=False` |
+| PASS | 2026-08-04 23:58 +09:00 | Candidate hash, manifest, structure, version, signature, and residue inspection | Exact immutable local evidence exists before installation | Setup 100,044,997 bytes / `59296c2244e9ef80aaa1cc29223c711ffe1323e893e365f7615994e66fd762ea`; ZIP 68,335,547 bytes / `65b13d023509ee994d51cec5017aa08b687f17866ea466f6ecbb764bbcd5b0f2`; checksum file 196 bytes / `b26df6a56e3d45ab1614791ae74f9b1d53e3265a3f093170c99732c472126e22`; two manifest lines match | Fresh `Get-FileHash`, manifest comparison, ZIP/publish inventories, version resources, `Get-AuthenticodeSignature`, and root/process checks |
+| PASS | 2026-08-04 23:58 +09:00 | ZIP and Setup payload boundary | ZIP remains normal-HUD-only; Setup carries Designer only as optional payload | ZIP exactly `LICENSE`, `README.md`, App, `scripts/install.ps1`, `scripts/uninstall.ps1`; no Designer. Publish tree exactly App plus `designer/CodexQuotaHud.SkinDesigner.exe`; isolated default install excludes Designer and selected install includes it | ZIP archive entries, publish-tree inventory, and passing `fresh-default` / `fresh-designer` scenarios |
+| PASS | 2026-08-04 23:58 +09:00 | Candidate binary identity and signing | Both applications and Setup identify v1.2.3; signing state is honest | App/Designer `1.2.3.0`, product version `1.2.3+fb6ae812c9a35ba84c74353d63eff0d7926d946e`; Setup product version `1.2.3`; all three `NotSigned`, no signer/timestamper | Fresh version-resource and Authenticode reads |
+| PASS | 2026-08-04 23:58 +09:00 | Release-boundary stop | Production install and all remote release state remain untouched | Installed App/Designer/uninstall entry remain `1.2.2`; startup remains formal `--background`; zero smoke roots/processes/installers; no push, `main` movement, tag, upload, or Release action | Fresh installed-state readback, root/process inventory, local Git status |
+
+### v1.2.3 manual and installation rows
+
+| Status | Date/time (Asia/Tokyo) | Command or action | Expected | Observed | Evidence |
+|---|---|---|---|---|---|
+| NOT RUN | — | Built-in skin fast-refresh timing | Existing built-in speed character remains unchanged and effective refresh acceleration stays visible for about 1.5 seconds after completion | Deliberately deferred to installed GUI acceptance | Automated state-machine coverage only |
+| NOT RUN | — | Custom skin `0x`, `2x`, `4x` with hold `0`, `1.5`, `3` seconds | Exact speed/hold behavior is visible without multiplier or timer stacking | Deliberately deferred to installed GUI acceptance | Automated contract/controller/real-WPF-clock coverage only |
+| NOT RUN | — | Re-refresh during hold; disable animation; hide; switch skin | Re-refresh starts one new hold; every cancellation path is immediate | Deliberately deferred to installed GUI acceptance | Automated cancellation coverage only |
+| NOT RUN | — | Import old package with neither refresh property | HUD/Designer show effective `2x` / `1.5s` without migration | No real package was opened in the GUI | Automated legacy JSON/document coverage only |
+| NOT RUN | — | Edit, save, apply, export, and inspect old package | Canonical JSON contains both refresh properties and minimum HUD `1.2.3` | No real GUI output package was created or applied | Automated save/output/package-builder coverage only |
+| NOT RUN | — | Native picker with disabled Designer owner | Owner buttons remain dark while disabled; native picker behavior is unchanged | No GUI launched | Automated shared-template and boundary coverage only |
+| NOT RUN | — | Unsaved, export-replace, collision, success, warning, and failure themed dialogs | Dialogs are centered, dark-themed, accessible, correctly ordered, and preserve Enter/Escape/close semantics | No GUI launched | Automated dialog/window/adapter coverage only |
+| NOT RUN | — | Install v1.2.3 on maintainer machine | Installed App/Designer report 1.2.3, match publish hashes, retain data, startup/shortcuts, and formal HUD behavior | Explicitly stopped before production Setup launch | None |
+| NOT RUN | — | User practical acceptance | User accepts the exact installed candidate before any remote release action | Candidate has not been installed or handed over for practical acceptance | None |
+
+**Current v1.2.3 decision: PARTIAL — automated candidate PASS; installation,
+manual GUI checks, and user acceptance remain NOT RUN. No remote release is
+authorized.**
+
 ## 2026-08-04 v1.2.2 skin metadata correction
 
 | Status | Date/time (Asia/Tokyo) | Command or action | Expected | Observed | Evidence |

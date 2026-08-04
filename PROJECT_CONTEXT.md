@@ -8,6 +8,52 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
+## v1.2.3 local candidate — not installed or released
+
+The v1.2.3 work combines two approved corrections. Skin Designer-owned
+messages now use accessible dark-themed WPF dialogs and a shared Designer
+palette/button template; native Windows file-open and file-save pickers remain
+unchanged. Refresh animation now distinguishes requested and effective state:
+the five built-in skins keep their established speed profiles and hold the
+accelerated presentation for 1.5 seconds after completion. Custom skins support
+an absolute `0x..4x` multiplier and `0..3` second hold. Old packages without
+the new fields default to `2x`/`1.5s`; new Designer output writes both canonical
+properties and declares HUD `1.2.3`.
+
+Fresh Release source verification is Core `75/75`, Skins `355/355`, App/UI
+`622/622`, and Designer `389/389`, totaling `1441/1441`, with zero failed or
+skipped. Release build is zero warnings/errors and `git diff --check` passes.
+The production-structure package workflow created these local-only files:
+
+- Setup: 100,044,997 bytes / SHA-256
+  `59296C2244E9EF80AAA1CC29223C711FFE1323E893E365F7615994E66FD762EA`
+- normal-HUD-only ZIP: 68,335,547 bytes / SHA-256
+  `65B13D023509EE994D51CEC5017AA08B687F17866EA466F6ECBB764BBCD5B0F2`
+- `SHA256SUMS.txt`: 196 bytes / SHA-256
+  `B26DF6A56E3D45AB1614791AE74F9B1D53E3265A3F093170C99732C472126E22`
+
+The manifest's two entries match. The ZIP contains exactly App, README,
+LICENSE, install script, and uninstall script; it contains no Designer. The
+Setup publish tree contains exactly App and the optional Designer executable.
+Both executables are version `1.2.3.0` and report
+`1.2.3+fb6ae812c9a35ba84c74353d63eff0d7926d946e`; Setup reports `1.2.3`.
+Setup and both executables are unsigned.
+
+All seven normal isolated installer scenarios and both committed-cleanup
+failure/retry scenarios pass and leave no smoke root, process, or test registry
+state. A first restricted attempt was excluded after Windows denied its
+GUID-scoped test registry write with error 5; Inno rolled it back, the exact
+diagnostic log was captured, and that temp root was removed. The authorized
+rerun is the passing evidence above.
+
+The real machine remains on the verified v1.2.2 App/Designer installation with
+formal `--background` startup. v1.2.3 has not been installed, launched, tagged,
+uploaded, pushed, merged to `main`, or published. Manual animation timing,
+legacy-package editing/export, themed-dialog visual acceptance, installed
+startup/formal HUD, and user practical acceptance all remain `NOT RUN`.
+Remote release work is forbidden until the user accepts the installed local
+candidate.
+
 ## v1.1.1 historical release
 
 The primary distribution path is the current-user Inno Setup executable

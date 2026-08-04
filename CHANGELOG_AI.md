@@ -1,5 +1,46 @@
 # AI Change Log
 
+## 2026-08-04 — v1.2.3 local candidate prepared; installation pending
+
+- Added a shared requested/effective refresh animation state machine. Built-in
+  skin speed profiles are unchanged and receive a 1.5-second completion hold.
+  Custom skins support an absolute `0x..4x` refresh multiplier and `0..3`
+  second hold. Re-refresh restarts one hold; disable, hide, target switch,
+  detach, and dispose cancel immediately without timer or multiplier stacking.
+- Extended the strict skin contract with canonical
+  `refreshSpeedMultiplier`/`refreshHoldSeconds` properties. Missing properties
+  default to `2x`/`1.5s`, so old packages require no migration. New Designer
+  output writes both fields and declares minimum HUD `1.2.3`.
+- Added the two Skin Designer controls and real custom-preview wiring, including
+  `0x` paused WPF clocks, 0.1-step quantization, accessible names, and shared
+  validation/draft-dirty behavior.
+- Moved the Designer palette and button template to shared resources and
+  replaced Designer-owned native message boxes with typed accessible
+  dark-themed WPF dialogs. Native Windows open/save pickers remain allowed.
+- Fresh Release verification passed Core `75/75`, Skins `355/355`, App/UI
+  `622/622`, and Designer `389/389`, totaling `1441/1441`, zero failed/skipped.
+  Release build completed with zero warnings/errors; `git diff --check` passed.
+- Built local candidate Setup
+  `59296C2244E9EF80AAA1CC29223C711FFE1323E893E365F7615994E66FD762EA`
+  (100,044,997 bytes), ZIP
+  `65B13D023509EE994D51CEC5017AA08B687F17866EA466F6ECBB764BBCD5B0F2`
+  (68,335,547 bytes), and 196-byte checksum manifest
+  `B26DF6A56E3D45AB1614791AE74F9B1D53E3265A3F093170C99732C472126E22`.
+  The manifest matches both artifacts; ZIP has exactly five approved entries
+  and no Designer; Setup publish has exactly App plus optional Designer.
+- App and Designer report
+  `1.2.3+fb6ae812c9a35ba84c74353d63eff0d7926d946e`; Setup reports product
+  version `1.2.3`. Setup and both executables are `NotSigned`.
+- All seven normal isolated installer scenarios plus both committed-cleanup
+  failure/retry scenarios passed in the authorized run, with zero final smoke
+  roots/processes. One preceding restricted run was excluded after sandbox
+  denial of its GUID-scoped HKCU test key; Inno rolled back, its log was
+  retained long enough to prove error 5, and the exact temp root was removed.
+- Stopped before production installation. The machine remains on v1.2.2.
+  Manual timing/package/dialog GUI checks and installed startup/formal-HUD/user
+  acceptance remain `NOT RUN`. No push, `main` movement, tag, upload, release,
+  or publication was performed or authorized.
+
 ## 2026-08-04 — v1.2.2 skin metadata correction released
 
 - Replaced the import-preview label `作者（未验证）` with `作者`. Codex Quota
