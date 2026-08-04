@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using CodexQuotaHud.SkinDesigner.Tests.Preview;
 using CodexQuotaHud.SkinDesigner.UI.Dialogs;
 
@@ -253,6 +254,41 @@ public sealed class DesignerDialogWindowTests
     }
 
     [Fact]
+    public void Window_RejectsRequestsWithMoreThanThreeActions()
+    {
+        RunSta(() => Assert.Throws<ArgumentException>(() => CreateDialog(
+            new DesignerDialogAction("one", "One"),
+            new DesignerDialogAction("two", "Two"),
+            new DesignerDialogAction("three", "Three"),
+            new DesignerDialogAction("four", "Four"))));
+    }
+
+    [Theory]
+    [InlineData("   ", "Replace")]
+    [InlineData("replace", "   ")]
+    public void Window_RejectsActionsWithBlankIdsOrLabels(string id, string label)
+    {
+        RunSta(() => Assert.Throws<ArgumentException>(() => CreateDialog(
+            new DesignerDialogAction(id, label, true))));
+    }
+
+    [Fact]
+    public void Window_RejectsMultipleDefaultActions()
+    {
+        RunSta(() => Assert.Throws<ArgumentException>(() => CreateDialog(
+            new DesignerDialogAction("replace", "Replace", true),
+            new DesignerDialogAction("copy", "Keep copy", true))));
+    }
+
+    [Fact]
+    public void Window_RejectsMultipleCancelActions()
+    {
+        RunSta(() => Assert.Throws<ArgumentException>(() => CreateDialog(
+            new DesignerDialogAction("replace", "Replace", IsCancel: true),
+            new DesignerDialogAction("cancel", "Cancel", IsCancel: true))));
+    }
+
+    [Fact]
     public void Service_RejectsMissingRequestsBeforeOpeningAWindow()
     {
         RunSta(() =>
@@ -261,6 +297,101 @@ public sealed class DesignerDialogWindowTests
 
             Assert.Throws<ArgumentNullException>(() => service.Show(null, null!));
         });
+    }
+
+    [Fact]
+    public async Task Service_ShowsOnTheLiveOwnerDispatcherWhenCalledFromAnotherSta()
+    {
+        using var host = new OwnerWindowHost();
+        var shown = new TaskCompletionSource<DesignerDialogWindow>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        ScheduleOwnerDialogClose(host, shown);
+        string? result = null;
+        Exception? workerFailure = null;
+        var completed = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                result = new DesignerDialogService().Show(
+                    host.Owner,
+                    new DesignerDialogRequest(
+                        "Replace package",
+                        "A package already exists.",
+                        DesignerDialogIcon.Question,
+                        [new DesignerDialogAction("replace", "Replace", true)]));
+            }
+            catch (Exception exception)
+            {
+                workerFailure = exception;
+            }
+            finally
+            {
+                completed.TrySetResult();
+            }
+        })
+        {
+            IsBackground = true
+        };
+        worker.SetApartmentState(ApartmentState.STA);
+        worker.Start();
+
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Null(workerFailure);
+        var dialog = await shown.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.Same(host.Dispatcher, dialog.Dispatcher);
+        Assert.Equal("replace", result);
+    }
+
+    [Fact]
+    public async Task Service_UsesCenteredUnownedDialogWhenOwnerIsNoLongerLoaded()
+    {
+        using var host = new OwnerWindowHost();
+        host.CloseOwner();
+        var shown = new TaskCompletionSource<DesignerDialogWindow>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        ScheduleUnownedDialogClose(host, shown);
+        string? result = null;
+        Exception? workerFailure = null;
+        var completed = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                result = new DesignerDialogService().Show(
+                    host.Owner,
+                    new DesignerDialogRequest(
+                        "Replace package",
+                        "A package already exists.",
+                        DesignerDialogIcon.Question,
+                        [new DesignerDialogAction("replace", "Replace", true)]));
+            }
+            catch (Exception exception)
+            {
+                workerFailure = exception;
+            }
+            finally
+            {
+                completed.TrySetResult();
+            }
+        })
+        {
+            IsBackground = true
+        };
+        worker.SetApartmentState(ApartmentState.STA);
+        worker.Start();
+
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Null(workerFailure);
+        var dialog = await shown.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.Same(host.Dispatcher, dialog.Dispatcher);
+        var placement = host.Dispatcher.Invoke(
+            () => (dialog.Owner, dialog.WindowStartupLocation));
+        Assert.Null(placement.Owner);
+        Assert.Equal(WindowStartupLocation.CenterScreen, placement.WindowStartupLocation);
+        Assert.Equal("replace", result);
     }
 
     private static DesignerDialogWindow CreateDialog(
@@ -281,6 +412,75 @@ public sealed class DesignerDialogWindowTests
 
     private static Button Action(IEnumerable<Button> actions, string id) =>
         Assert.Single(actions, action => Equals(action.Tag, id));
+
+    private static void ScheduleOwnerDialogClose(
+        OwnerWindowHost host,
+        TaskCompletionSource<DesignerDialogWindow> shown)
+    {
+        void CloseWhenShown()
+        {
+            try
+            {
+                var dialog = host.Owner.OwnedWindows
+                    .OfType<DesignerDialogWindow>()
+                    .SingleOrDefault();
+                if (dialog is null)
+                {
+                    host.Dispatcher.BeginInvoke(
+                        DispatcherPriority.ContextIdle,
+                        new Action(CloseWhenShown));
+                    return;
+                }
+
+                shown.TrySetResult(dialog);
+                Action(Actions(dialog), "replace").RaiseEvent(
+                    new RoutedEventArgs(Button.ClickEvent));
+            }
+            catch (Exception exception)
+            {
+                shown.TrySetException(exception);
+            }
+        }
+
+        host.Dispatcher.BeginInvoke(
+            DispatcherPriority.ContextIdle,
+            new Action(CloseWhenShown));
+    }
+
+    private static void ScheduleUnownedDialogClose(
+        OwnerWindowHost host,
+        TaskCompletionSource<DesignerDialogWindow> shown)
+    {
+        void CloseWhenShown()
+        {
+            try
+            {
+                var dialog = PresentationSource.CurrentSources.Cast<PresentationSource>()
+                    .Select(source => source.RootVisual)
+                    .OfType<DesignerDialogWindow>()
+                    .SingleOrDefault();
+                if (dialog is null)
+                {
+                    host.Dispatcher.BeginInvoke(
+                        DispatcherPriority.ContextIdle,
+                        new Action(CloseWhenShown));
+                    return;
+                }
+
+                shown.TrySetResult(dialog);
+                Action(Actions(dialog), "replace").RaiseEvent(
+                    new RoutedEventArgs(Button.ClickEvent));
+            }
+            catch (Exception exception)
+            {
+                shown.TrySetException(exception);
+            }
+        }
+
+        host.Dispatcher.BeginInvoke(
+            DispatcherPriority.ContextIdle,
+            new Action(CloseWhenShown));
+    }
 
     private static void Press(DesignerDialogWindow dialog, Key key)
     {
@@ -316,6 +516,72 @@ public sealed class DesignerDialogWindowTests
         if (failure is not null)
         {
             throw new Xunit.Sdk.XunitException(failure.ToString());
+        }
+    }
+
+    private sealed class OwnerWindowHost : IDisposable
+    {
+        private readonly ManualResetEventSlim _started = new();
+        private readonly Thread _thread;
+        private Exception? _startupFailure;
+
+        public OwnerWindowHost()
+        {
+            _thread = new Thread(() =>
+            {
+                try
+                {
+                    Dispatcher = Dispatcher.CurrentDispatcher;
+                    Owner = new Window();
+                    Owner.Show();
+                    _started.Set();
+                    Dispatcher.Run();
+                }
+                catch (Exception exception)
+                {
+                    _startupFailure = exception;
+                    _started.Set();
+                }
+            })
+            {
+                IsBackground = true
+            };
+            _thread.SetApartmentState(ApartmentState.STA);
+            _thread.Start();
+            if (!_started.Wait(TimeSpan.FromSeconds(5)))
+            {
+                throw new TimeoutException("The owner STA did not start.");
+            }
+
+            if (_startupFailure is not null)
+            {
+                throw new Xunit.Sdk.XunitException(_startupFailure.ToString());
+            }
+        }
+
+        public Dispatcher Dispatcher { get; private set; } = null!;
+
+        public Window Owner { get; private set; } = null!;
+
+        public void CloseOwner() => Dispatcher.Invoke(Owner.Close);
+
+        public void Dispose()
+        {
+            if (!Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (Owner.IsLoaded)
+                    {
+                        Owner.Close();
+                    }
+
+                    Dispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
+                });
+            }
+
+            _thread.Join(TimeSpan.FromSeconds(5));
+            _started.Dispose();
         }
     }
 }
