@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Canonical worktree: `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud\.worktrees\inno-setup-installer-20260731`；不得使用旧对话 worktree。
-- Design authority: `docs/superpowers/specs/2026-08-05-lightning-companion-skin-design.md` at commit `3536284`.
+- Design authority: the current branch version of `docs/superpowers/specs/2026-08-05-lightning-companion-skin-design.md`; commit `3536284` records the originally approved baseline, while later execution adjudications are recorded in the same spec.
 - Character: original `圆耳电团兽`; no Pokémon/Pikachu names, silhouettes, marks, accessories, or downloaded copyrighted art.
 - Metadata: display name `雷光伙伴`, author `老姚`, package version `1.0.0`, minimum HUD `1.2.3`.
 - Template: `free-decoration-ring`; no HUD, Designer, installer, or `.cqskin` schema changes.
