@@ -20,6 +20,7 @@
 - Text: number `30`, label `14`, `semiBold`, `numberAboveLabel`; character composition must accommodate `100%` without ear contact.
 - Animation: rotation `0.78`, breathing `0.88`, glow `0.92`, floating `0.18`, refresh speed `3.5x`, hold `3.0s`.
 - Center transform starts at scale `1.03`, offset `0/0`; only Offset Y may be tuned within `-4..4` DIP with visual evidence.
+- Designer precision: the v1.2.3 continuous sliders may serialize the nearest UI-representable value. Accept only these deltas: center scale `±0.001`; base opacity, static glow, and four animation intensities `±0.003`; ring diameter `±0.1` DIP; start angle `±1°`. Colors, discrete ring/text settings, refresh `3.5x`, and hold `3.0s` remain exact. Do not edit draft JSON to bypass the Designer.
 - The breathing peak face diameter is approximately `72.881` DIP; the cyan ring must remain outside it with approximately `2.059` DIP radial clearance.
 - The decoration asset is a transparent PNG containing translucent yellow halo, real rendered lightning/electric fragments, star glints, and sparks; no character glyphs, text, solid background, or fake third data ring.
 - Do not overwrite an existing `雷光伙伴.cqskin`; if the target appears during execution, export a candidate file and ask before replacement.
@@ -304,9 +305,9 @@ Center:     Offset 0/0, Scale 1.03, Rotation 0, Opacity 1.00, Crop 0.5/0.5
 Decoration: Offset 0/0, Scale 1.00, Rotation 0, Opacity 1.00, Crop 0.5/0.5
 ```
 
-- [ ] **Step 6: Enter theme, ring, and text values**
+- [ ] **Step 6: Enter theme, ring, and text target values**
 
-Set exactly:
+Set the following displayed targets. Continuous slider persistence must stay inside the Global Constraints tolerances; discrete fields remain exact:
 
 ```text
 Primary ring: #FFFFD52E
@@ -317,9 +318,9 @@ Diameter 102; Thickness 7; Gap 2; Start 270
 Number 30; Label 14; SemiBold; Number Above Label
 ```
 
-- [ ] **Step 7: Enter animation values**
+- [ ] **Step 7: Enter animation target values**
 
-Set exactly:
+Set the following displayed targets. Continuous intensity persistence must stay inside the Global Constraints tolerance; refresh speed and hold remain exact:
 
 ```text
 Rotation 0.78
@@ -389,7 +390,7 @@ Toggle global animation off and back on; all custom animation must stop and resu
 
 - [ ] **Step 6: Save the final tuned values**
 
-Choose `保存草稿` again. Read `draft.json` and confirm the saved theme contains the final center transform, exact ring/text/color values, and all six animation fields.
+Choose `保存草稿` again. Read `draft.json` and confirm the saved theme contains the final center transform, exact discrete ring/text/color values, continuous values inside the documented tolerances, and all six animation fields.
 
 ---
 
