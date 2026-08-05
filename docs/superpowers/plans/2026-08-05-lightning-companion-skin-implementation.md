@@ -552,7 +552,7 @@ Leave the formal HUD running with `雷光伙伴` selected and the Designer open 
 
 **Files:**
 - Read: final draft, installed skin, package, verification evidence.
-- Do not modify: product source, installer, release assets, `tmp/`, historical Soft Rose exports.
+- Do not modify: product source, installer, release assets, or `tmp/`.
 
 **Interfaces:**
 - Consumes: all prior task evidence.
@@ -562,9 +562,9 @@ Leave the formal HUD running with `雷光伙伴` selected and the Designer open 
 
 Report the new draft GUID, new skin GUID, installed directory, export path, package byte length, SHA-256, final center scale/offset, and the six animation values.
 
-- [ ] **Step 2: Recheck cleanup and counts**
+- [ ] **Step 2: Recheck user-approved Soft Rose cleanup and counts**
 
-Confirm the Soft Rose draft remains absent, installed Soft Rose count is one, installed Lightning Companion count is one, and the two historical Soft Rose export archives remain untouched.
+The user explicitly superseded the earlier “leave both historical exports untouched” boundary. Confirm the Soft Rose draft remains absent, installed Soft Rose count is one, installed Lightning Companion count is one, and the shared exchange directory retains only the current `柔光玫瑰.cqskin`. The older, parameter-divergent `柔光玫瑰-1.0.0.cqskin` must have been sent to the Windows Recycle Bin rather than permanently deleted.
 
 - [ ] **Step 3: Recheck Git integrity**
 
