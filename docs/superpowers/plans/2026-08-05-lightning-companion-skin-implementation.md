@@ -17,9 +17,9 @@
 - Template: `free-decoration-ring`; no HUD, Designer, installer, or `.cqskin` schema changes.
 - Colors: primary `#FFFFD52E`, secondary `#FF4DE7FF`, base `#FF10141B` at `0.82`, glow `#FFFFE35A` at `0.62`.
 - Ring geometry: diameter `102`, thickness `7`, gap `2`, start angle `270`; secondary diameter is `84` and its inner opening is `77`.
-- Text: number `30`, label `14`, `semiBold`, `numberAboveLabel`; character composition must accommodate `100%` without ear contact.
+- Text: number `18`, label `12`, `semiBold`, `numberAboveLabel`; character composition must accommodate `100%` between the outward eyes without ear or iris contact.
 - Animation: rotation `0.78`, breathing `0.88`, glow `0.92`, floating `0.18`, refresh speed `3.5x`, hold `3.0s`.
-- Center transform starts at scale `1.03`, offset `0/0`; only Offset Y may be tuned within `-4..4` DIP with visual evidence.
+- Center transform uses scale target `1.03`, offset `0/-4`; the final `-4` DIP Offset Y is backed by synthetic Dual collision evidence.
 - Designer precision: the v1.2.3 continuous sliders may serialize the nearest UI-representable value. Accept only these deltas: center scale `±0.001`; base opacity, static glow, and four animation intensities `±0.003`; ring diameter `±0.1` DIP; start angle `±1°`. Colors, discrete ring/text settings, refresh `3.5x`, and hold `3.0s` remain exact. Do not edit draft JSON to bypass the Designer.
 - The breathing peak face diameter is approximately `72.881` DIP; the cyan ring must remain outside it with approximately `2.059` DIP radial clearance.
 - The decoration asset is a transparent PNG containing translucent yellow halo, real rendered lightning/electric fragments, star glints, and sparks; no character glyphs, text, solid background, or fake third data ring.
@@ -301,7 +301,7 @@ Set:
 
 ```text
 Background: Offset 0/0, Scale 1.00, Rotation 0, Opacity 1.00, Crop 0.5/0.5
-Center:     Offset 0/0, Scale 1.03, Rotation 0, Opacity 1.00, Crop 0.5/0.5
+Center:     Offset 0/-4, Scale 1.03, Rotation 0, Opacity 1.00, Crop 0.5/0.5
 Decoration: Offset 0/0, Scale 1.00, Rotation 0, Opacity 1.00, Crop 0.5/0.5
 ```
 
@@ -315,7 +315,7 @@ Secondary ring: #FF4DE7FF
 Base: #FF10141B at 0.82
 Glow: #FFFFE35A at 0.62
 Diameter 102; Thickness 7; Gap 2; Start 270
-Number 30; Label 14; SemiBold; Number Above Label
+Number 18; Label 12; SemiBold; Number Above Label
 ```
 
 - [ ] **Step 7: Enter animation target values**
@@ -360,11 +360,11 @@ Animations on
 Refreshing off
 ```
 
-Capture a screenshot. Confirm `68%` sits between ears and eyes without touching the ear roots, `5 小时` sits directly below the mouth, the cyan ring remains outside the face, and the yellow halo does not overexpose the rings.
+Capture a screenshot. Confirm `68%` sits below the ear roots and between the outward eyes without touching either iris, `5 小时` sits directly below the mouth, the cyan ring remains outside the face, and the yellow halo does not overexpose the rings.
 
 - [ ] **Step 2: Validate the longest number**
 
-Set the 5-hour value to `100`. Capture a screenshot and confirm `100%` remains clear of both ears. If it touches, adjust only Center Offset Y within `-4..4` DIP; do not move the head visibly off center or change text spacing.
+Set the 5-hour value to `100`. Capture a screenshot and confirm `100%` remains clear of both ears and both irises. If it touches, stop and report; the final Offset Y is already fixed at the visually validated `-4` DIP.
 
 - [ ] **Step 3: Validate the breathing peak clearance**
 
