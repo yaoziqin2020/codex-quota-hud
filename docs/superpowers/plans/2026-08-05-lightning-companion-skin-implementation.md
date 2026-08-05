@@ -21,7 +21,7 @@
 - Animation: rotation `0.78`, breathing `0.88`, glow `0.92`, floating `0.18`, refresh speed `3.5x`, hold `3.0s`.
 - Center transform uses scale target `1.03`, offset `0/-4`; the final `-4` DIP Offset Y is backed by synthetic Dual collision evidence.
 - Designer precision: the v1.2.3 continuous sliders may serialize the nearest UI-representable value. Accept only these deltas: center scale `±0.001`; base opacity, static glow, and four animation intensities `±0.003`; ring diameter `±0.1` DIP; start angle `±1°`. Colors, discrete ring/text settings, refresh `3.5x`, and hold `3.0s` remain exact. Do not edit draft JSON to bypass the Designer.
-- The breathing peak face diameter is approximately `72.881` DIP; the cyan ring must remain outside it with approximately `2.059` DIP radial clearance.
+- Breathing clearance is measured against the visible mascot silhouette, not the opaque 64-DIP center-image background. On the final center asset, `max(R,G,B) >= 40` yields bbox `(38,106)-(984,947)`; with saved peak scale and `offsetY=-4`, the minimum gap to the cyan ring's inner edge is approximately `4.86` DIP.
 - The decoration asset is a transparent PNG containing translucent yellow halo, real rendered lightning/electric fragments, star glints, and sparks; no character glyphs, text, solid background, or fake third data ring.
 - Do not overwrite an existing `雷光伙伴.cqskin`; if the target appears during execution, export a candidate file and ask before replacement.
 - Preserve the current installed `柔光玫瑰` and its selection unless `雷光伙伴` is deliberately applied; do not delete the two historical Soft Rose export archives.
@@ -368,7 +368,7 @@ Set the 5-hour value to `100`. Capture a screenshot and confirm `100%` remains c
 
 - [ ] **Step 3: Validate the breathing peak clearance**
 
-Observe at least two breathing cycles with intensity `0.88`. Capture or inspect the maximum face expansion and confirm it does not cover the cyan ring. If antialiasing or the generated face visually crosses the ring despite the calculated clearance, reduce Center Scale in increments of `0.01`, stopping at the first value that clears the ring; record the final scale.
+Observe at least two breathing cycles with intensity `0.88`. Capture or inspect the maximum visible mascot expansion and confirm the yellow/cyan silhouette does not cover the cyan ring. Recalculate the visible-silhouette bbox clearance using the Global Constraints rule; the opaque dark image background is not part of the mascot silhouette.
 
 - [ ] **Step 4: Validate Single modes**
 
@@ -490,13 +490,15 @@ assets count = 3
 Assert every Global Constraint color, geometry, text, image-transform, and animation value. Recalculate:
 
 ```text
-secondary diameter = 102 - 2 × (7 + 2) = 84
-secondary inner opening = 84 - 7 = 77
-breathing peak face = 64 × finalCenterScale × (1 + 0.12 × 0.88)
-radial clearance = (77 - peakFace) / 2 > 0
+secondary diameter = savedRingDiameter - 2 × (savedThickness + savedGap)
+secondary inner radius = (secondaryDiameter - savedThickness) / 2
+peak scale = savedCenterScale × (1 + 0.12 × savedBreathingIntensity)
+visible mascot bbox = pixels in the decoded center asset where max(R,G,B) >= 40
+map bbox sides from 1024-space into the 64-DIP center layer, apply peak scale and saved Offset Y
+minimum left/right/top/bottom gap to secondary inner radius > 0
 ```
 
-If Task 5 reduced center scale, use that recorded final scale rather than `1.03`.
+Expected for the final package: bbox `(38,106)-(984,947)`, peak scale approximately `1.1383446`, and minimum visible-silhouette gap approximately `4.86` DIP.
 
 - [ ] **Step 5: Verify asset hashes**
 
