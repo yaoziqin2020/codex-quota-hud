@@ -38,6 +38,11 @@ public sealed class SkinApplyServiceTests
                 " | ",
                 result.Errors.Select(error => $"{error.Code}: {error.Message}")));
         var installed = Assert.IsType<InstalledSkinRecord>(result.Installed);
+        Assert.Equal("Ocean / Ring", installed.DisplayName);
+        Assert.Equal(SemanticVersion.Parse("1.2.3"), installed.PackageVersion);
+        Assert.Equal(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            installed.SkinId);
         Assert.Equal(installed.SelectionKey, activatedKey);
         Assert.Equal(
             [
@@ -157,7 +162,12 @@ public sealed class SkinApplyServiceTests
         Assert.Equal(
             DesignerOutputDisposition.InstalledNotActivated,
             result.Disposition);
-        Assert.NotNull(result.Installed);
+        var installed = Assert.IsType<InstalledSkinRecord>(result.Installed);
+        Assert.Equal("Ocean / Ring", installed.DisplayName);
+        Assert.Equal(SemanticVersion.Parse("1.2.3"), installed.PackageVersion);
+        Assert.Equal(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            installed.SkinId);
         Assert.Equal(settings, File.ReadAllBytes(settingsPath));
         Assert.Contains("HUD", result.Message ?? string.Empty, StringComparison.Ordinal);
         Assert.NotNull(new InstalledSkinCatalog(root.Paths, OutputTestFixture.HudVersion)
@@ -184,7 +194,12 @@ public sealed class SkinApplyServiceTests
         Assert.Equal(
             DesignerOutputDisposition.InstalledAndHudStarted,
             result.Disposition);
-        Assert.NotNull(result.Installed);
+        var installed = Assert.IsType<InstalledSkinRecord>(result.Installed);
+        Assert.Equal("Ocean / Ring", installed.DisplayName);
+        Assert.Equal(SemanticVersion.Parse("1.2.3"), installed.PackageVersion);
+        Assert.Equal(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            installed.SkinId);
     }
 
     [Theory]

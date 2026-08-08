@@ -12,6 +12,169 @@ namespace CodexQuotaHud.SkinDesigner.Tests.Output;
 public sealed class WindowsSkinOutputDialogsTests
 {
     [Fact]
+    public void Create_AppliedLiveReportsExactIdentityAndLiveActivation()
+    {
+        using var root = new TemporaryRoot();
+        var installed = InstallSkin(root);
+        var result = new DesignerOutputResult(
+            DesignerOutputDisposition.AppliedLive,
+            installed,
+            null,
+            [],
+            "Skin installed and applied to the running HUD.");
+
+        var presentation = DesignerOutputPresentation.Create(result);
+
+        Assert.Equal("已应用到 HUD", presentation.Title);
+        Assert.Equal(DesignerDialogIcon.Information, presentation.Icon);
+        Assert.Contains("Ocean / Ring", presentation.Message, StringComparison.Ordinal);
+        Assert.Contains("1.2.3", presentation.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "11111111-1111-1111-1111-111111111111",
+            presentation.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "已安装并应用到正在运行的 HUD",
+            presentation.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_InstalledAndHudStartedReportsExactIdentityAndStartedActivation()
+    {
+        using var root = new TemporaryRoot();
+        var installed = InstallSkin(root);
+        var result = new DesignerOutputResult(
+            DesignerOutputDisposition.InstalledAndHudStarted,
+            installed,
+            null,
+            [],
+            "Skin installed and the HUD was started.");
+
+        var presentation = DesignerOutputPresentation.Create(result);
+
+        Assert.Equal("已安装并启动 HUD", presentation.Title);
+        Assert.Equal(DesignerDialogIcon.Information, presentation.Icon);
+        Assert.Contains("Ocean / Ring", presentation.Message, StringComparison.Ordinal);
+        Assert.Contains("1.2.3", presentation.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "11111111-1111-1111-1111-111111111111",
+            presentation.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "HUD 已带着此皮肤的启用请求启动",
+            presentation.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "已应用此皮肤",
+            presentation.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_InstalledNotActivatedReportsExactIdentityAndManualActivationWarning()
+    {
+        using var root = new TemporaryRoot();
+        var installed = InstallSkin(root);
+        var result = new DesignerOutputResult(
+            DesignerOutputDisposition.InstalledNotActivated,
+            installed,
+            null,
+            [new SkinValidationError(
+                "control.protocol.invalid",
+                "$activation",
+                "Malformed response.")],
+            "The installed skin could not be activated.");
+
+        var presentation = DesignerOutputPresentation.Create(result);
+
+        Assert.Equal("皮肤已安装，但未启用", presentation.Title);
+        Assert.Equal(DesignerDialogIcon.Warning, presentation.Icon);
+        Assert.Contains("Ocean / Ring", presentation.Message, StringComparison.Ordinal);
+        Assert.Contains("1.2.3", presentation.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "11111111-1111-1111-1111-111111111111",
+            presentation.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "未能自动启用",
+            presentation.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "请在 HUD 的皮肤菜单中手动选择",
+            presentation.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "已应用到正在运行的 HUD",
+            presentation.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_ExportedReportsLeafFileAndFullParentDirectory()
+    {
+        var exportPath = Path.GetFullPath(
+            Path.Combine("presentation-export", "Ocean Ring.cqskin"));
+        var result = new DesignerOutputResult(
+            DesignerOutputDisposition.Exported,
+            null,
+            exportPath,
+            [],
+            "Skin package exported.");
+
+        var presentation = DesignerOutputPresentation.Create(result);
+
+        Assert.Equal("导出完成", presentation.Title);
+        Assert.Equal(DesignerDialogIcon.Information, presentation.Icon);
+        Assert.Contains("Ocean Ring.cqskin", presentation.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            Path.GetDirectoryName(exportPath)!,
+            presentation.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_CancelledReportsThatNoOutputWasCommitted()
+    {
+        var result = new DesignerOutputResult(
+            DesignerOutputDisposition.Cancelled,
+            null,
+            null,
+            [],
+            "Apply cancelled.");
+
+        var presentation = DesignerOutputPresentation.Create(result);
+
+        Assert.Equal("操作已取消", presentation.Title);
+        Assert.Equal("未创建或更改任何输出。", presentation.Message);
+        Assert.Equal(DesignerDialogIcon.Information, presentation.Icon);
+    }
+
+    [Fact]
+    public void Create_FailedUsesErrorPresentationWithoutSuccessIcon()
+    {
+        var result = new DesignerOutputResult(
+            DesignerOutputDisposition.Failed,
+            null,
+            null,
+            [new SkinValidationError(
+                "export.failed",
+                "$destination",
+                "The package could not be exported safely.")],
+            "The package could not be exported safely.");
+
+        var presentation = DesignerOutputPresentation.Create(result);
+
+        Assert.Equal("操作失败", presentation.Title);
+        Assert.Equal(DesignerDialogIcon.Error, presentation.Icon);
+        Assert.NotEqual(DesignerDialogIcon.Information, presentation.Icon);
+        Assert.Contains(
+            "未能完成输出操作",
+            presentation.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildExportDialogOptions_SplitsExchangeDirectoryFromLeafFileName()
     {
         var expectedDirectory = Path.Combine(
@@ -140,8 +303,9 @@ public sealed class WindowsSkinOutputDialogsTests
 
             var call = Assert.Single(service.Calls);
             Assert.Same(owner, call.Owner);
-            Assert.Equal("Skin Designer", call.Request.Title);
-            Assert.Equal("Skin package exported.", call.Request.Message);
+            Assert.Equal("导出完成", call.Request.Title);
+            Assert.Contains("Ocean Ring.cqskin", call.Request.Message);
+            Assert.Contains(@"C:\exports", call.Request.Message);
             Assert.Equal(DesignerDialogIcon.Information, call.Request.Icon);
             var action = Assert.Single(call.Request.Actions);
             AssertAction(action, "ok", "OK", true, true);
@@ -153,23 +317,27 @@ public sealed class WindowsSkinOutputDialogsTests
     {
         RunSta(() =>
         {
+            using var root = new TemporaryRoot();
             var service = new RecordingDesignerDialogService("ok");
             var dialogs = new WindowsSkinOutputDialogs(() => null, service);
             var result = new DesignerOutputResult(
                 DesignerOutputDisposition.AppliedLive,
-                null,
+                InstallSkin(root),
                 null,
                 [new SkinValidationError(
                     "apply.cleanup-failed",
                     "$operation",
-                    "Cleanup failed.")],
-                "Installed, but cleanup failed.");
+                    "Cleanup failed; recovery operation: abc123.")],
+                "Installed, but cleanup failed; recovery operation: abc123.");
 
             dialogs.ShowResult(result);
 
             var call = Assert.Single(service.Calls);
             Assert.Null(call.Owner);
             Assert.Equal(DesignerDialogIcon.Warning, call.Request.Icon);
+            Assert.NotEqual(DesignerDialogIcon.Information, call.Request.Icon);
+            Assert.Contains("输出已完成", call.Request.Message);
+            Assert.Contains("abc123", call.Request.Message);
         });
     }
 
@@ -192,6 +360,19 @@ public sealed class WindowsSkinOutputDialogsTests
                 OutputTestFixture.HudVersion,
                 CancellationToken.None);
         return Assert.IsType<SkinInstallPreview>(inspected.Value);
+    }
+
+    private static InstalledSkinRecord InstallSkin(TemporaryRoot root)
+    {
+        var installer = new SkinPackageInstaller(
+            root.Paths,
+            OutputTestFixture.HudVersion);
+        var installed = installer.Install(
+            CreatePreview(root),
+            SkinCollisionDecision.Replace,
+            CancellationToken.None);
+        Assert.Empty(installed.Errors);
+        return Assert.IsType<InstalledSkinRecord>(installed.Installed);
     }
 
     private static void AssertAction(

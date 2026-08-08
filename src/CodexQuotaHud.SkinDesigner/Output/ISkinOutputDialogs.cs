@@ -103,19 +103,13 @@ internal sealed class WindowsSkinOutputDialogs : ISkinOutputDialogs
     public void ShowResult(DesignerOutputResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
-        var isWarning = result.Errors.Count > 0 || result.Disposition is
-            DesignerOutputDisposition.Failed or
-            DesignerOutputDisposition.InstalledNotActivated;
+        var presentation = DesignerOutputPresentation.Create(result);
         _ = _dialogs.Show(
             _owner(),
             new DesignerDialogRequest(
-                "Skin Designer",
-                result.Message ?? (isWarning
-                    ? "The output operation did not complete cleanly."
-                    : "The output operation completed."),
-                isWarning
-                    ? DesignerDialogIcon.Warning
-                    : DesignerDialogIcon.Information,
+                presentation.Title,
+                presentation.Message,
+                presentation.Icon,
                 [new DesignerDialogAction(
                     "ok",
                     "OK",
