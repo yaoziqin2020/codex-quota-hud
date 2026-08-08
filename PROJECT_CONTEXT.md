@@ -405,12 +405,13 @@ It does not call a private web endpoint directly.
 - Public source: GitHub `main`
 - Installed executable:
   `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`
-- Installed candidate on the maintainer machine: `v1.3.0` from `aecaea1`
-- Latest public release: `v1.2.3`
+- Installed release on the maintainer machine: `v1.3.0` from product source
+  `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`
+- Latest public release: `v1.3.0`
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 
-The real machine currently has the verified local `v1.3.0` candidate with the
+The real machine currently has the verified public `v1.3.0` release with the
 optional Designer selected for maintainer acceptance. The maintainer-only
 desktop Developer Preview shortcut is local customization and is not public
 Setup behavior.
@@ -420,9 +421,14 @@ Do not treat the old conversation worktree under
 
 ## Quality baseline
 
-- Core tests: 55
-- App/UI tests: 333
-- Total: 388
+- 2026-08-09 v1.3.0 release baseline: Core `75/75`, Skins `375/375`, App/UI
+  `625/625`, Designer `486/486`, total `1561/1561` with zero failed/skipped;
+  Release build zero warnings/errors; isolated installer matrix `9/9`; local
+  upgrade and user hands-on acceptance passed. Release CI run `31266376831`
+  and the later final-docs CI run `31267475822` both completed successfully.
+  The three public v1.3.0 assets were downloaded again and matched their exact
+  recorded sizes and SHA-256 values.
+- Legacy pre-Designer baseline: Core `55`, App/UI `333`, total `388`.
 - 2026-07-31 Release verification: focused low-quota alert tests 66/66;
   full suite Core 55/55, App/UI 266/266, total 321/321; build zero warnings
   and zero errors. GUI/manual preview acceptance was not performed.

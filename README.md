@@ -21,17 +21,16 @@ and a numeric tray icon without scraping web pages or storing credentials.
 
 ## v1.3.0 release / 正式版
 
-The fixed local candidate from source
-`cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` is **accepted for publication**.
+The v1.3.0 release is built from product source
+`cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` and is **published and verified**.
 Fresh serial Release verification passed `1561/1561` with zero failed/skipped,
 the build passed with zero warnings/errors, packaging passed, the isolated
 installer matrix passed `9/9`, and the real upgrade preserved bounded user
 state. Installed UI acceptance is `NOT RUN`: both independent Computer Use
 attempts selected the unique exact Designer window but failed before input
 with `node_repl exec context not found`, including the documented recovery
-retry. Policy prohibited a UIA fallback, so the required fixed-path UI rows
-still need a healthy Computer Use session or user manual smoke. Overall
-automated evidence remains `NOT RUN`. On 2026-08-09, the user completed the
+retry. Policy prohibited a UIA fallback, so automated evidence for the
+required fixed-path UI rows remains `NOT RUN`. On 2026-08-09, the user completed the
 installed hands-on checks, reported no issues, and accepted this exact
 candidate. User-manual acceptance is `PASS`. The accepted commit is on
 `main`, CI passed, and [v1.3.0](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0)
@@ -52,13 +51,13 @@ evidence are claimed.
 The [latest public release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0)
 is `v1.3.0`.
 
-从源码 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` 重建的 fixed 本地候选版
-**已通过用户实装验收并获准发布**。fresh serial Release 测试 `1561/1561`、Release build、
+v1.3.0 正式版基于源码 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` 构建，
+**已经发布并完成公开资产校验**。fresh serial Release 测试 `1561/1561`、Release build、
 封包、九场景隔离安装器矩阵和本机升级均通过；但 installed UI 验收为 `NOT RUN`。
 两次独立 Computer Use 尝试都准确选中了唯一设计器窗口，却在任何输入前重复遇到
 `node_repl exec context not found`；按工具安全规则不得改用 UIA 后备路径。因此撤销/重做、
-图像 Discard/Save、旧包导入、托盘和关闭隔离等直接 installed 行仍需健康的 Computer Use
-会话。2026-08-09，用户完成实装手测并反馈无问题；自动行仍诚实保留为 `NOT RUN`，
+图像 Discard/Save、旧包导入、托盘和关闭隔离等直接 installed 行的自动化证据仍为
+`NOT RUN`。2026-08-09，用户完成实装手测并反馈无问题；
 独立的用户手测验收为 `PASS`。验收提交已进入 `main`，CI 已通过，
 [v1.3.0](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0)
 已成为最新公开正式版；三份公开下载资产均已重新下载并通过大小与 SHA-256 复核。
@@ -239,10 +238,9 @@ as completed acceptance in the release record.
 
 ## 下载与安装 / Download
 
-在 v1.3.0 完成本机验收、用户明确接受并公开发布后，可从
+v1.3.0 已完成本机验收、用户明确接受和公开发布，可从
 [最新 Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
 下载 ZIP 后备包 `CodexQuotaHud-v1.3.0-win-x64.zip`，解压后在该目录运行。
-在此之前，最新公开版本仍为 v1.2.3：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
@@ -383,8 +381,8 @@ two-direction handoff remains an optional manual UI check.
 `%LOCALAPPDATA%\CodexQuotaHud\preview-window.json`。该文件不包含模拟额度、
 皮肤或正式 HUD 设置；小屏幕和高 DPI 下仍可使用纵向滚动。
 
-刷新时序和设计器深色弹窗修正版已从标签 `v1.2.3` 公开发布。不要移动
-`v1.2.0`、`v1.2.1`、`v1.2.2`、`v1.2.3` 历史标签，也不要替换其 Release 资产。
+当前正式版已从标签 `v1.3.0` 公开发布。不要移动
+`v1.2.0`、`v1.2.1`、`v1.2.2`、`v1.2.3`、`v1.3.0` 历史标签，也不要替换其 Release 资产。
 
 ## 项目结构 / Project Structure
 
@@ -401,7 +399,7 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前 v1.3.0 候选源码包含 1561 项自动化测试：
+当前 v1.3.0 正式版源码包含 1561 项自动化测试：
 
 - Core：75 项
 - Skins：375 项
@@ -418,19 +416,19 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 自包含发布检查。CI 包固定使用临时版本 `0.0.0`，只在 Runner 内做安装烟测，
 不会冒用或覆盖公开 Release 版本。
 
-当前 v1.3.0 候选源码的 fresh serial Release 测试为 `1561/1561`、失败 `0`、
+当前 v1.3.0 正式版源码的 fresh serial Release 测试为 `1561/1561`、失败 `0`、
 跳过 `0`，Release build 为 `0` warnings / `0` errors。旧包 `0/0` 默认值、
 规范写出、共享文字/参考线几何、预览工具不持久化、`free-decoration-ring`
 预览的 Dual 圈层说明、原生选择器目录和
 结果反馈均有自动化覆盖。生产封包、九场景安装器矩阵、本机升级、已安装身份/数据
 保留均按实际执行结果记录。Task 8 的 installed GUI 行全部为 `NOT RUN`：两次独立
 Computer Use 尝试在任何输入前重复遇到 `node_repl exec context not found`，工具安全规则
-禁止改用 UIA 后备路径。Task 4 的旧缺陷观察保留为历史证据；源码自动化不能替代 fixed
-candidate 的 installed 观察。详见
+禁止改用 UIA 后备路径。Task 4 的旧缺陷观察保留为历史证据；源码自动化不能替代正式版
+的 installed 观察。用户随后完成全部实装手测并反馈无问题。详见
 [`docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md`](docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md)。
 
-上一公开版 v1.2.3 的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已
-完整记录在验收文档中。注释标签 `v1.2.3` 指向通过 CI 的提交 `0f42c5d`；公开 Release
+当前公开版 v1.3.0 的 Setup/ZIP 结构、九场景隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已
+完整记录在验收文档中。注释标签 `v1.3.0` 指向用户验收提交 `c0f6ae5`；公开 Release
 为 Latest、非草稿、非预发布，三个上传资产的在线大小和重新下载后的 SHA-256 均与本地一致。
 
 Release verification for `v1.1.1` passed Core `55/55`, App/UI `333/333`, and

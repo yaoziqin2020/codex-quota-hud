@@ -63,6 +63,8 @@ evidence; the user-manual acceptance gate is `PASS`. Overall status is
 `PASS — user accepted`. Commit `c0f6ae5a51112dfde8098f97e26022dfbc4ef309`
 was fast-forwarded to `main`; CI run `31266376831` passed its complete test,
 build, ephemeral-package, and isolated-installer-smoke workflow in `22m24s`.
+The later docs-only closeout push at `51251ba` also passed the same complete
+workflow in GitHub CI run `31267475822`.
 Annotated tag `v1.3.0` points to that accepted commit. GitHub Release
 `https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0` is the
 latest non-draft, non-prerelease release. All three public downloads were

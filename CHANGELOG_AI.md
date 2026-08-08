@@ -13,6 +13,10 @@
 - Uploaded Setup, normal-HUD ZIP, and `SHA256SUMS.txt`; downloaded all three
   public assets again and verified exact size and SHA-256 equality. Signing
   status remains `NotSigned` as already disclosed.
+- The later docs-only closeout push `51251ba` passed the same full GitHub
+  workflow in run `31267475822` (tests, build, ephemeral packaging, and
+  isolated installer smoke). Project closeout reconciled stale stable-location
+  and README release-status text with the already published v1.3.0 facts.
 
 ## 2026-08-09 — v1.3.0 installed candidate accepted for publication
 
