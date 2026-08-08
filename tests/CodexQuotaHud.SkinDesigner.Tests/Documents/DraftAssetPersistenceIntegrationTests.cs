@@ -13,6 +13,67 @@ namespace CodexQuotaHud.SkinDesigner.Tests.Documents;
 public sealed class DraftAssetPersistenceIntegrationTests
 {
     [Fact]
+    public async Task CommittedPromotionPostCheckFailureReleasesHandleAndSavedReferenceReopens()
+    {
+        var faultingStorage = new CommittedPromotionStorage();
+        using var harness = await Harness.CreateAsync(faultingStorage);
+
+        Assert.Equal(1, faultingStorage.MoveCalls);
+        Assert.Equal(1, faultingStorage.ReleaseCalls);
+        Assert.Equal(0, faultingStorage.DeleteCalls);
+        harness.AssertOpened(AlphaPng, Hash(AlphaPng));
+    }
+
+    [Fact]
+    public async Task CommittedPromotionPostCheckFailureValidatesDestinationBeforeSessionCommit()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new SkinStoragePaths(temporary.Path);
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var now = DateTimeOffset.Parse("2026-08-08T00:00:00Z");
+        var session = new SkinDraftSession(
+            SkinDraftFactory.CreateNew(
+                draftId,
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                now,
+                SemanticVersion.Parse("1.3.0")),
+            () => now = now.AddSeconds(1));
+        using var designer = new DesignerViewModel(
+            session,
+            new Dictionary<SkinAssetSlot, SkinAsset>(),
+            (_, _) => { });
+        var faultingStorage = new CommittedPromotionStorage(
+            returnMismatchedDestinationRead: true);
+        var images = new DesignerImageService(
+            paths,
+            designer,
+            storage: faultingStorage);
+        var source = Path.Combine(temporary.SourceRoot, "source.png");
+        await File.WriteAllBytesAsync(source, AlphaPng);
+
+        var result = await images.ImportAsync(
+            draftId,
+            SkinAssetSlot.Background,
+            source);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors,
+            error => error.Code == "image.storage-hash-mismatch");
+        Assert.Empty(session.Current.Assets);
+        Assert.Empty(designer.Assets);
+        Assert.Equal(1, faultingStorage.ReleaseCalls);
+        Assert.Equal(0, faultingStorage.DeleteCalls);
+        var storageRelativePath = DraftAssetStorage.CreateContentRelativePath(
+            "assets/background.png",
+            AlphaPng);
+        Assert.Equal(
+            AlphaPng,
+            await File.ReadAllBytesAsync(Path.Combine(
+                new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
+                Path.GetFileName(storageRelativePath))));
+    }
+
+    [Fact]
     public async Task NamedReplacementThenDiscardReopensExactNamedBytes()
     {
         using var harness = await Harness.CreateAsync();
@@ -122,7 +183,9 @@ public sealed class DraftAssetPersistenceIntegrationTests
         private DateTimeOffset _now =
             DateTimeOffset.Parse("2026-08-08T00:00:00Z");
 
-        private Harness(TemporaryDirectory temporary)
+        private Harness(
+            TemporaryDirectory temporary,
+            IDesignerDraftStorageLeaseProvider? storage)
         {
             _temporary = temporary;
             Paths = new SkinStoragePaths(temporary.Path);
@@ -139,7 +202,10 @@ public sealed class DraftAssetPersistenceIntegrationTests
                 Session,
                 new Dictionary<SkinAssetSlot, SkinAsset>(),
                 (_, _) => { });
-            Images = new DesignerImageService(Paths, _designer);
+            Images = new DesignerImageService(
+                Paths,
+                _designer,
+                storage: storage);
             Documents = new DesignerDocumentService(
                 Paths,
                 Store,
@@ -164,9 +230,10 @@ public sealed class DraftAssetPersistenceIntegrationTests
 
         public DesignerDocumentService Documents { get; }
 
-        public static async Task<Harness> CreateAsync()
+        public static async Task<Harness> CreateAsync(
+            IDesignerDraftStorageLeaseProvider? storage = null)
         {
-            var harness = new Harness(new TemporaryDirectory());
+            var harness = new Harness(new TemporaryDirectory(), storage);
             var source = Path.Combine(harness._temporary.SourceRoot, "named.png");
             await File.WriteAllBytesAsync(source, AlphaPng);
             var imported = await harness.Images.ImportAsync(
@@ -216,6 +283,128 @@ public sealed class DraftAssetPersistenceIntegrationTests
         {
             _designer.Dispose();
             _temporary.Dispose();
+        }
+    }
+
+    private sealed class CommittedPromotionStorage(
+        bool returnMismatchedDestinationRead = false) :
+        IDesignerDraftStorageLeaseProvider
+    {
+        public int MoveCalls { get; private set; }
+
+        public int ReleaseCalls { get; private set; }
+
+        public int DeleteCalls { get; private set; }
+
+        public IDesignerDraftProjectLease? OpenDesignerProject(
+            string draftsRoot,
+            Guid draftId,
+            DesignerDraftProjectOpenMode mode)
+        {
+            var inner = PhysicalDraftFileOperations.Instance.OpenDesignerProject(
+                draftsRoot,
+                draftId,
+                mode);
+            return inner is null
+                ? null
+                : new Project(
+                    inner,
+                    this,
+                    returnMismatchedDestinationRead);
+        }
+
+        public IDesignerSourceFileLease OpenDesignerSource(string absolutePath) =>
+            PhysicalDraftFileOperations.Instance.OpenDesignerSource(absolutePath);
+
+        private sealed class Project(
+            IDesignerDraftProjectLease inner,
+            CommittedPromotionStorage owner,
+            bool returnMismatchedDestinationRead) : IDesignerDraftProjectLease
+        {
+            public bool WasCreated => inner.WasCreated;
+
+            public IDesignerDraftAssetsLease OpenAssets(bool create) =>
+                new Assets(
+                    inner.OpenAssets(create),
+                    owner,
+                    returnMismatchedDestinationRead);
+
+            public void DeleteOwnedProjectIfEmpty() =>
+                inner.DeleteOwnedProjectIfEmpty();
+
+            public void Dispose() => inner.Dispose();
+        }
+
+        private sealed class Assets(
+            IDesignerDraftAssetsLease inner,
+            CommittedPromotionStorage owner,
+            bool returnMismatchedDestinationRead) : IDesignerDraftAssetsLease
+        {
+            public bool FileExists(string leafName) => inner.FileExists(leafName);
+
+            public byte[] ReadAllBytes(string leafName) =>
+                returnMismatchedDestinationRead && owner.MoveCalls > 0
+                    ? ReplacementPng
+                    : inner.ReadAllBytes(leafName);
+
+            public void WriteAndFlushNew(
+                string operationLeafName,
+                ReadOnlySpan<byte> bytes,
+                CancellationToken cancellationToken) =>
+                inner.WriteAndFlushNew(
+                    operationLeafName,
+                    bytes,
+                    cancellationToken);
+
+            public byte[] ReadOperationBytes(string operationLeafName) =>
+                inner.ReadOperationBytes(operationLeafName);
+
+            public bool MoveCanonicalToOperation(
+                string canonicalLeafName,
+                string operationLeafName) =>
+                inner.MoveCanonicalToOperation(
+                    canonicalLeafName,
+                    operationLeafName);
+
+            public void MoveOperationToCanonical(
+                string operationLeafName,
+                string canonicalLeafName) =>
+                inner.MoveOperationToCanonical(
+                    operationLeafName,
+                    canonicalLeafName);
+
+            public void MoveOperationToImmutable(
+                string operationLeafName,
+                string contentAddressedLeafName)
+            {
+                owner.MoveCalls++;
+                inner.MoveOperationToImmutable(
+                    operationLeafName,
+                    contentAddressedLeafName);
+                throw new DraftReplaceCommittedException(
+                    "Injected post-rename identity failure.",
+                    new IOException("Injected post-check failure."));
+            }
+
+            public void DeleteCanonical(string canonicalLeafName) =>
+                inner.DeleteCanonical(canonicalLeafName);
+
+            public void DeleteOperation(string operationLeafName)
+            {
+                owner.DeleteCalls++;
+                inner.DeleteOperation(operationLeafName);
+            }
+
+            public void ReleaseOperation(string operationLeafName)
+            {
+                owner.ReleaseCalls++;
+                inner.ReleaseOperation(operationLeafName);
+            }
+
+            public void DeleteDirectoryIfEmpty() =>
+                inner.DeleteDirectoryIfEmpty();
+
+            public void Dispose() => inner.Dispose();
         }
     }
 

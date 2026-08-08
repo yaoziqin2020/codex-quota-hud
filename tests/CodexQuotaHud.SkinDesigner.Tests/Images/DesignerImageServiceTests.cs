@@ -175,6 +175,70 @@ public sealed class DesignerImageServiceTests
     }
 
     [Fact]
+    public async Task ImportAsync_WhenSameContentWinnerAppearsDuringNoReplaceMoveUsesWinnerAndDeletesOnlyTemp()
+    {
+        using var temporary = new TemporaryDirectory();
+        var storage = new SkinStoragePaths(temporary.Path);
+        var sourcePath = Path.Combine(temporary.SourceRoot, "background.png");
+        await File.WriteAllBytesAsync(sourcePath, AlphaPng);
+        var racingStorage = new WinnerRaceStorage();
+        var sut = new DesignerImageService(
+            storage,
+            new RecordingCommitter(),
+            storage: racingStorage);
+
+        var result = await sut.ImportAsync(
+            DraftId,
+            SkinAssetSlot.Background,
+            sourcePath);
+
+        Assert.True(result.Succeeded, Format(result.Errors));
+        var reference = Assert.IsType<DraftAssetReference>(result.Reference);
+        var storagePath = Assert.IsType<string>(reference.StorageRelativePath);
+        Assert.Equal(AlphaPng, await File.ReadAllBytesAsync(
+            OwnedPath(storage, DraftId, storagePath)));
+        Assert.Equal(1, racingStorage.MoveAttempts);
+        Assert.Equal(1, racingStorage.DeleteOperationCalls);
+        Assert.Equal(1, racingStorage.ReleaseOperationCalls);
+        Assert.DoesNotContain(
+            Directory.EnumerateFiles(new DraftProjectPaths(
+                storage.DraftsRoot,
+                DraftId).AssetsRoot),
+            path => Path.GetFileName(path).Contains(".tmp-", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ImportAsync_WhenGenericPromotionFailureIsAmbiguousNeverDeletesPromotedHandle()
+    {
+        using var temporary = new TemporaryDirectory();
+        var storage = new SkinStoragePaths(temporary.Path);
+        var sourcePath = Path.Combine(temporary.SourceRoot, "background.png");
+        await File.WriteAllBytesAsync(sourcePath, AlphaPng);
+        var ambiguousStorage = new AmbiguousPromotionStorage();
+        var sut = new DesignerImageService(
+            storage,
+            new RecordingCommitter(),
+            storage: ambiguousStorage);
+
+        var result = await sut.ImportAsync(
+            DraftId,
+            SkinAssetSlot.Background,
+            sourcePath);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors,
+            error => error.Code == "image.promote-failed");
+        Assert.Equal(1, ambiguousStorage.MoveAttempts);
+        Assert.Equal(2, ambiguousStorage.ReleaseOperationCalls);
+        Assert.Equal(0, ambiguousStorage.DeleteOperationCalls);
+        var storagePath = DraftAssetStorage.CreateContentRelativePath(
+            "assets/background.png",
+            AlphaPng);
+        Assert.Equal(AlphaPng, await File.ReadAllBytesAsync(
+            OwnedPath(storage, DraftId, storagePath)));
+    }
+
+    [Fact]
     public async Task ImportAsync_WhenSessionCommitRejectsRollsBackBytesReferenceAndPreview()
     {
         using var temporary = new TemporaryDirectory();
@@ -611,6 +675,228 @@ public sealed class DesignerImageServiceTests
         }
 
         public bool TryRemove(SkinAssetSlot slot) => Accept;
+    }
+
+    private sealed class WinnerRaceStorage : IDesignerDraftStorageLeaseProvider
+    {
+        public int MoveAttempts { get; private set; }
+
+        public int DeleteOperationCalls { get; private set; }
+
+        public int ReleaseOperationCalls { get; private set; }
+
+        public IDesignerDraftProjectLease? OpenDesignerProject(
+            string draftsRoot,
+            Guid draftId,
+            DesignerDraftProjectOpenMode mode)
+        {
+            var inner = PhysicalDraftFileOperations.Instance.OpenDesignerProject(
+                draftsRoot,
+                draftId,
+                mode);
+            return inner is null
+                ? null
+                : new Project(
+                    inner,
+                    new DraftProjectPaths(draftsRoot, draftId).AssetsRoot,
+                    this);
+        }
+
+        public IDesignerSourceFileLease OpenDesignerSource(string absolutePath) =>
+            PhysicalDraftFileOperations.Instance.OpenDesignerSource(absolutePath);
+
+        private sealed class Project(
+            IDesignerDraftProjectLease inner,
+            string assetsRoot,
+            WinnerRaceStorage owner) : IDesignerDraftProjectLease
+        {
+            public bool WasCreated => inner.WasCreated;
+
+            public IDesignerDraftAssetsLease OpenAssets(bool create) =>
+                new Assets(inner.OpenAssets(create), assetsRoot, owner);
+
+            public void DeleteOwnedProjectIfEmpty() =>
+                inner.DeleteOwnedProjectIfEmpty();
+
+            public void Dispose() => inner.Dispose();
+        }
+
+        private sealed class Assets(
+            IDesignerDraftAssetsLease inner,
+            string assetsRoot,
+            WinnerRaceStorage owner) : IDesignerDraftAssetsLease
+        {
+            public bool FileExists(string leafName) => inner.FileExists(leafName);
+
+            public byte[] ReadAllBytes(string leafName) =>
+                inner.ReadAllBytes(leafName);
+
+            public void WriteAndFlushNew(
+                string operationLeafName,
+                ReadOnlySpan<byte> bytes,
+                CancellationToken cancellationToken) =>
+                inner.WriteAndFlushNew(
+                    operationLeafName,
+                    bytes,
+                    cancellationToken);
+
+            public byte[] ReadOperationBytes(string operationLeafName) =>
+                inner.ReadOperationBytes(operationLeafName);
+
+            public bool MoveCanonicalToOperation(
+                string canonicalLeafName,
+                string operationLeafName) =>
+                inner.MoveCanonicalToOperation(
+                    canonicalLeafName,
+                    operationLeafName);
+
+            public void MoveOperationToCanonical(
+                string operationLeafName,
+                string canonicalLeafName) =>
+                inner.MoveOperationToCanonical(
+                    operationLeafName,
+                    canonicalLeafName);
+
+            public void MoveOperationToImmutable(
+                string operationLeafName,
+                string contentAddressedLeafName)
+            {
+                owner.MoveAttempts++;
+                File.WriteAllBytes(
+                    Path.Combine(assetsRoot, contentAddressedLeafName),
+                    inner.ReadOperationBytes(operationLeafName));
+                inner.MoveOperationToImmutable(
+                    operationLeafName,
+                    contentAddressedLeafName);
+            }
+
+            public void DeleteCanonical(string canonicalLeafName) =>
+                inner.DeleteCanonical(canonicalLeafName);
+
+            public void DeleteOperation(string operationLeafName)
+            {
+                owner.DeleteOperationCalls++;
+                inner.DeleteOperation(operationLeafName);
+            }
+
+            public void ReleaseOperation(string operationLeafName)
+            {
+                owner.ReleaseOperationCalls++;
+                inner.ReleaseOperation(operationLeafName);
+            }
+
+            public void DeleteDirectoryIfEmpty() =>
+                inner.DeleteDirectoryIfEmpty();
+
+            public void Dispose() => inner.Dispose();
+        }
+    }
+
+    private sealed class AmbiguousPromotionStorage :
+        IDesignerDraftStorageLeaseProvider
+    {
+        public int MoveAttempts { get; private set; }
+
+        public int DeleteOperationCalls { get; private set; }
+
+        public int ReleaseOperationCalls { get; private set; }
+
+        public IDesignerDraftProjectLease? OpenDesignerProject(
+            string draftsRoot,
+            Guid draftId,
+            DesignerDraftProjectOpenMode mode)
+        {
+            var inner = PhysicalDraftFileOperations.Instance.OpenDesignerProject(
+                draftsRoot,
+                draftId,
+                mode);
+            return inner is null ? null : new Project(inner, this);
+        }
+
+        public IDesignerSourceFileLease OpenDesignerSource(string absolutePath) =>
+            PhysicalDraftFileOperations.Instance.OpenDesignerSource(absolutePath);
+
+        private sealed class Project(
+            IDesignerDraftProjectLease inner,
+            AmbiguousPromotionStorage owner) : IDesignerDraftProjectLease
+        {
+            public bool WasCreated => inner.WasCreated;
+
+            public IDesignerDraftAssetsLease OpenAssets(bool create) =>
+                new Assets(inner.OpenAssets(create), owner);
+
+            public void DeleteOwnedProjectIfEmpty() =>
+                inner.DeleteOwnedProjectIfEmpty();
+
+            public void Dispose() => inner.Dispose();
+        }
+
+        private sealed class Assets(
+            IDesignerDraftAssetsLease inner,
+            AmbiguousPromotionStorage owner) : IDesignerDraftAssetsLease
+        {
+            public bool FileExists(string leafName) => inner.FileExists(leafName);
+
+            public byte[] ReadAllBytes(string leafName) =>
+                inner.ReadAllBytes(leafName);
+
+            public void WriteAndFlushNew(
+                string operationLeafName,
+                ReadOnlySpan<byte> bytes,
+                CancellationToken cancellationToken) =>
+                inner.WriteAndFlushNew(
+                    operationLeafName,
+                    bytes,
+                    cancellationToken);
+
+            public byte[] ReadOperationBytes(string operationLeafName) =>
+                inner.ReadOperationBytes(operationLeafName);
+
+            public bool MoveCanonicalToOperation(
+                string canonicalLeafName,
+                string operationLeafName) =>
+                inner.MoveCanonicalToOperation(
+                    canonicalLeafName,
+                    operationLeafName);
+
+            public void MoveOperationToCanonical(
+                string operationLeafName,
+                string canonicalLeafName) =>
+                inner.MoveOperationToCanonical(
+                    operationLeafName,
+                    canonicalLeafName);
+
+            public void MoveOperationToImmutable(
+                string operationLeafName,
+                string contentAddressedLeafName)
+            {
+                owner.MoveAttempts++;
+                inner.MoveOperationToImmutable(
+                    operationLeafName,
+                    contentAddressedLeafName);
+                throw new IOException("Injected ambiguous promotion failure.");
+            }
+
+            public void DeleteCanonical(string canonicalLeafName) =>
+                inner.DeleteCanonical(canonicalLeafName);
+
+            public void DeleteOperation(string operationLeafName)
+            {
+                owner.DeleteOperationCalls++;
+                inner.DeleteOperation(operationLeafName);
+            }
+
+            public void ReleaseOperation(string operationLeafName)
+            {
+                owner.ReleaseOperationCalls++;
+                throw new IOException("Injected release failure.");
+            }
+
+            public void DeleteDirectoryIfEmpty() =>
+                inner.DeleteDirectoryIfEmpty();
+
+            public void Dispose() => inner.Dispose();
+        }
     }
 
     private sealed class PixelBudgetCommitter(params SkinAsset[] assets) :

@@ -311,17 +311,31 @@ public sealed class DesignerDocumentService
                 }
 
                 var destinationLeaf = ResolveOwnedAssetLeaf(slot, reference);
-                var operationLeaf = AssetOperationLeaf(
-                    Path.GetFileName(reference.RelativePath));
-                assets.WriteAndFlushNew(
-                    operationLeaf,
-                    source.Content,
-                    cancellationToken);
-                ownedOperations.Add(operationLeaf);
-                var copied = assets.ReadOperationBytes(operationLeaf);
-                if (!copied.AsSpan().SequenceEqual(source.Content))
+                string? operationLeaf = null;
+                byte[] copied;
+                if (assets.FileExists(destinationLeaf))
                 {
-                    throw new IOException("The copied draft asset bytes changed.");
+                    copied = assets.ReadAllBytes(destinationLeaf);
+                    if (!ImmutableContentMatches(reference, source.Content, copied))
+                    {
+                        throw new InvalidDataException(
+                            "The existing immutable draft asset bytes do not match.");
+                    }
+                }
+                else
+                {
+                    operationLeaf = AssetOperationLeaf(
+                        Path.GetFileName(reference.RelativePath));
+                    assets.WriteAndFlushNew(
+                        operationLeaf,
+                        source.Content,
+                        cancellationToken);
+                    ownedOperations.Add(operationLeaf);
+                    copied = assets.ReadOperationBytes(operationLeaf);
+                    if (!copied.AsSpan().SequenceEqual(source.Content))
+                    {
+                        throw new IOException("The copied draft asset bytes changed.");
+                    }
                 }
 
                 var decoded = SkinImageDecoder.Decode(
@@ -344,7 +358,52 @@ public sealed class DesignerDocumentService
                         "The copied draft assets exceed the decoded pixel budget.");
                 }
 
-                assets.MoveOperationToImmutable(operationLeaf, destinationLeaf);
+                if (operationLeaf is not null)
+                {
+                    try
+                    {
+                        assets.MoveOperationToImmutable(
+                            operationLeaf,
+                            destinationLeaf);
+                    }
+                    catch (DraftReplaceCommittedException)
+                    {
+                        if (!assets.FileExists(destinationLeaf) ||
+                            !ImmutableContentMatches(
+                                reference,
+                                source.Content,
+                                assets.ReadAllBytes(destinationLeaf)))
+                        {
+                            throw;
+                        }
+                    }
+                    catch (IOException)
+                    {
+                        if (!assets.FileExists(destinationLeaf))
+                        {
+                            throw;
+                        }
+
+                        // A generic failure with a present destination is
+                        // ambiguous. Stop treating its tracked handle as
+                        // delete-owned before any further operation can fail.
+                        ownedOperations.Remove(operationLeaf);
+                        var winner = assets.ReadAllBytes(destinationLeaf);
+                        assets.ReleaseOperation(operationLeaf);
+                        assets.DeleteOperation(operationLeaf);
+                        if (!ImmutableContentMatches(
+                                reference,
+                                source.Content,
+                                winner))
+                        {
+                            throw new InvalidDataException(
+                                "The immutable draft asset collision bytes do not match.");
+                        }
+
+                        copied = winner;
+                    }
+                }
+
                 ownedAssets.Add(slot, source with { Content = [.. copied] });
             }
 
@@ -514,6 +573,13 @@ public sealed class DesignerDocumentService
 
         throw new IOException("The draft asset path leaves owned storage.");
     }
+
+    private static bool ImmutableContentMatches(
+        DraftAssetReference reference,
+        ReadOnlySpan<byte> expected,
+        ReadOnlySpan<byte> actual) =>
+        actual.SequenceEqual(expected) &&
+        DraftAssetStorage.MatchesContent(reference, actual);
 
     private static bool CleanupClaimedProject(
         ref IDesignerDraftAssetsLease? assets,

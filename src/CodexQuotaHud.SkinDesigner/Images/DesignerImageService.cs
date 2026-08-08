@@ -251,7 +251,8 @@ public sealed class DesignerImageService
             relativePath,
             Path.GetFileName(normalizedSource),
             storageRelativePath);
-        var operationCreated = false;
+        var operationTracked = false;
+        var promotionCommitted = false;
         try
         {
             if (assets.FileExists(destinationLeaf))
@@ -266,7 +267,7 @@ public sealed class DesignerImageService
             else
             {
                 assets.WriteAndFlushNew(temporaryLeaf, content, cancellationToken);
-                operationCreated = true;
+                operationTracked = true;
                 var verifiedBytes = assets.ReadOperationBytes(temporaryLeaf);
                 if (!verifiedBytes.AsSpan().SequenceEqual(content))
                 {
@@ -308,8 +309,29 @@ public sealed class DesignerImageService
                     assets.MoveOperationToImmutable(
                         temporaryLeaf,
                         destinationLeaf);
-                    operationCreated = false;
+                    promotionCommitted = true;
                     assets.ReleaseOperation(temporaryLeaf);
+                    operationTracked = false;
+                }
+                catch (DraftReplaceCommittedException)
+                {
+                    promotionCommitted = true;
+                    if (!assets.FileExists(destinationLeaf))
+                    {
+                        throw;
+                    }
+
+                    if (!ImmutableDestinationMatches(
+                            assets,
+                            destinationLeaf,
+                            reference,
+                            content))
+                    {
+                        return StorageHashMismatch();
+                    }
+
+                    assets.ReleaseOperation(temporaryLeaf);
+                    operationTracked = false;
                 }
                 catch (IOException)
                 {
@@ -318,9 +340,19 @@ public sealed class DesignerImageService
                         throw;
                     }
 
-                    var winner = assets.ReadAllBytes(destinationLeaf);
-                    if (!winner.AsSpan().SequenceEqual(content) ||
-                        !DraftAssetStorage.MatchesContent(reference, winner))
+                    // A generic failure with a present destination is
+                    // ambiguous: it can be a true no-replace collision, but
+                    // it must not make a possibly promoted handle deletable.
+                    promotionCommitted = true;
+                    var destinationMatches = ImmutableDestinationMatches(
+                        assets,
+                        destinationLeaf,
+                        reference,
+                        content);
+                    assets.ReleaseOperation(temporaryLeaf);
+                    operationTracked = false;
+                    assets.DeleteOperation(temporaryLeaf);
+                    if (!destinationMatches)
                     {
                         return StorageHashMismatch();
                     }
@@ -359,21 +391,39 @@ public sealed class DesignerImageService
             exception is IOException or UnauthorizedAccessException)
         {
             return Invalid(
-                operationCreated
+                operationTracked
                     ? "image.promote-failed"
                     : "image.prepare-failed",
                 "$image",
-                operationCreated
+                operationTracked
                     ? "The staged image could not become an immutable draft asset safely."
                     : "The owned image files could not be prepared safely.");
         }
         finally
         {
-            if (operationCreated)
+            if (operationTracked)
             {
-                TryDeleteOperation(assets, temporaryLeaf);
+                if (promotionCommitted)
+                {
+                    TryReleaseOperation(assets, temporaryLeaf);
+                }
+                else
+                {
+                    TryDeleteOperation(assets, temporaryLeaf);
+                }
             }
         }
+    }
+
+    private static bool ImmutableDestinationMatches(
+        IDesignerDraftAssetsLease assets,
+        string destinationLeaf,
+        DraftAssetReference reference,
+        ReadOnlySpan<byte> expected)
+    {
+        var actual = assets.ReadAllBytes(destinationLeaf);
+        return actual.AsSpan().SequenceEqual(expected) &&
+            DraftAssetStorage.MatchesContent(reference, actual);
     }
 
     private ImageMutationResult CommitRemove(SkinAssetSlot slot)
@@ -444,6 +494,20 @@ public sealed class DesignerImageService
         catch
         {
             // A promoted immutable asset is never targeted by operation cleanup.
+        }
+    }
+
+    private static void TryReleaseOperation(
+        IDesignerDraftAssetsLease assets,
+        string operationLeaf)
+    {
+        try
+        {
+            assets.ReleaseOperation(operationLeaf);
+        }
+        catch
+        {
+            // A committed immutable destination must never be deleted as cleanup.
         }
     }
 

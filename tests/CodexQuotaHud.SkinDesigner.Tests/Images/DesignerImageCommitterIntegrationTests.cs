@@ -83,7 +83,7 @@ public sealed class DesignerImageCommitterIntegrationTests
     }
 
     [Fact]
-    public async Task Import_WhenCancelledBeforeCommitRetainsHistory()
+    public async Task Import_WhenCancelledAfterImmutablePromotionRetainsHistoryAndPromotedBytes()
     {
         using var temporary = new TemporaryDirectory();
         var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
@@ -92,9 +92,13 @@ public sealed class DesignerImageCommitterIntegrationTests
             session,
             new Dictionary<SkinAssetSlot, SkinAsset>(),
             (_, _) => { });
+        var paths = new SkinStoragePaths(temporary.Path);
+        using var cancellation = new CancellationTokenSource();
+        var timedStorage = new CancelAfterPromotionStorage(cancellation);
         var service = new DesignerImageService(
-            new SkinStoragePaths(temporary.Path),
-            designer);
+            paths,
+            designer,
+            storage: timedStorage);
         var source = Path.Combine(temporary.SourceRoot, "background.png");
         await File.WriteAllBytesAsync(source, AlphaPng);
 
@@ -108,12 +112,29 @@ public sealed class DesignerImageCommitterIntegrationTests
                 draftId,
                 SkinAssetSlot.Background,
                 source,
-                new CancellationToken(canceled: true)));
+                cancellation.Token));
 
         Assert.Equal(canUndoBefore, session.CanUndo);
         Assert.Equal(canRedoBefore, session.CanRedo);
         Assert.Empty(session.Current.Assets);
         Assert.Empty(designer.Assets);
+        var storageRelativePath = DraftAssetStorage.CreateContentRelativePath(
+            "assets/background.png",
+            AlphaPng);
+        Assert.Equal(
+            AlphaPng,
+            await File.ReadAllBytesAsync(OwnedPath(
+                paths,
+                draftId,
+                storageRelativePath)));
+        Assert.Equal(1, timedStorage.MoveCalls);
+        Assert.Equal(1, timedStorage.ReleaseCalls);
+        Assert.Equal(0, timedStorage.DeleteCalls);
+        Assert.DoesNotContain(
+            Directory.EnumerateFiles(new DraftProjectPaths(
+                paths.DraftsRoot,
+                draftId).AssetsRoot),
+            path => Path.GetFileName(path).Contains(".tmp-", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -500,6 +521,115 @@ public sealed class DesignerImageCommitterIntegrationTests
         {
             Slots.Add(slot);
             return selectedPath;
+        }
+    }
+
+    private sealed class CancelAfterPromotionStorage(
+        CancellationTokenSource cancellation) : IDesignerDraftStorageLeaseProvider
+    {
+        public int MoveCalls { get; private set; }
+
+        public int ReleaseCalls { get; private set; }
+
+        public int DeleteCalls { get; private set; }
+
+        public IDesignerDraftProjectLease? OpenDesignerProject(
+            string draftsRoot,
+            Guid draftId,
+            DesignerDraftProjectOpenMode mode)
+        {
+            var inner = PhysicalDraftFileOperations.Instance.OpenDesignerProject(
+                draftsRoot,
+                draftId,
+                mode);
+            return inner is null ? null : new Project(inner, this, cancellation);
+        }
+
+        public IDesignerSourceFileLease OpenDesignerSource(string absolutePath) =>
+            PhysicalDraftFileOperations.Instance.OpenDesignerSource(absolutePath);
+
+        private sealed class Project(
+            IDesignerDraftProjectLease inner,
+            CancelAfterPromotionStorage owner,
+            CancellationTokenSource cancellation) : IDesignerDraftProjectLease
+        {
+            public bool WasCreated => inner.WasCreated;
+
+            public IDesignerDraftAssetsLease OpenAssets(bool create) =>
+                new Assets(inner.OpenAssets(create), owner, cancellation);
+
+            public void DeleteOwnedProjectIfEmpty() =>
+                inner.DeleteOwnedProjectIfEmpty();
+
+            public void Dispose() => inner.Dispose();
+        }
+
+        private sealed class Assets(
+            IDesignerDraftAssetsLease inner,
+            CancelAfterPromotionStorage owner,
+            CancellationTokenSource cancellation) : IDesignerDraftAssetsLease
+        {
+            public bool FileExists(string leafName) => inner.FileExists(leafName);
+
+            public byte[] ReadAllBytes(string leafName) =>
+                inner.ReadAllBytes(leafName);
+
+            public void WriteAndFlushNew(
+                string operationLeafName,
+                ReadOnlySpan<byte> bytes,
+                CancellationToken cancellationToken) =>
+                inner.WriteAndFlushNew(
+                    operationLeafName,
+                    bytes,
+                    cancellationToken);
+
+            public byte[] ReadOperationBytes(string operationLeafName) =>
+                inner.ReadOperationBytes(operationLeafName);
+
+            public bool MoveCanonicalToOperation(
+                string canonicalLeafName,
+                string operationLeafName) =>
+                inner.MoveCanonicalToOperation(
+                    canonicalLeafName,
+                    operationLeafName);
+
+            public void MoveOperationToCanonical(
+                string operationLeafName,
+                string canonicalLeafName) =>
+                inner.MoveOperationToCanonical(
+                    operationLeafName,
+                    canonicalLeafName);
+
+            public void MoveOperationToImmutable(
+                string operationLeafName,
+                string contentAddressedLeafName)
+            {
+                inner.MoveOperationToImmutable(
+                    operationLeafName,
+                    contentAddressedLeafName);
+                owner.MoveCalls++;
+                cancellation.Cancel();
+            }
+
+            public void DeleteCanonical(string canonicalLeafName) =>
+                inner.DeleteCanonical(canonicalLeafName);
+
+            public void DeleteOperation(string operationLeafName)
+            {
+                owner.DeleteCalls++;
+                inner.DeleteOperation(operationLeafName);
+            }
+
+            public void ReleaseOperation(string operationLeafName)
+            {
+                owner.ReleaseCalls++;
+                inner.ReleaseOperation(operationLeafName);
+            }
+
+            public void DeleteDirectoryIfEmpty() =>
+                inner.DeleteDirectoryIfEmpty();
+
+            public void Dispose() => inner.Dispose();
         }
     }
 

@@ -333,6 +333,102 @@ public sealed class DesignerDocumentServiceTests
     }
 
     [Fact]
+    public async Task ImportForEditing_TwoPngSlotsWithIdenticalBytesReuseOneVerifiedImmutableBlob()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new SkinStoragePaths(temporary.Path);
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var package = BuildPackage(
+            temporary,
+            Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            "Shared Blob",
+            includeCenter: true);
+        var sut = CreateService(
+            temporary,
+            () => draftId,
+            () => DateTimeOffset.Parse("2026-08-02T03:30:00Z"));
+
+        var result = await sut.ImportForEditingAsync(package, HudVersion);
+
+        Assert.Empty(result.Errors);
+        var draft = Assert.IsType<SkinDraftDocument>(result.Draft);
+        var background = draft.Assets[SkinAssetSlot.Background];
+        var center = draft.Assets[SkinAssetSlot.Center];
+        Assert.Equal(background.StorageRelativePath, center.StorageRelativePath);
+        Assert.Equal("assets/background.png", background.RelativePath);
+        Assert.Equal("assets/center.png", center.RelativePath);
+        Assert.Equal(AlphaPng, result.Assets[SkinAssetSlot.Background].Content);
+        Assert.Equal(AlphaPng, result.Assets[SkinAssetSlot.Center].Content);
+        var assetsRoot = new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot;
+        var storageLeaf = Path.GetFileName(Assert.IsType<string>(
+            background.StorageRelativePath));
+        Assert.Equal(
+            [storageLeaf],
+            Directory.EnumerateFiles(assetsRoot)
+                .Select(path => Path.GetFileName(path)!)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray());
+        Assert.Equal(AlphaPng, await File.ReadAllBytesAsync(Path.Combine(
+            assetsRoot,
+            storageLeaf)));
+    }
+
+    [Theory]
+    [InlineData(PromotionWinnerKind.SameContent, true)]
+    [InlineData(PromotionWinnerKind.MismatchedContent, false)]
+    public async Task ImportForEditing_NoReplaceWinnerRaceReusesOnlyExactContent(
+        PromotionWinnerKind winnerKind,
+        bool expectedSuccess)
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new SkinStoragePaths(temporary.Path);
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var package = BuildPackage(
+            temporary,
+            Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            $"{winnerKind} Race");
+        var racingStorage = new ImmutablePromotionRaceStorage(winnerKind);
+        var sut = CreateService(
+            temporary,
+            () => draftId,
+            () => DateTimeOffset.Parse("2026-08-02T03:45:00Z"),
+            racingStorage);
+
+        var result = await sut.ImportForEditingAsync(package, HudVersion);
+
+        Assert.Equal(1, racingStorage.MoveCalls);
+        Assert.Equal(1, racingStorage.DeleteCalls);
+        var storageRelativePath = DraftAssetStorage.CreateContentRelativePath(
+            "assets/background.png",
+            AlphaPng);
+        var blobPath = Path.Combine(
+            new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
+            Path.GetFileName(storageRelativePath));
+        if (expectedSuccess)
+        {
+            Assert.Equal(1, racingStorage.ReleaseCalls);
+            Assert.Empty(result.Errors);
+            var draft = Assert.IsType<SkinDraftDocument>(result.Draft);
+            Assert.Equal(
+                storageRelativePath,
+                draft.Assets[SkinAssetSlot.Background].StorageRelativePath);
+            Assert.Equal(AlphaPng, await File.ReadAllBytesAsync(blobPath));
+        }
+        else
+        {
+            Assert.Equal(1, racingStorage.ReleaseCalls);
+            Assert.Null(result.Draft);
+            Assert.Contains(result.Errors,
+                error => error.Code == "document.cleanup-failed");
+            Assert.Equal(OpaquePng, await File.ReadAllBytesAsync(blobPath));
+        }
+
+        Assert.DoesNotContain(
+            Directory.EnumerateFiles(Path.GetDirectoryName(blobPath)!),
+            path => Path.GetFileName(path).Contains(".tmp-", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ImportForEditing_NormalizesV123MinimumWithoutChangingSkinContent()
     {
         using var temporary = new TemporaryDirectory();
@@ -533,7 +629,8 @@ public sealed class DesignerDocumentServiceTests
             temporary,
             Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
             "Partial Copy",
-            includeCenter: true);
+            includeCenter: true,
+            centerUsesSameContent: false);
         var transition = new TransitionStorage(TransitionFault.SecondAssetWrite);
         var sut = CreateService(
             temporary,
@@ -631,6 +728,7 @@ public sealed class DesignerDocumentServiceTests
         Guid skinId,
         string displayName,
         bool includeCenter = false,
+        bool centerUsesSameContent = true,
         SemanticVersion? minimumHudVersion = null)
     {
         var packagePath = Path.Combine(
@@ -664,15 +762,16 @@ public sealed class DesignerDocumentServiceTests
         };
         if (includeCenter)
         {
+            var centerContent = centerUsesSameContent ? AlphaPng : OpaquePng;
             assets.Add(
                 SkinAssetSlot.Center,
                 new SkinAsset(
                     SkinAssetSlot.Center,
                     "center.png",
-                    AlphaPng,
+                    centerContent,
                     1,
                     1,
-                    HasAlpha: true));
+                    HasAlpha: centerUsesSameContent));
         }
 
         var request = new SkinPackageBuildRequest(
@@ -806,6 +905,138 @@ public sealed class DesignerDocumentServiceTests
         public string SourceRoot { get; }
 
         public void Dispose() => Directory.Delete(Path, recursive: true);
+    }
+
+    public enum PromotionWinnerKind
+    {
+        SameContent,
+        MismatchedContent
+    }
+
+    private sealed class ImmutablePromotionRaceStorage(
+        PromotionWinnerKind winnerKind) : IDesignerDraftStorageLeaseProvider
+    {
+        public int MoveCalls { get; private set; }
+
+        public int DeleteCalls { get; private set; }
+
+        public int ReleaseCalls { get; private set; }
+
+        public IDesignerDraftProjectLease? OpenDesignerProject(
+            string draftsRoot,
+            Guid draftId,
+            DesignerDraftProjectOpenMode mode)
+        {
+            var inner = PhysicalDraftFileOperations.Instance.OpenDesignerProject(
+                draftsRoot,
+                draftId,
+                mode);
+            return inner is null
+                ? null
+                : new Project(
+                    inner,
+                    new DraftProjectPaths(draftsRoot, draftId).AssetsRoot,
+                    this,
+                    winnerKind);
+        }
+
+        public IDesignerSourceFileLease OpenDesignerSource(string absolutePath) =>
+            PhysicalDraftFileOperations.Instance.OpenDesignerSource(absolutePath);
+
+        private sealed class Project(
+            IDesignerDraftProjectLease inner,
+            string assetsRoot,
+            ImmutablePromotionRaceStorage owner,
+            PromotionWinnerKind winnerKind) : IDesignerDraftProjectLease
+        {
+            public bool WasCreated => inner.WasCreated;
+
+            public IDesignerDraftAssetsLease OpenAssets(bool create) =>
+                new Assets(
+                    inner.OpenAssets(create),
+                    assetsRoot,
+                    owner,
+                    winnerKind);
+
+            public void DeleteOwnedProjectIfEmpty() =>
+                inner.DeleteOwnedProjectIfEmpty();
+
+            public void Dispose() => inner.Dispose();
+        }
+
+        private sealed class Assets(
+            IDesignerDraftAssetsLease inner,
+            string assetsRoot,
+            ImmutablePromotionRaceStorage owner,
+            PromotionWinnerKind winnerKind) : IDesignerDraftAssetsLease
+        {
+            public bool FileExists(string leafName) => inner.FileExists(leafName);
+
+            public byte[] ReadAllBytes(string leafName) =>
+                inner.ReadAllBytes(leafName);
+
+            public void WriteAndFlushNew(
+                string operationLeafName,
+                ReadOnlySpan<byte> bytes,
+                CancellationToken cancellationToken) =>
+                inner.WriteAndFlushNew(
+                    operationLeafName,
+                    bytes,
+                    cancellationToken);
+
+            public byte[] ReadOperationBytes(string operationLeafName) =>
+                inner.ReadOperationBytes(operationLeafName);
+
+            public bool MoveCanonicalToOperation(
+                string canonicalLeafName,
+                string operationLeafName) =>
+                inner.MoveCanonicalToOperation(
+                    canonicalLeafName,
+                    operationLeafName);
+
+            public void MoveOperationToCanonical(
+                string operationLeafName,
+                string canonicalLeafName) =>
+                inner.MoveOperationToCanonical(
+                    operationLeafName,
+                    canonicalLeafName);
+
+            public void MoveOperationToImmutable(
+                string operationLeafName,
+                string contentAddressedLeafName)
+            {
+                owner.MoveCalls++;
+                var winner = winnerKind == PromotionWinnerKind.SameContent
+                    ? inner.ReadOperationBytes(operationLeafName)
+                    : OpaquePng;
+                File.WriteAllBytes(
+                    Path.Combine(assetsRoot, contentAddressedLeafName),
+                    winner);
+                inner.MoveOperationToImmutable(
+                    operationLeafName,
+                    contentAddressedLeafName);
+            }
+
+            public void DeleteCanonical(string canonicalLeafName) =>
+                inner.DeleteCanonical(canonicalLeafName);
+
+            public void DeleteOperation(string operationLeafName)
+            {
+                owner.DeleteCalls++;
+                inner.DeleteOperation(operationLeafName);
+            }
+
+            public void ReleaseOperation(string operationLeafName)
+            {
+                owner.ReleaseCalls++;
+                inner.ReleaseOperation(operationLeafName);
+            }
+
+            public void DeleteDirectoryIfEmpty() =>
+                inner.DeleteDirectoryIfEmpty();
+
+            public void Dispose() => inner.Dispose();
+        }
     }
 
     private enum TransitionFault
