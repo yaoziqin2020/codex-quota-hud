@@ -36,9 +36,11 @@
   removal, choosing Discard at the dirty prompt closed the draft but left
   `assets\decoration.png` physically deleted while saved `draft.json` still
   referenced it. Reopening reported `document.asset-missing`.
-- Installed rows total `6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`. Six nonzero
-  animation auditions, Apply-to-HUD result/actual formal-HUD selection, and
-  post-Designer-close isolation passed. Old-package import stopped when the
+- Installed rows total `5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`. Six nonzero
+  animation auditions and Apply-to-HUD result/actual formal-HUD selection
+  passed. Post-Designer-close isolation is `PARTIAL`: guides were Off and
+  audition was All before close, so active-state cleanup was not exercised.
+  Old-package import stopped when the
   filename failed exact round-trip verification; the picker was safely
   cancelled. Tray operation stopped when exact icon hit-testing failed before
   input; no right-click was sent.

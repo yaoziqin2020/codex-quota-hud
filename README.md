@@ -30,7 +30,7 @@ state. Direct installed undo/redo smoke then found a release-blocking defect:
 Undo/Redo changed the preview and history availability but left the edited
 slider/value stale. A second defect left `draft.json` referencing a physically
 deleted decoration after the user chose Discard. Installed Task 4 rows are
-`6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`; old-package import and tray-menu
+`5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`; old-package import and tray-menu
 operation stopped at their exact input safety gates. Overall candidate status
 is `FAIL`; no push, merge, tag, upload, or GitHub Release is authorized.
 Until explicit acceptance and publication, the
@@ -41,7 +41,7 @@ remains `v1.2.3`.
 fresh serial Release 测试 `1508/1508`、Release build、封包、九场景隔离安装器矩阵和本机升级均通过，
 但直接 installed undo/redo 冒烟发现阻塞缺陷：撤销/重做虽然改变预览和历史可用状态，滑块和值却保持
 旧编辑值；图像删除后选择 Discard 还会留下引用已删除装饰文件的草稿。Task 4 installed 行汇总为
-`6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`；旧包导入与托盘菜单在准确输入安全门失败后停止。
+`5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`；旧包导入与托盘菜单在准确输入安全门失败后停止。
 候选整体为 `FAIL`，禁止 push、merge、tag、上传或创建 GitHub Release。
 在用户明确接受并公开发布前，[最新公开版本](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
 仍为 `v1.2.3`。
@@ -408,7 +408,8 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 结果反馈均有自动化覆盖。生产封包、九场景安装器矩阵、本机升级、已安装身份/数据
 保留和 installed GUI 冒烟均按实际执行结果记录。Task 4 直接发现 undo/redo 控件值未同步和
 Discard 后装饰文件未恢复两项产品缺陷；旧包导入与托盘菜单在输入安全门失败后为 `NOT RUN`。
-Designer 关闭后正式 HUD 隔离检查通过。源码自动化不能替代这些 installed 观察。详见
+Designer 关闭后正式 HUD 隔离检查为 `PARTIAL`：关闭前参考线已为 Off、单项预演已为“全部”，
+只证明未激活状态未泄露，未直接验证关闭会清除激活中的参考线/单项预演。源码自动化不能替代这些 installed 观察。详见
 [`docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md`](docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md)。
 
 上一公开版 v1.2.3 的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已

@@ -633,9 +633,9 @@ draft backup was restored before continuing.
 | PASS | Apply-to-HUD | Exact result dialog: name `雷光伙伴`, version `1.0.0`, skin ID `75c7b76e-7b3a-4e51-83db-c404555a7a7e`, installed and applied to running HUD. Exact formal App remained responsive with selected key `custom:75c7b76e-...` and its sole 132×132 window captured |
 | NOT RUN | Untouched v1.2.3 package import | `柔光玫瑰.cqskin` remained exact SHA `cbcf4caff3238e9f4ee4ce247fb6b8b39652d6d2d7f444912853788a6684279f`, but filename input did not round-trip exactly in the native picker. Per safety rule that input path stopped and the exact picker was cancelled; effective installed `0/0` was not claimed |
 | NOT RUN | Formal HUD tray menu actions | Overflow panel exposed one product `NotifyItemIcon`, but center-point UIA hit-testing did not resolve to that exact icon. The safety gate stopped before input; no right-click/menu action was sent |
-| PASS | Close Designer, inspect formal HUD isolation | Immediately before close, guides were Off and audition `全部`; exact Designer exited, exact formal App remained responding, Designer process count became `0`, and the sole 132×132 formal window was captured without guide/audition overlays |
+| PARTIAL | Close Designer, inspect formal HUD isolation | Immediately before close, guides were Off and audition `全部`; exact Designer exited, exact formal App remained responding, Designer process count became `0`, and the sole 132×132 formal window was captured without overlays. This proves the inactive/default state did not leak, but active guides/audition were not enabled before close, so active-state cleanup was not exercised |
 
-Installed Task 4 total: `6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`.
+Installed Task 4 total: `5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`.
 
 ### Final state restoration and decision
 

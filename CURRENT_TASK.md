@@ -35,9 +35,11 @@ However, after removing the decoration and choosing Discard, the physical
 `assets\decoration.png` remained deleted while saved `draft.json` still
 referenced it, producing `document.asset-missing` on reopen.
 
-Installed Task 4 rows total `6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`.
-Six nonzero animation auditions, Apply-to-HUD identity/result/actual formal-HUD
-selection, and post-Designer-close isolation passed. Old-package import is
+Installed Task 4 rows total `5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`.
+Six nonzero animation auditions and Apply-to-HUD identity/result/actual
+formal-HUD selection passed. Post-Designer-close isolation is `PARTIAL` because
+guides were Off and audition was All before close; active-state cleanup was not
+exercised. Old-package import is
 `NOT RUN` because the native filename input did not round-trip exactly; the
 picker was safely cancelled. Tray-menu operation is `NOT RUN` because the
 exact tray-icon center hit-test failed before input; no right-click was sent.

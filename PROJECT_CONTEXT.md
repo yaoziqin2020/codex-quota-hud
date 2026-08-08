@@ -42,8 +42,10 @@ shortcuts share this defect. A separate destructive defect was observed after
 image removal: choosing Discard closed the dirty draft but did not restore the
 deleted decoration file, so the saved JSON referenced a missing asset on
 reopen. The Task 4 installed aggregate is
-`6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`. Nonzero animation auditions,
-Apply-to-HUD, and post-Designer-close formal-HUD isolation passed. Old-package
+`5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`. Nonzero animation auditions and
+Apply-to-HUD passed. Post-Designer-close formal-HUD isolation is `PARTIAL`:
+guides were already Off and audition already All before close, so active-state
+cleanup was not exercised. Old-package
 import and tray-menu operation are `NOT RUN` because their exact input gates
 failed before a safe action; no guess was made.
 
