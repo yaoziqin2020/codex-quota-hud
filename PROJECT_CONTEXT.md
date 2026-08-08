@@ -27,17 +27,24 @@ installed skin as live-switched.
 Task 8 source evidence is Core `75/75`, Skins `375/375`, App/UI `625/625`, and
 Designer `424/424`, totaling `1499/1499`, with zero failed/skipped; Release
 build and diff checks passed. The v1.3.0 package identity and nine-scenario
-installer matrix pass. Real Setup exited `0`; installed App/Designer match
-publish at `1.3.0.0 + aecaea1`, startup/uninstall/Start-menu are correct, and
-all state/exchange data stayed equal except a normal refresh timestamp advance.
+installer matrix pass. The verified real-upgrade scope is Setup exit `0`,
+installed App/Designer matching publish at `1.3.0.0 + aecaea1`, correct
+startup/uninstall/Start-menu state, preserved state/exchange data except a
+normal refresh timestamp advance, and successful App/Designer launch.
 Bounded installed Designer GUI smoke is `6 PASS / 3 PARTIAL / 1 NOT RUN`.
 Text offset, line gap, guides/click-through, refresh-state restoration, display
 roles, and export-picker rows passed directly. Undo/redo/save/reopen, same-
 context legacy visual equivalence, and visually distinct animation channels
 remain partial; Apply was stopped before input by the exact identity gate and
 is not run. Temporary GUI-smoke state was removed, all pre-existing state was
-reverified, and the installed Designer remains open. User practical acceptance
-is still `NOT RUN`; the latest public accepted release remains `v1.2.3`.
+reverified, and the installed Designer remains open. Three separate installed
+gates are `NOT RUN`: formal-HUD tray-menu operation, old-package import through
+the installed product, and direct confirmation that closing Designer leaves no
+composition guides or audition-isolated animation in the formal HUD. Task 8
+source automated compatibility/isolation coverage is not evidence for those
+installed-smoke gates. User practical acceptance is still `NOT RUN`; overall
+Task 9 remains `PARTIAL`, and the latest public accepted release remains
+`v1.2.3`. Remote release Step 7 remains prohibited.
 
 Distribution boundaries remain fixed: ordinary Setup defaults startup plus
 the normal desktop shortcut, both deselectable and without `--preview`;

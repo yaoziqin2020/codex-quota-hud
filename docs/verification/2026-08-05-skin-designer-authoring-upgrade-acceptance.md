@@ -546,10 +546,25 @@ evidence.
 | PASS | 2026-08-08 18:02:51–18:04:01 +09:00 | Open export picker | Native picker starts in `C:\Users\yaozi\Documents\Codex Quota HUD Skins` with a leaf `.cqskin` name | The process-owned native picker opened at breadcrumb `文档 > Codex Quota HUD Skins`; filename was leaf-only `未命名皮肤.cqskin` with the CQSKIN filter. Escape cancelled without saving; the app-owned `操作已取消` result was dismissed, and exchange files remained unchanged |
 | NOT RUN | 2026-08-08 18:07:57–18:08:41 +09:00 | Apply copied/temporary skin to HUD | Result shows exact display name/version/skin ID and truthful activation disposition | Both the action attempt and the one explicitly authorized read-only retry stopped before input because the harness observed the expected path/responding process but transient `MainWindowHandle=0` and empty title, failing the exact identity gate. Apply was never invoked, the HUD was never contacted, selected skin stayed `custom:75c7b76e-7b3a-4e51-83db-c404555a7a7e`, and no temporary installed skin was created |
 
+### Additional plan-required installed gates
+
+These gates are independent of the ten-row Designer GUI aggregate above.
+Task 8 source automated compatibility/isolation tests and a responding
+installed process do not substitute for direct installed smoke evidence.
+
+| Status | Date/time (Asia/Tokyo) | Installed gate | Expected | Observed / evidence |
+|---|---|---|---|---|
+| NOT RUN | — | Installed formal-HUD tray menu | Open and operate the installed tray menu after upgrade | The formal HUD process launched and remained responding, but its tray menu was not opened or operated |
+| NOT RUN | — | Installed old-package import | Import a legacy package through the installed product and observe the compatibility result | Source compatibility suites/probes passed, but no legacy package was imported through the installed HUD or Designer; source automation is not installed smoke |
+| NOT RUN | — | Close Designer, then inspect formal HUD for preview-tool leakage | After the installed Designer closes, the formal HUD shows neither composition guides nor audition-isolated animation | The Designer was stopped and reopened during state restoration, but the formal HUD was not directly inspected for guide/audition leakage after that close; process continuity and source isolation tests do not prove the visual/runtime result |
+
 Installed-GUI total: `6 PASS / 3 PARTIAL / 1 NOT RUN`. Overall Task 9 is
 `PARTIAL — installed candidate handed off, user acceptance pending`.
 Packaging, isolated installer testing, the real upgrade, and bounded installed
 GUI evidence are recorded honestly. The row 3 installed-UI contract gap, row 4
 missing same-context legacy visual, row 6 unsuitable animation fixture, row 10
-identity-gate block, and user practical acceptance remain open. No Step 7
-remote release action is authorized.
+identity-gate block, all three additional installed gates above, and user
+practical acceptance remain open. The real-upgrade PASS scope is limited to
+Setup exit/identity, data preservation, startup/shortcut/uninstall state, and
+binary launch; it does not include the unrun tray/import/isolation checks.
+Remote release Step 7 remains prohibited.

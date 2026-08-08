@@ -21,17 +21,25 @@ and a numeric tray icon without scraping web pages or storing credentials.
 
 ## v1.3.0 candidate installation / 候选安装
 
-The local candidate installer is `CodexQuotaHud-Setup-v1.3.0.exe`. Packaging,
-the nine-scenario isolated installer matrix, and the verified local upgrade
-have passed. Bounded installed Designer GUI smoke is
+The local candidate installer is `CodexQuotaHud-Setup-v1.3.0.exe`. Packaging
+and the nine-scenario isolated installer matrix passed. For the real upgrade,
+Setup exit, installed identity, data preservation, startup/shortcut/uninstall
+state, and binary launch passed; installed tray-menu operation, old-package
+import, and post-Designer-close HUD guide/audition isolation are `NOT RUN`.
+Source compatibility/isolation automation is not installed smoke. Bounded
+installed Designer GUI smoke is
 `6 PASS / 3 PARTIAL / 1 NOT RUN`; user practical acceptance remains open.
+Overall Task 9 remains `PARTIAL`; remote release Step 7 remains prohibited.
 Until explicit acceptance and publication, the
 [latest public release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
 remains `v1.2.3`.
 
-本地候选安装文件为 `CodexQuotaHud-Setup-v1.3.0.exe`，目前尚未公开。封包、九场景隔离安装器
-矩阵和已验证的本机升级已经通过；十行已安装设计器 GUI 检查为
+本地候选安装文件为 `CodexQuotaHud-Setup-v1.3.0.exe`，目前尚未公开。封包和九场景隔离安装器
+矩阵已通过；本机升级仅确认 Setup 退出、安装身份、数据保留、启动项/快捷方式/卸载信息和
+二进制启动。installed 托盘菜单操作、旧包导入、Designer 关闭后正式 HUD 不泄露参考线/
+单项预演均为 `NOT RUN`；源码兼容/隔离自动化不能替代 installed smoke。十行已安装设计器 GUI 检查为
 `6 PASS / 3 PARTIAL / 1 NOT RUN`，用户实操验收仍未完成。
+Task 9 整体仍为 `PARTIAL`，远程发布 Step 7 仍被禁止。
 在用户明确接受并公开发布前，[最新公开版本](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
 仍为 `v1.2.3`。
 
@@ -391,7 +399,8 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 规范写出、共享文字/参考线几何、预览工具不持久化、Dual 语义、原生选择器目录和
 结果反馈均有自动化覆盖。生产封包、九场景安装器矩阵、本机升级、已安装身份/数据
 保留、十行已安装 Designer GUI 冒烟和用户实操验收在 Task 9 按实际执行结果记录；
-在未执行时一律为 `NOT RUN`。详见
+在未执行时一律为 `NOT RUN`。尤其是 installed 托盘菜单、旧包导入和 Designer 关闭后
+正式 HUD 隔离检查仍未执行，不能由源码自动化覆盖替代。详见
 [`docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md`](docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md)。
 
 上一公开版 v1.2.3 的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已

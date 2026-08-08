@@ -17,17 +17,25 @@ as `0/0`; new output declares minimum HUD `1.3.0` while schema remains `1`.
 
 Production packaging and identity inspection pass, including exact hashes,
 normal-only ZIP, App+Designer publish, `1.3.0` versions, and `NotSigned` status.
-All nine isolated installer scenarios pass. The real Setup upgrade exited `0`;
-installed App/Designer match publish, startup/uninstall/Start-menu are correct,
-and user data is unchanged except the expected refresh timestamp. Formal HUD
-and installed Designer are running. Bounded installed-GUI smoke is
+All nine isolated installer scenarios pass. The real Setup upgrade's verified
+scope is limited to exit `0`, matching installed App/Designer identity,
+startup/uninstall/Start-menu state, data preservation except the expected
+refresh timestamp, and successful binary launch. Formal HUD and installed
+Designer are running. Bounded installed-GUI smoke is
 `6 PASS / 3 PARTIAL / 1 NOT RUN`; user practical acceptance remains `NOT RUN`.
 The partial rows are the unavailable installed Undo/Redo path plus unexecuted
 save/reopen subset, missing same-context v1.2.3 visual, and an unsuitable blank
 animation fixture. Apply is `NOT RUN` because its exact PID/HWND/title safety
 gate failed twice before input; no HUD or skin state changed. The latest public
-release remains `v1.2.3`; no push, `main` integration, tag, GitHub Release,
-upload, or public readback is authorized before explicit user acceptance.
+release remains `v1.2.3`. Three additional plan-required installed gates are
+also `NOT RUN`: operating the installed tray menu, importing an old package
+through the installed product, and directly confirming that the formal HUD
+shows neither composition guides nor audition-isolated animation after the
+Designer closes. Task 8 source compatibility/isolation automation does not
+substitute for these installed checks. Overall Task 9 remains `PARTIAL`; no
+push, `main` integration, tag, GitHub Release, upload, or public readback is
+authorized before explicit user acceptance. Remote release Step 7 remains
+prohibited.
 
 Public Setup behavior is unchanged: startup and the normal `Codex Quota HUD`
 desktop shortcut are selected by default and may be deselected; the normal

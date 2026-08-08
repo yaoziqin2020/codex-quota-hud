@@ -25,10 +25,11 @@
   failure scenarios passed. The one sandbox-denied diagnostic is excluded and
   its exact root was safely removed; final smoke-root count is zero.
 - Real Setup selected startup + Designer and omitted the normal desktop icon;
-  exit was `0`. Installed App/Designer match publish at `1.3.0.0 + aecaea1`;
-  uninstall/startup/Start-menu are correct. Thirty-four state files and two
-  exchange packages were preserved, with only the expected refresh timestamp
-  advance.
+  exit was `0`. The verified upgrade scope is installed App/Designer matching
+  publish at `1.3.0.0 + aecaea1`, correct uninstall/startup/Start-menu state,
+  preserved data, and successful binary launch. Thirty-four state files and
+  two exchange packages were preserved, with only the expected refresh
+  timestamp advance.
 - Setup left zero product desktop links before local customization. The
   maintainer preview shortcut was then separately restored from its exact
   backup with `--preview`; this is explicitly not Setup behavior.
@@ -43,6 +44,12 @@
   `34` state files with non-settings diffs `0`, stable settings/selected skin,
   and both exchange package names/hashes unchanged. No temporary installed skin
   exists; only the normal refresh timestamp advanced.
+- Three additional plan-required installed checks remain `NOT RUN`: operating
+  the installed tray menu, importing an old package through the installed
+  product, and directly inspecting the formal HUD for guide/audition leakage
+  after Designer closes. Task 8 source compatibility/isolation automation does
+  not substitute for installed smoke; overall Task 9 remains `PARTIAL`, and
+  remote release Step 7 remains prohibited.
 - Ordinary Setup contract remains unchanged: startup and normal desktop icon
   default selected and deselectable, no `--preview`; Designer optional and
   unchecked; ZIP normal-HUD-only; Setup removes preview entries. The
