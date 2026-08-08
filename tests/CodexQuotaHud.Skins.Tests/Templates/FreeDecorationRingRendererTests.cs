@@ -72,6 +72,25 @@ public sealed class FreeDecorationRingRendererTests
             }
         });
 
+    [Fact]
+    public void Constructor_AppliesSharedTextLayoutToBothTextMargins() =>
+        WpfTestThread.Run(() =>
+        {
+            var document = CreateDocument(
+                transformTheme: theme => theme with
+                {
+                    TextPlacement = SkinTextPlacement.LabelAboveNumber,
+                    TextOffsetY = -4,
+                    TextLineGap = 6
+                });
+
+            var renderer = Assert.IsType<FreeDecorationRingRenderer>(
+                new FreeDecorationRingTemplate().CreateRenderer(document));
+
+            Assert.Equal(new Thickness(0, 17, 0, 0), renderer.QuotaNumber.Margin);
+            Assert.Equal(new Thickness(0, -29, 0, 0), renderer.QuotaLabel.Margin);
+        });
+
     internal static SkinPackageDocument CreateDocument(
         IEnumerable<SkinAssetSlot>? slots = null,
         Func<SkinTheme, SkinTheme>? transformTheme = null)

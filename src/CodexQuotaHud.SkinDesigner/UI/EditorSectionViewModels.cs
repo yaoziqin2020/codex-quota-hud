@@ -99,6 +99,12 @@ public sealed class TextEditorViewModel(
     public EditorMutationResult SetTextPlacement(SkinTextPlacement value) =>
         Update(theme => theme with { TextPlacement = value });
 
+    public EditorMutationResult SetTextOffsetY(double value) =>
+        Update(theme => theme with { TextOffsetY = value });
+
+    public EditorMutationResult SetTextLineGap(double value) =>
+        Update(theme => theme with { TextLineGap = value });
+
     private EditorMutationResult Update(Func<SkinTheme, SkinTheme> edit) =>
         Owner.Apply(draft => draft with { Theme = edit(draft.Theme) });
 }

@@ -294,7 +294,13 @@ public sealed class MainWindowLayoutTests
                     SkinPackageLimits.MaximumTextSizeDip),
                 ["LabelTextSize"] = (
                     SkinPackageLimits.MinimumTextSizeDip,
-                    SkinPackageLimits.MaximumTextSizeDip)
+                    SkinPackageLimits.MaximumTextSizeDip),
+                ["TextOffsetY"] = (
+                    SkinPackageLimits.MinimumTextOffsetYDip,
+                    SkinPackageLimits.MaximumTextOffsetYDip),
+                ["TextLineGap"] = (
+                    SkinPackageLimits.MinimumTextLineGapDip,
+                    SkinPackageLimits.MaximumTextLineGapDip)
             };
 
             foreach (var pair in expected)
@@ -304,6 +310,73 @@ public sealed class MainWindowLayoutTests
             }
 
             Assert.Null(window.FindName("ThemeSelector"));
+            window.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
+    public void RealWindow_ExposesAccessibleSignedTextCompositionControls()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var window = CreateWindow(temporary, out _);
+            window.AttachPreviewOwnerForTesting();
+            Assert.IsType<Expander>(window.FindName("TextSection")).IsExpanded = true;
+            window.ApplyTemplate();
+            window.UpdateLayout();
+            var taggedSliders = Descendants<Slider>(window)
+                .Where(slider => slider.Tag is string)
+                .ToArray();
+            var tags = taggedSliders
+                .Select(slider => (string)slider.Tag)
+                .ToArray();
+            var offset = Assert.Single(
+                taggedSliders,
+                slider => Equals(slider.Tag, "TextOffsetY"));
+            var gap = Assert.Single(
+                taggedSliders,
+                slider => Equals(slider.Tag, "TextLineGap"));
+
+            Assert.Equal(tags.Length, tags.Distinct(StringComparer.Ordinal).Count());
+            Assert.Equal(-32, offset.Minimum);
+            Assert.Equal(32, offset.Maximum);
+            Assert.Equal(1, offset.TickFrequency);
+            Assert.True(offset.IsSnapToTickEnabled);
+            Assert.Equal("文字整体上下偏移", AutomationProperties.GetName(offset));
+            Assert.Equal(-16, gap.Minimum);
+            Assert.Equal(32, gap.Maximum);
+            Assert.Equal(1, gap.TickFrequency);
+            Assert.True(gap.IsSnapToTickEnabled);
+            Assert.Equal("数字和时间行距", AutomationProperties.GetName(gap));
+            Assert.Contains(
+                Descendants<TextBlock>(window),
+                text => text.Text == "文字整体上下");
+            Assert.Contains(
+                Descendants<TextBlock>(window),
+                text => text.Text == "数字/时间间距");
+            Assert.Equal("0 DIP", Assert.IsType<TextBlock>(
+                window.FindName("TextOffsetYValueText")).Text);
+            Assert.Equal("0 DIP", Assert.IsType<TextBlock>(
+                window.FindName("TextLineGapValueText")).Text);
+
+            offset.Value = 7;
+            gap.Value = -5;
+
+            Assert.Equal(7, window.Editor.Current.Theme.TextOffsetY);
+            Assert.Equal(-5, window.Editor.Current.Theme.TextLineGap);
+            Assert.Equal("+7 DIP", Assert.IsType<TextBlock>(
+                window.FindName("TextOffsetYValueText")).Text);
+            Assert.Equal("-5 DIP", Assert.IsType<TextBlock>(
+                window.FindName("TextLineGapValueText")).Text);
+
+            offset.Maximum = 40;
+            offset.Value = 33;
+
+            Assert.Equal(7, window.Editor.Current.Theme.TextOffsetY);
+            Assert.Equal(7, offset.Value);
+            Assert.NotNull(offset.ToolTip);
+            Assert.Same(Brushes.OrangeRed, offset.BorderBrush);
             window.DisposeWithoutShowingForTesting();
         });
     }
@@ -662,7 +735,7 @@ public sealed class MainWindowLayoutTests
                 Assert.False(string.IsNullOrWhiteSpace(
                     AutomationProperties.GetName(control))));
             var tabIndexes = controls.Select(KeyboardNavigation.GetTabIndex).ToArray();
-            Assert.Equal(Enumerable.Range(1, 62), tabIndexes);
+            Assert.Equal(Enumerable.Range(1, 64), tabIndexes);
             Assert.Equal(
                 "图片变换目标",
                 AutomationProperties.GetName(controls[15]));
@@ -671,10 +744,10 @@ public sealed class MainWindowLayoutTests
                 AutomationProperties.GetName(controls[23]));
             Assert.Equal(
                 "额度显示模式",
-                AutomationProperties.GetName(controls[46]));
+                AutomationProperties.GetName(controls[48]));
             Assert.Equal(
                 "保存草稿",
-                AutomationProperties.GetName(controls[59]));
+                AutomationProperties.GetName(controls[61]));
             var projectName = Assert.IsType<TextBox>(
                 window.FindName("ProjectNameTextBox"));
             var displayName = Assert.IsType<TextBox>(

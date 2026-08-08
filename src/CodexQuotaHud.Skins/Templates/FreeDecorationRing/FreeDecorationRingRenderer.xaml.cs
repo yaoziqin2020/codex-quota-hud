@@ -113,6 +113,7 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
 
     private void ApplyTheme(SkinTheme theme)
     {
+        var geometry = FreeDecorationRingGeometry.CalculateGuideGeometry(theme);
         BaseFill.Fill = CreateFrozenBrush(ParseColor(theme.BaseBackgroundColor));
         BaseFill.Opacity = theme.BaseBackgroundOpacity;
         BaseFill.Effect = new DropShadowEffect
@@ -139,15 +140,19 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
             Opacity = theme.GlowIntensity
         };
 
-        SetRingMetrics(PrimaryTrack, PrimaryProgress, theme.RingDiameter, theme);
-        AnimatedGlow.Width = theme.RingDiameter;
-        AnimatedGlow.Height = theme.RingDiameter;
+        SetRingMetrics(
+            PrimaryTrack,
+            PrimaryProgress,
+            geometry.PrimaryDiameter,
+            theme);
+        AnimatedGlow.Width = geometry.PrimaryDiameter;
+        AnimatedGlow.Height = geometry.PrimaryDiameter;
         AnimatedGlow.StrokeThickness = theme.RingThickness;
-        var secondaryDiameter = Math.Max(
-            2 * theme.RingThickness,
-            theme.RingDiameter -
-            (2 * (theme.RingThickness + theme.RingGap)));
-        SetRingMetrics(SecondaryTrack, SecondaryProgress, secondaryDiameter, theme);
+        SetRingMetrics(
+            SecondaryTrack,
+            SecondaryProgress,
+            geometry.SecondaryDiameter,
+            theme);
 
         QuotaNumber.FontSize = theme.NumberTextSize;
         QuotaLabel.FontSize = theme.LabelTextSize;
@@ -160,7 +165,8 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         };
         QuotaNumber.FontWeight = weight;
         QuotaLabel.FontWeight = weight;
-        ApplyTextPlacement(theme.TextPlacement);
+        QuotaNumber.Margin = new Thickness(0, geometry.Text.NumberY, 0, 0);
+        QuotaLabel.Margin = new Thickness(0, geometry.Text.LabelY, 0, 0);
     }
 
     private static void SetRingMetrics(
@@ -176,25 +182,6 @@ public partial class FreeDecorationRingRenderer : CustomSkinRenderer
         progress.Height = diameter;
         progress.StrokeThickness = theme.RingThickness;
         progress.StartAngle = theme.StartAngle;
-    }
-
-    private void ApplyTextPlacement(SkinTextPlacement placement)
-    {
-        switch (placement)
-        {
-            case SkinTextPlacement.LabelAboveNumber:
-                QuotaLabel.Margin = new Thickness(0, -22, 0, 0);
-                QuotaNumber.Margin = new Thickness(0, 18, 0, 0);
-                break;
-            case SkinTextPlacement.NumberAboveLabel:
-                QuotaNumber.Margin = new Thickness(0, -18, 0, 0);
-                QuotaLabel.Margin = new Thickness(0, 25, 0, 0);
-                break;
-            default:
-                QuotaNumber.Margin = new Thickness(0);
-                QuotaLabel.Margin = new Thickness(0, 26, 0, 0);
-                break;
-        }
     }
 
     private void SetQuotaVisibility(

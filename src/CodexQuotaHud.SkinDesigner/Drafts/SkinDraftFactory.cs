@@ -49,7 +49,9 @@ public static class SkinDraftFactory
                 RotationIntensity: 0,
                 BreathingIntensity: 0.55,
                 GlowIntensity: 0.65,
-                FloatingIntensity: 0));
+                FloatingIntensity: 0),
+            TextOffsetY: 0,
+            TextLineGap: 0);
 
         return new SkinDraftDocument(
             DraftSchemaVersion: 1,

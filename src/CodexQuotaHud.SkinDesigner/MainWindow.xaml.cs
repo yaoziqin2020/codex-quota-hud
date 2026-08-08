@@ -860,6 +860,8 @@ public partial class MainWindow : Window, IDesignerWindow
                 Editor.ColorsAndEffects.SetGlowIntensity(e.NewValue),
             "NumberTextSize" => Editor.Text.SetNumberTextSize(e.NewValue),
             "LabelTextSize" => Editor.Text.SetLabelTextSize(e.NewValue),
+            "TextOffsetY" => Editor.Text.SetTextOffsetY(e.NewValue),
+            "TextLineGap" => Editor.Text.SetTextLineGap(e.NewValue),
             "RotationIntensity" =>
                 Editor.Animation.SetRotationIntensity(e.NewValue),
             "BreathingIntensity" =>
@@ -1025,6 +1027,8 @@ public partial class MainWindow : Window, IDesignerWindow
                 "GlowIntensity" => theme.GlowIntensity,
                 "NumberTextSize" => theme.NumberTextSize,
                 "LabelTextSize" => theme.LabelTextSize,
+                "TextOffsetY" => theme.TextOffsetY,
+                "TextLineGap" => theme.TextLineGap,
                 "RotationIntensity" => theme.Animation.RotationIntensity,
                 "BreathingIntensity" => theme.Animation.BreathingIntensity,
                 "AnimationGlowIntensity" => theme.Animation.GlowIntensity,

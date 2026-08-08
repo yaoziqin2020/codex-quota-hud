@@ -36,6 +36,8 @@ public sealed class SkinDraftFactoryTests
         Assert.Equal(MinimumHudVersion, draft.MinimumHudVersion);
         Assert.Null(draft.OriginSkinId);
         Assert.Empty(draft.Assets);
+        Assert.Equal(0d, draft.Theme.TextOffsetY);
+        Assert.Equal(0d, draft.Theme.TextLineGap);
         Assert.Equal(2d, draft.Theme.Animation.RefreshSpeedMultiplier);
         Assert.Equal(1.5d, draft.Theme.Animation.RefreshHoldSeconds);
         Assert.Equal(NowUtc, draft.CreatedAtUtc);
@@ -82,7 +84,9 @@ public sealed class SkinDraftFactoryTests
                 RotationIntensity: 0,
                 BreathingIntensity: 0.55,
                 GlowIntensity: 0.65,
-                FloatingIntensity: 0));
+                FloatingIntensity: 0),
+            TextOffsetY: 0,
+            TextLineGap: 0);
 
         Assert.Equal(expected, draft.Theme);
     }
