@@ -249,6 +249,18 @@ public static class SkinDraftValidator
                     "The original file name must be a bounded leaf PNG or JPEG name.");
             }
 
+            if (asset.StorageRelativePath is not null &&
+                !DraftAssetStorage.IsValidContentRelativePath(
+                    asset.StorageRelativePath,
+                    asset.RelativePath))
+            {
+                Add(
+                    errors,
+                    "draft.asset.storage-path.invalid",
+                    $"{location}.storageRelativePath",
+                    "The draft asset storage path is not a matching content-addressed locator.");
+            }
+
             index++;
         }
     }

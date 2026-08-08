@@ -5,7 +5,8 @@ namespace CodexQuotaHud.SkinDesigner.Drafts;
 public sealed record DraftAssetReference(
     SkinAssetSlot Slot,
     string RelativePath,
-    string OriginalFileName);
+    string OriginalFileName,
+    string? StorageRelativePath = null);
 
 public sealed record SkinDraftDocument(
     int DraftSchemaVersion,

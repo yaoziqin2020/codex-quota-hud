@@ -108,6 +108,12 @@ internal interface IDesignerDraftAssetsLease : IDisposable
         string operationLeafName,
         string canonicalLeafName);
 
+    void MoveOperationToImmutable(
+        string operationLeafName,
+        string contentAddressedLeafName) =>
+        throw new NotSupportedException(
+            "This draft assets lease does not support immutable promotion.");
+
     void DeleteCanonical(string canonicalLeafName);
 
     void DeleteOperation(string operationLeafName);
@@ -660,6 +666,24 @@ internal sealed class WindowsDraftAssetsLease : IDesignerDraftAssetsLease
             operationTarget: false);
     }
 
+    public void MoveOperationToImmutable(
+        string operationLeafName,
+        string contentAddressedLeafName)
+    {
+        DraftStorageName.ValidateAssetOperationLeaf(operationLeafName);
+        DraftStorageName.ValidateImmutableAssetLeaf(contentAddressedLeafName);
+        if (!_operations.TryGetValue(operationLeafName, out var file))
+        {
+            throw new FileNotFoundException(
+                "The draft asset operation file does not exist.",
+                operationLeafName);
+        }
+
+        file.RenameDesignerImmutableAssetTo(
+            _assets,
+            contentAddressedLeafName);
+    }
+
     public void DeleteCanonical(string canonicalLeafName)
     {
         DraftStorageName.ValidateAssetLeaf(canonicalLeafName);
@@ -1091,7 +1115,10 @@ internal sealed class WindowsDraftFileLease : IDisposable
         string destinationLeafName)
     {
         DraftStorageName.ValidateTargetLeaf(destinationLeafName);
-        RenameToCore(destinationParent, destinationLeafName);
+        RenameToCore(
+            destinationParent,
+            destinationLeafName,
+            replaceIfExists: true);
     }
 
     internal void RenameDesignerAssetTo(
@@ -1108,12 +1135,27 @@ internal sealed class WindowsDraftFileLease : IDisposable
             DraftStorageName.ValidateAssetLeaf(destinationLeafName);
         }
 
-        RenameToCore(destinationParent, destinationLeafName);
+        RenameToCore(
+            destinationParent,
+            destinationLeafName,
+            replaceIfExists: true);
+    }
+
+    internal void RenameDesignerImmutableAssetTo(
+        WindowsDraftDirectoryLease destinationParent,
+        string destinationLeafName)
+    {
+        DraftStorageName.ValidateImmutableAssetLeaf(destinationLeafName);
+        RenameToCore(
+            destinationParent,
+            destinationLeafName,
+            replaceIfExists: false);
     }
 
     private void RenameToCore(
         WindowsDraftDirectoryLease destinationParent,
-        string destinationLeafName)
+        string destinationLeafName,
+        bool replaceIfExists)
     {
         var destinationPath = Path.Combine(
             destinationParent.ExpectedPath,
@@ -1124,7 +1166,8 @@ internal sealed class WindowsDraftFileLease : IDisposable
             DraftNative.RenameFile(
                 _stream.SafeFileHandle,
                 parentHandle,
-                destinationLeafName);
+                destinationLeafName,
+                replaceIfExists);
             return true;
         });
         _expectedPath = destinationPath;
@@ -1302,6 +1345,16 @@ internal static class DraftStorageName
 
         throw new DraftUnsafePathException(
             "The draft asset operation leaf name is invalid.");
+    }
+
+    internal static void ValidateImmutableAssetLeaf(string leafName)
+    {
+        ValidateSegment(leafName);
+        if (!DraftAssetStorage.IsValidContentLeaf(leafName))
+        {
+            throw new DraftUnsafePathException(
+                "The immutable draft asset leaf name is invalid.");
+        }
     }
 
     private static void ValidateSegment(string name)
@@ -1491,7 +1544,8 @@ internal static class DraftNative
     internal static void RenameFile(
         SafeFileHandle fileHandle,
         IntPtr destinationParentHandle,
-        string destinationLeafName)
+        string destinationLeafName,
+        bool replaceIfExists)
     {
         var nameBytes = Encoding.Unicode.GetBytes(destinationLeafName);
         var rootOffset = IntPtr.Size == 8 ? 8 : 4;
@@ -1507,7 +1561,7 @@ internal static class DraftNative
                 Marshal.WriteByte(buffer, index, 0);
             }
 
-            Marshal.WriteByte(buffer, 0, 1);
+            Marshal.WriteByte(buffer, 0, replaceIfExists ? (byte)1 : (byte)0);
             Marshal.WriteIntPtr(buffer, rootOffset, destinationParentHandle);
             Marshal.WriteInt32(buffer, lengthOffset, nameBytes.Length);
             Marshal.Copy(nameBytes, 0, buffer + nameOffset, nameBytes.Length);

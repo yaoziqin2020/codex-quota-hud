@@ -10,6 +10,9 @@ namespace CodexQuotaHud.SkinDesigner.Tests.Drafts;
 
 public sealed class DraftJsonCodecTests
 {
+    private const string AddressedCenterPath =
+        "assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png";
+
     private static readonly string[] DraftPropertyOrder =
     [
         "draftSchemaVersion",
@@ -57,6 +60,136 @@ public sealed class DraftJsonCodecTests
                 .EnumerateObject()
                 .Select(property => property.Name));
     }
+
+    [Fact]
+    public void ParseWrite_LegacyLiteralPreservesSchemaOneBytesAndNullStoragePath()
+    {
+        var expected = CanonicalUtf8(LegacyLiteralDraftJson);
+
+        var parsed = DraftJsonCodec.Parse(expected);
+
+        Assert.True(parsed.IsValid, string.Join("; ", parsed.Errors));
+        var draft = Assert.IsType<SkinDraftDocument>(parsed.Value);
+        Assert.Equal(1, draft.DraftSchemaVersion);
+        Assert.Null(draft.Assets[SkinAssetSlot.Center].StorageRelativePath);
+        Assert.Equal(expected, DraftJsonCodec.Write(draft));
+    }
+
+    [Fact]
+    public void ParseWrite_AddressedLiteralPreservesCanonicalAssetPropertyOrder()
+    {
+        var expected = CanonicalUtf8(AddressedLiteralDraftJson);
+
+        var parsed = DraftJsonCodec.Parse(expected);
+
+        Assert.True(parsed.IsValid, string.Join("; ", parsed.Errors));
+        var draft = Assert.IsType<SkinDraftDocument>(parsed.Value);
+        Assert.Equal(
+            AddressedCenterPath,
+            draft.Assets[SkinAssetSlot.Center].StorageRelativePath);
+        Assert.Equal(expected, DraftJsonCodec.Write(draft));
+        using var document = JsonDocument.Parse(expected);
+        Assert.Equal(
+            ["slot", "relativePath", "storageRelativePath", "originalFileName"],
+            document.RootElement.GetProperty("assets")[0]
+                .EnumerateObject()
+                .Select(property => property.Name));
+    }
+
+    [Fact]
+    public void Parse_RejectsDuplicateStorageRelativePath()
+    {
+        var canonical = AddressedLiteralDraftJson.Replace("\r\n", "\n");
+        var duplicate = canonical.Replace(
+            $"      \"storageRelativePath\": \"{AddressedCenterPath}\",",
+            $"      \"storageRelativePath\": \"{AddressedCenterPath}\",\n" +
+            $"      \"storageRelativePath\": \"{AddressedCenterPath}\",",
+            StringComparison.Ordinal);
+
+        Assert.NotEqual(canonical, duplicate);
+        AssertError(
+            DraftJsonCodec.Parse(Encoding.UTF8.GetBytes(duplicate)),
+            "json.duplicate-property",
+            "$.assets[0].storageRelativePath");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(17)]
+    public void Parse_RejectsNullOrNonStringStorageRelativePath(object? value)
+    {
+        var bytes = Mutate(root =>
+            root["assets"]!.AsArray()[0]!["storageRelativePath"] =
+                JsonValue.Create(value));
+
+        AssertError(
+            DraftJsonCodec.Parse(bytes),
+            "json.invalid-value",
+            "$.assets[0].storageRelativePath");
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidStorageRelativePaths))]
+    public void Parse_RejectsInvalidStorageRelativePathMatrix(
+        string relativePath,
+        string storageRelativePath)
+    {
+        var bytes = Mutate(root =>
+        {
+            root["assets"]!.AsArray()[0]!["relativePath"] = relativePath;
+            root["assets"]!.AsArray()[0]!["storageRelativePath"] =
+                storageRelativePath;
+        });
+
+        AssertError(
+            DraftJsonCodec.Parse(bytes),
+            "draft.asset.storage-path.invalid",
+            "$.assets[0].storageRelativePath");
+    }
+
+    public static TheoryData<string, string> InvalidStorageRelativePaths => new()
+    {
+        {
+            "assets/background.png",
+            "assets/sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.png"
+        },
+        {
+            "assets/background.png",
+            "assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+        },
+        {
+            "assets/background.png",
+            "assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+        },
+        {
+            "assets/background.png",
+            "assets/hash-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+        },
+        {
+            "assets/background.png",
+            "assets/../sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+        },
+        {
+            "assets/background.png",
+            "assets\\sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+        },
+        {
+            "assets/background.png",
+            "C:/assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+        },
+        {
+            "assets/background.png",
+            "assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpeg"
+        },
+        {
+            "assets/background.png",
+            "assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.gif"
+        },
+        {
+            "assets/background.png",
+            "assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+        }
+    };
 
     [Theory]
     [InlineData("assets/background.png", "assets/center.png")]
@@ -514,6 +647,9 @@ public sealed class DraftJsonCodecTests
         IDictionary<SkinAssetSlot, DraftAssetReference> assets) =>
         new ReadOnlyDictionary<SkinAssetSlot, DraftAssetReference>(assets);
 
+    private static byte[] CanonicalUtf8(string json) =>
+        Encoding.UTF8.GetBytes(json.Replace("\r\n", "\n"));
+
     private static void AssertError(
         SkinValidationResult<SkinDraftDocument> result,
         string code,
@@ -524,4 +660,165 @@ public sealed class DraftJsonCodecTests
             result.Errors,
             error => error.Code == code && error.Location == location);
     }
+
+    private const string LegacyLiteralDraftJson = """
+        {
+          "draftSchemaVersion": 1,
+          "draftId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "skinId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "revision": 7,
+          "projectName": "Ocean project",
+          "displayName": "Ocean",
+          "author": "Alice",
+          "packageVersion": "1.2.3",
+          "description": "Ocean ring",
+          "minimumHudVersion": "1.1.1",
+          "originSkinId": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "theme": {
+            "schemaVersion": 1,
+            "templateId": "free-decoration-ring",
+            "background": {
+              "offsetX": 0,
+              "offsetY": 0,
+              "scale": 1,
+              "rotation": 0,
+              "opacity": 1,
+              "cropFocusX": 0.5,
+              "cropFocusY": 0.5
+            },
+            "center": {
+              "offsetX": 0,
+              "offsetY": 0,
+              "scale": 1,
+              "rotation": 0,
+              "opacity": 1,
+              "cropFocusX": 0.5,
+              "cropFocusY": 0.5
+            },
+            "decoration": {
+              "offsetX": 0,
+              "offsetY": 0,
+              "scale": 1,
+              "rotation": 0,
+              "opacity": 1,
+              "cropFocusX": 0.5,
+              "cropFocusY": 0.5
+            },
+            "primaryRingColor": "#FF53DCF8",
+            "secondaryRingColor": "#FF9A68FF",
+            "baseBackgroundColor": "#FF0A1622",
+            "baseBackgroundOpacity": 0.9,
+            "ringDiameter": 96,
+            "ringThickness": 8,
+            "ringGap": 6,
+            "startAngle": 270,
+            "glowColor": "#FF24CFF2",
+            "glowIntensity": 0.5,
+            "numberTextSize": 28,
+            "labelTextSize": 12,
+            "textWeight": "semiBold",
+            "textPlacement": "numberAboveLabel",
+            "textOffsetY": 0,
+            "textLineGap": 0,
+            "animation": {
+              "rotationIntensity": 0,
+              "breathingIntensity": 0.55,
+              "glowIntensity": 0.65,
+              "floatingIntensity": 0,
+              "refreshSpeedMultiplier": 2,
+              "refreshHoldSeconds": 1.5
+            }
+          },
+          "assets": [
+            {
+              "slot": "center",
+              "relativePath": "assets/center.png",
+              "originalFileName": "center.png"
+            }
+          ],
+          "createdAtUtc": "2026-08-02T00:00:00.0000000Z",
+          "updatedAtUtc": "2026-08-02T00:01:00.0000000Z"
+        }
+        """;
+
+    private const string AddressedLiteralDraftJson = """
+        {
+          "draftSchemaVersion": 1,
+          "draftId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "skinId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "revision": 7,
+          "projectName": "Ocean project",
+          "displayName": "Ocean",
+          "author": "Alice",
+          "packageVersion": "1.2.3",
+          "description": "Ocean ring",
+          "minimumHudVersion": "1.1.1",
+          "originSkinId": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "theme": {
+            "schemaVersion": 1,
+            "templateId": "free-decoration-ring",
+            "background": {
+              "offsetX": 0,
+              "offsetY": 0,
+              "scale": 1,
+              "rotation": 0,
+              "opacity": 1,
+              "cropFocusX": 0.5,
+              "cropFocusY": 0.5
+            },
+            "center": {
+              "offsetX": 0,
+              "offsetY": 0,
+              "scale": 1,
+              "rotation": 0,
+              "opacity": 1,
+              "cropFocusX": 0.5,
+              "cropFocusY": 0.5
+            },
+            "decoration": {
+              "offsetX": 0,
+              "offsetY": 0,
+              "scale": 1,
+              "rotation": 0,
+              "opacity": 1,
+              "cropFocusX": 0.5,
+              "cropFocusY": 0.5
+            },
+            "primaryRingColor": "#FF53DCF8",
+            "secondaryRingColor": "#FF9A68FF",
+            "baseBackgroundColor": "#FF0A1622",
+            "baseBackgroundOpacity": 0.9,
+            "ringDiameter": 96,
+            "ringThickness": 8,
+            "ringGap": 6,
+            "startAngle": 270,
+            "glowColor": "#FF24CFF2",
+            "glowIntensity": 0.5,
+            "numberTextSize": 28,
+            "labelTextSize": 12,
+            "textWeight": "semiBold",
+            "textPlacement": "numberAboveLabel",
+            "textOffsetY": 0,
+            "textLineGap": 0,
+            "animation": {
+              "rotationIntensity": 0,
+              "breathingIntensity": 0.55,
+              "glowIntensity": 0.65,
+              "floatingIntensity": 0,
+              "refreshSpeedMultiplier": 2,
+              "refreshHoldSeconds": 1.5
+            }
+          },
+          "assets": [
+            {
+              "slot": "center",
+              "relativePath": "assets/center.png",
+              "storageRelativePath": "assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png",
+              "originalFileName": "center.png"
+            }
+          ],
+          "createdAtUtc": "2026-08-02T00:00:00.0000000Z",
+          "updatedAtUtc": "2026-08-02T00:01:00.0000000Z"
+        }
+        """;
 }

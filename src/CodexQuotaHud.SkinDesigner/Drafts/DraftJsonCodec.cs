@@ -33,11 +33,16 @@ public static class DraftJsonCodec
         "updatedAtUtc"
     ];
 
-    private static readonly string[] AssetProperties =
+    private static readonly string[] AssetRequiredProperties =
     [
         "slot",
         "relativePath",
         "originalFileName"
+    ];
+
+    private static readonly string[] AssetOptionalProperties =
+    [
+        "storageRelativePath"
     ];
 
     private static readonly JsonDocumentOptions DocumentOptions = new()
@@ -74,8 +79,9 @@ public static class DraftJsonCodec
                 ValidateObject(
                     asset,
                     $"$.assets[{assetIndex}]",
-                    AssetProperties,
-                    errors);
+                    AssetRequiredProperties,
+                    errors,
+                    AssetOptionalProperties);
                 assetIndex++;
             }
 
@@ -223,6 +229,13 @@ public static class DraftJsonCodec
                 writer.WriteStartObject();
                 writer.WriteString("slot", WriteAssetSlot(asset.Slot));
                 writer.WriteString("relativePath", asset.RelativePath);
+                if (asset.StorageRelativePath is not null)
+                {
+                    writer.WriteString(
+                        "storageRelativePath",
+                        asset.StorageRelativePath);
+                }
+
                 writer.WriteString("originalFileName", asset.OriginalFileName);
                 writer.WriteEndObject();
             }
@@ -280,6 +293,14 @@ public static class DraftJsonCodec
                 assetElement.GetProperty("relativePath"),
                 $"{location}.relativePath",
                 errors);
+            var storageRelativePath = assetElement.TryGetProperty(
+                "storageRelativePath",
+                out var storageRelativePathElement)
+                ? ReadString(
+                    storageRelativePathElement,
+                    $"{location}.storageRelativePath",
+                    errors)
+                : null;
             var originalFileName = ReadString(
                 assetElement.GetProperty("originalFileName"),
                 $"{location}.originalFileName",
@@ -291,7 +312,8 @@ public static class DraftJsonCodec
                 var reference = new DraftAssetReference(
                     definedSlot,
                     relativePath,
-                    originalFileName);
+                    originalFileName,
+                    storageRelativePath);
                 if (!assets.TryAdd(definedSlot, reference))
                 {
                     errors.Add(new SkinValidationError(
@@ -311,7 +333,8 @@ public static class DraftJsonCodec
         JsonElement element,
         string path,
         IReadOnlyList<string> expectedProperties,
-        ICollection<SkinValidationError> errors)
+        ICollection<SkinValidationError> errors,
+        IReadOnlyList<string>? optionalProperties = null)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
@@ -321,6 +344,11 @@ public static class DraftJsonCodec
 
         var startingErrorCount = errors.Count;
         var expected = new HashSet<string>(expectedProperties, StringComparer.Ordinal);
+        if (optionalProperties is not null)
+        {
+            expected.UnionWith(optionalProperties);
+        }
+
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in element.EnumerateObject())
         {
