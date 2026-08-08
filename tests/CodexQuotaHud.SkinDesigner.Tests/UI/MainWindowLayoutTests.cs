@@ -794,19 +794,25 @@ public sealed class MainWindowLayoutTests
                 Assert.False(string.IsNullOrWhiteSpace(
                     AutomationProperties.GetName(control))));
             var tabIndexes = controls.Select(KeyboardNavigation.GetTabIndex).ToArray();
-            Assert.Equal(Enumerable.Range(1, 66), tabIndexes);
+            Assert.Equal(Enumerable.Range(1, 68), tabIndexes);
+            Assert.Equal(
+                "撤销草稿编辑 (Ctrl+Z)",
+                AutomationProperties.GetName(controls[4]));
+            Assert.Equal(
+                "重做草稿编辑 (Ctrl+Y)",
+                AutomationProperties.GetName(controls[5]));
             Assert.Equal(
                 "图片变换目标",
-                AutomationProperties.GetName(controls[15]));
+                AutomationProperties.GetName(controls[17]));
             Assert.Equal(
                 "额度环直径",
-                AutomationProperties.GetName(controls[23]));
+                AutomationProperties.GetName(controls[25]));
             Assert.Equal(
                 "额度显示模式",
-                AutomationProperties.GetName(controls[48]));
+                AutomationProperties.GetName(controls[50]));
             Assert.Equal(
                 "保存草稿",
-                AutomationProperties.GetName(controls[63]));
+                AutomationProperties.GetName(controls[65]));
             var projectName = Assert.IsType<TextBox>(
                 window.FindName("ProjectNameTextBox"));
             var displayName = Assert.IsType<TextBox>(
@@ -837,6 +843,46 @@ public sealed class MainWindowLayoutTests
             Assert.True(projectName.ActualWidth <=
                 Assert.IsType<ScrollViewer>(
                     window.FindName("EditorScrollViewer")).ActualWidth);
+            window.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
+    public void RealWindow_ExposesUndoRedoCommandsKeyboardGesturesAndVisibleEditorToolbar()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var window = CreateWindow(temporary, out _);
+            window.AttachPreviewOwnerForTesting();
+            window.Width = 600;
+            window.Height = 720;
+            window.UpdateLayout();
+
+            var undo = Assert.IsType<Button>(window.FindName("UndoDraftButton"));
+            var redo = Assert.IsType<Button>(window.FindName("RedoDraftButton"));
+            Assert.Equal("撤销", undo.Content);
+            Assert.Equal("重做", redo.Content);
+            Assert.Same(window.Editor.UndoCommand, undo.Command);
+            Assert.Same(window.Editor.RedoCommand, redo.Command);
+            Assert.Equal("撤销草稿编辑 (Ctrl+Z)", AutomationProperties.GetName(undo));
+            Assert.Equal("重做草稿编辑 (Ctrl+Y)", AutomationProperties.GetName(redo));
+
+            var bindings = window.InputBindings.OfType<KeyBinding>().ToArray();
+            var undoBindings = bindings.Where(binding =>
+                binding.Key == Key.Z && binding.Modifiers == ModifierKeys.Control).ToArray();
+            var redoBindings = bindings.Where(binding =>
+                binding.Key == Key.Y && binding.Modifiers == ModifierKeys.Control).ToArray();
+            var undoBinding = Assert.Single(undoBindings);
+            var redoBinding = Assert.Single(redoBindings);
+            Assert.Same(undo.Command, undoBinding.Command);
+            Assert.Same(redo.Command, redoBinding.Command);
+
+            var toolbar = Assert.IsType<Border>(window.FindName("EditHistoryToolbar"));
+            var editor = Assert.IsType<ScrollViewer>(window.FindName("EditorScrollViewer"));
+            AssertFullyRenderedWithin(toolbar, editor);
+            AssertFullyRenderedWithin(undo, editor);
+            AssertFullyRenderedWithin(redo, editor);
             window.DisposeWithoutShowingForTesting();
         });
     }

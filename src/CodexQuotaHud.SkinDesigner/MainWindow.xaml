@@ -13,6 +13,12 @@
         Foreground="{DynamicResource DesignerTextBrush}"
         WindowStartupLocation="Manual"
         ShowActivated="True">
+    <Window.InputBindings>
+        <KeyBinding Key="Z" Modifiers="Control"
+                    Command="{Binding Editor.UndoCommand}" />
+        <KeyBinding Key="Y" Modifiers="Control"
+                    Command="{Binding Editor.RedoCommand}" />
+    </Window.InputBindings>
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -145,6 +151,29 @@
                           HorizontalScrollBarVisibility="Disabled"
                           AutomationProperties.Name="皮肤编辑器">
                 <StackPanel>
+                    <Border x:Name="EditHistoryToolbar"
+                            Margin="0,0,0,10" Padding="10,8"
+                            Background="{DynamicResource DesignerSurfaceBrush}"
+                            BorderBrush="{DynamicResource DesignerBorderBrush}"
+                            BorderThickness="1" CornerRadius="6">
+                        <Grid>
+                            <TextBlock VerticalAlignment="Center" FontWeight="SemiBold"
+                                       Text="编辑历史" />
+                            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                                <Button x:Name="UndoDraftButton" Content="撤销"
+                                        MinWidth="64" MinHeight="30" Padding="10,4"
+                                        Command="{Binding Editor.UndoCommand}"
+                                        AutomationProperties.Name="撤销草稿编辑 (Ctrl+Z)"
+                                        KeyboardNavigation.TabIndex="5" />
+                                <Button x:Name="RedoDraftButton" Content="重做"
+                                        MinWidth="64" MinHeight="30" Padding="10,4"
+                                        Margin="6,0,0,0"
+                                        Command="{Binding Editor.RedoCommand}"
+                                        AutomationProperties.Name="重做草稿编辑 (Ctrl+Y)"
+                                        KeyboardNavigation.TabIndex="6" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                     <Expander x:Name="BasicInformationSection"
                               Header="基本信息" IsExpanded="True">
                         <StackPanel>
@@ -156,7 +185,7 @@
                                      LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
                                      Tag="ProjectName"
                                      AutomationProperties.Name="项目名称"
-                                     KeyboardNavigation.TabIndex="5" />
+                                     KeyboardNavigation.TabIndex="7" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="显示名称" />
                             <TextBox x:Name="DisplayNameTextBox"
                                      Text="{Binding Editor.Current.DisplayName, Mode=OneWay}"
@@ -164,26 +193,26 @@
                                      LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
                                      Tag="DisplayName"
                                      AutomationProperties.Name="皮肤显示名称"
-                                     KeyboardNavigation.TabIndex="6" />
+                                     KeyboardNavigation.TabIndex="8" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="作者" />
                             <TextBox Text="{Binding Editor.Current.Author, Mode=OneWay}"
                                      LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
                                      Tag="Author"
                                      AutomationProperties.Name="作者"
-                                     KeyboardNavigation.TabIndex="7" />
+                                     KeyboardNavigation.TabIndex="9" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="版本" />
                             <TextBox Text="{Binding Editor.Current.PackageVersion, Mode=OneWay}"
                                      LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
                                      Tag="Version"
                                      AutomationProperties.Name="包版本"
-                                     KeyboardNavigation.TabIndex="8" />
+                                     KeyboardNavigation.TabIndex="10" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="说明" />
                             <TextBox Text="{Binding Editor.Current.Description, Mode=OneWay}"
                                      TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70"
                                      LostKeyboardFocus="BasicText_OnLostKeyboardFocus"
                                      Tag="Description"
                                      AutomationProperties.Name="皮肤说明"
-                                     KeyboardNavigation.TabIndex="9" />
+                                     KeyboardNavigation.TabIndex="11" />
                         </StackPanel>
                     </Expander>
 
@@ -194,39 +223,39 @@
                                 <Button x:Name="BackgroundReplaceButton" Content="选择 / 替换"
                                         Command="{Binding Editor.Images.Background.ReplaceCommand}"
                                         AutomationProperties.Name="选择或替换背景图片"
-                                        KeyboardNavigation.TabIndex="10" />
+                                        KeyboardNavigation.TabIndex="12" />
                                 <Button Margin="8,0,0,0" Content="移除"
                                         Command="{Binding Editor.Images.Background.RemoveCommand}"
                                         AutomationProperties.Name="移除背景图片"
-                                        KeyboardNavigation.TabIndex="11" />
+                                        KeyboardNavigation.TabIndex="13" />
                             </StackPanel>
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="中心" />
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="选择 / 替换"
                                         Command="{Binding Editor.Images.Center.ReplaceCommand}"
                                         AutomationProperties.Name="选择或替换中心图片"
-                                        KeyboardNavigation.TabIndex="12" />
+                                        KeyboardNavigation.TabIndex="14" />
                                 <Button Margin="8,0,0,0" Content="移除"
                                         Command="{Binding Editor.Images.Center.RemoveCommand}"
                                         AutomationProperties.Name="移除中心图片"
-                                        KeyboardNavigation.TabIndex="13" />
+                                        KeyboardNavigation.TabIndex="15" />
                             </StackPanel>
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="装饰（透明 PNG）" />
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="选择 / 替换"
                                         Command="{Binding Editor.Images.Decoration.ReplaceCommand}"
                                         AutomationProperties.Name="选择或替换装饰图片"
-                                        KeyboardNavigation.TabIndex="14" />
+                                        KeyboardNavigation.TabIndex="16" />
                                 <Button Margin="8,0,0,0" Content="移除"
                                         Command="{Binding Editor.Images.Decoration.RemoveCommand}"
                                         AutomationProperties.Name="移除装饰图片"
-                                        KeyboardNavigation.TabIndex="15" />
+                                        KeyboardNavigation.TabIndex="17" />
                             </StackPanel>
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="变换目标" />
                             <ComboBox x:Name="ImageTransformSlotBox" SelectedIndex="0"
                                       SelectionChanged="ImageTransformSlot_OnSelectionChanged"
                                       AutomationProperties.Name="图片变换目标"
-                                      KeyboardNavigation.TabIndex="16">
+                                      KeyboardNavigation.TabIndex="18">
                                 <ComboBoxItem Content="背景" />
                                 <ComboBoxItem Content="中心" />
                                 <ComboBoxItem Content="装饰" />
@@ -234,31 +263,31 @@
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="水平偏移 -50–50" />
                             <Slider x:Name="ImageOffsetXSlider" Minimum="-50" Maximum="50" Tag="OffsetX"
                                     ValueChanged="ImageTransform_OnValueChanged"
-                                    AutomationProperties.Name="图片水平偏移" KeyboardNavigation.TabIndex="17" />
+                                    AutomationProperties.Name="图片水平偏移" KeyboardNavigation.TabIndex="19" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="垂直偏移 -50–50" />
                             <Slider x:Name="ImageOffsetYSlider" Minimum="-50" Maximum="50" Tag="OffsetY"
                                     ValueChanged="ImageTransform_OnValueChanged"
-                                    AutomationProperties.Name="图片垂直偏移" KeyboardNavigation.TabIndex="18" />
+                                    AutomationProperties.Name="图片垂直偏移" KeyboardNavigation.TabIndex="20" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="缩放 0.25–3" />
                             <Slider x:Name="ImageScaleSlider" Minimum="0.25" Maximum="3" Value="1" Tag="Scale"
                                     ValueChanged="ImageTransform_OnValueChanged"
-                                    AutomationProperties.Name="图片缩放" KeyboardNavigation.TabIndex="19" />
+                                    AutomationProperties.Name="图片缩放" KeyboardNavigation.TabIndex="21" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="旋转 -180–180" />
                             <Slider x:Name="ImageRotationSlider" Minimum="-180" Maximum="180" Tag="Rotation"
                                     ValueChanged="ImageTransform_OnValueChanged"
-                                    AutomationProperties.Name="图片旋转" KeyboardNavigation.TabIndex="20" />
+                                    AutomationProperties.Name="图片旋转" KeyboardNavigation.TabIndex="22" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="透明度 0–1" />
                             <Slider x:Name="ImageOpacitySlider" Minimum="0" Maximum="1" Value="1" Tag="Opacity"
                                     ValueChanged="ImageTransform_OnValueChanged"
-                                    AutomationProperties.Name="图片透明度" KeyboardNavigation.TabIndex="21" />
+                                    AutomationProperties.Name="图片透明度" KeyboardNavigation.TabIndex="23" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="裁切焦点 X 0–1" />
                             <Slider x:Name="ImageCropXSlider" Minimum="0" Maximum="1" Value="0.5" Tag="CropX"
                                     ValueChanged="ImageTransform_OnValueChanged"
-                                    AutomationProperties.Name="图片裁切焦点 X" KeyboardNavigation.TabIndex="22" />
+                                    AutomationProperties.Name="图片裁切焦点 X" KeyboardNavigation.TabIndex="24" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="裁切焦点 Y 0–1" />
                             <Slider x:Name="ImageCropYSlider" Minimum="0" Maximum="1" Value="0.5" Tag="CropY"
                                     ValueChanged="ImageTransform_OnValueChanged"
-                                    AutomationProperties.Name="图片裁切焦点 Y" KeyboardNavigation.TabIndex="23" />
+                                    AutomationProperties.Name="图片裁切焦点 Y" KeyboardNavigation.TabIndex="25" />
                         </StackPanel>
                     </Expander>
 
@@ -268,22 +297,22 @@
                             <Slider Minimum="72" Maximum="116" Tag="RingDiameter"
                                     Value="{Binding Editor.Current.Theme.RingDiameter, Mode=OneWay}"
                                     ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="额度环直径" KeyboardNavigation.TabIndex="24" />
+                                    AutomationProperties.Name="额度环直径" KeyboardNavigation.TabIndex="26" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="线宽 2–16" />
                             <Slider Minimum="2" Maximum="16" Tag="RingThickness"
                                     Value="{Binding Editor.Current.Theme.RingThickness, Mode=OneWay}"
                                     ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="额度环线宽" KeyboardNavigation.TabIndex="25" />
+                                    AutomationProperties.Name="额度环线宽" KeyboardNavigation.TabIndex="27" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="间距 2–24" />
                             <Slider Minimum="2" Maximum="24" Tag="RingGap"
                                     Value="{Binding Editor.Current.Theme.RingGap, Mode=OneWay}"
                                     ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="额度环间距" KeyboardNavigation.TabIndex="26" />
+                                    AutomationProperties.Name="额度环间距" KeyboardNavigation.TabIndex="28" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="起始角度 0–359" />
                             <Slider Minimum="0" Maximum="359" Tag="StartAngle"
                                     Value="{Binding Editor.Current.Theme.StartAngle, Mode=OneWay}"
                                     ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="额度环起始角度" KeyboardNavigation.TabIndex="27" />
+                                    AutomationProperties.Name="额度环起始角度" KeyboardNavigation.TabIndex="29" />
                         </StackPanel>
                     </Expander>
 
@@ -292,29 +321,29 @@
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="主环颜色" />
                             <TextBox Text="{Binding Editor.Current.Theme.PrimaryRingColor, Mode=OneWay}"
                                      Tag="PrimaryRingColor" LostKeyboardFocus="ColorText_OnLostKeyboardFocus"
-                                     AutomationProperties.Name="主环颜色" KeyboardNavigation.TabIndex="28" />
+                                     AutomationProperties.Name="主环颜色" KeyboardNavigation.TabIndex="30" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="次环颜色" />
                             <TextBox Text="{Binding Editor.Current.Theme.SecondaryRingColor, Mode=OneWay}"
                                      Tag="SecondaryRingColor" LostKeyboardFocus="ColorText_OnLostKeyboardFocus"
-                                     AutomationProperties.Name="次环颜色" KeyboardNavigation.TabIndex="29" />
+                                     AutomationProperties.Name="次环颜色" KeyboardNavigation.TabIndex="31" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="背景颜色" />
                             <TextBox Text="{Binding Editor.Current.Theme.BaseBackgroundColor, Mode=OneWay}"
                                      Tag="BaseBackgroundColor" LostKeyboardFocus="ColorText_OnLostKeyboardFocus"
-                                     AutomationProperties.Name="背景颜色" KeyboardNavigation.TabIndex="30" />
+                                     AutomationProperties.Name="背景颜色" KeyboardNavigation.TabIndex="32" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="背景透明度 0–1" />
                             <Slider Minimum="0" Maximum="1" Tag="BaseBackgroundOpacity"
                                     Value="{Binding Editor.Current.Theme.BaseBackgroundOpacity, Mode=OneWay}"
                                     ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="背景透明度" KeyboardNavigation.TabIndex="31" />
+                                    AutomationProperties.Name="背景透明度" KeyboardNavigation.TabIndex="33" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="发光颜色" />
                             <TextBox Text="{Binding Editor.Current.Theme.GlowColor, Mode=OneWay}"
                                      Tag="GlowColor" LostKeyboardFocus="ColorText_OnLostKeyboardFocus"
-                                     AutomationProperties.Name="发光颜色" KeyboardNavigation.TabIndex="32" />
+                                     AutomationProperties.Name="发光颜色" KeyboardNavigation.TabIndex="34" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="发光强度 0–1" />
                             <Slider Minimum="0" Maximum="1" Tag="GlowIntensity"
                                     Value="{Binding Editor.Current.Theme.GlowIntensity, Mode=OneWay}"
                                     ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="发光强度" KeyboardNavigation.TabIndex="33" />
+                                    AutomationProperties.Name="发光强度" KeyboardNavigation.TabIndex="35" />
                         </StackPanel>
                     </Expander>
 
@@ -324,16 +353,16 @@
                             <Slider Minimum="12" Maximum="34" Tag="NumberTextSize"
                                     Value="{Binding Editor.Current.Theme.NumberTextSize, Mode=OneWay}"
                                     ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="数字字号" KeyboardNavigation.TabIndex="34" />
+                                    AutomationProperties.Name="数字字号" KeyboardNavigation.TabIndex="36" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="标签字号" />
                             <Slider Minimum="12" Maximum="34" Tag="LabelTextSize"
                                     Value="{Binding Editor.Current.Theme.LabelTextSize, Mode=OneWay}"
                                     ValueChanged="EditorSlider_OnValueChanged"
-                                    AutomationProperties.Name="标签字号" KeyboardNavigation.TabIndex="35" />
+                                    AutomationProperties.Name="标签字号" KeyboardNavigation.TabIndex="37" />
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="字重" />
                             <ComboBox x:Name="TextWeightBox" SelectedIndex="1"
                                       SelectionChanged="TextWeight_OnSelectionChanged"
-                                      AutomationProperties.Name="文字字重" KeyboardNavigation.TabIndex="36">
+                                      AutomationProperties.Name="文字字重" KeyboardNavigation.TabIndex="38">
                                 <ComboBoxItem Content="Regular" />
                                 <ComboBoxItem Content="SemiBold" />
                                 <ComboBoxItem Content="Bold" />
@@ -341,7 +370,7 @@
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="排列" />
                             <ComboBox x:Name="TextPlacementBox" SelectedIndex="1"
                                       SelectionChanged="TextPlacement_OnSelectionChanged"
-                                      AutomationProperties.Name="文字排列" KeyboardNavigation.TabIndex="37">
+                                      AutomationProperties.Name="文字排列" KeyboardNavigation.TabIndex="39">
                                 <ComboBoxItem Content="居中" />
                                 <ComboBoxItem Content="数字在标签上方" />
                                 <ComboBoxItem Content="标签在数字上方" />
@@ -370,7 +399,7 @@
                                         Value="{Binding Editor.Current.Theme.TextOffsetY, Mode=OneWay}"
                                         ValueChanged="EditorSlider_OnValueChanged"
                                         AutomationProperties.Name="文字整体上下偏移"
-                                        KeyboardNavigation.TabIndex="38" />
+                                        KeyboardNavigation.TabIndex="40" />
                             </Grid>
                             <Grid Margin="0,7,0,0">
                                 <Grid.RowDefinitions>
@@ -396,7 +425,7 @@
                                         Value="{Binding Editor.Current.Theme.TextLineGap, Mode=OneWay}"
                                         ValueChanged="EditorSlider_OnValueChanged"
                                         AutomationProperties.Name="数字和时间行距"
-                                        KeyboardNavigation.TabIndex="39" />
+                                        KeyboardNavigation.TabIndex="41" />
                             </Grid>
                         </StackPanel>
                     </Expander>
@@ -418,19 +447,19 @@
                                         Grid.Column="0" Content="静止" Tag="Still"
                                         Click="AnimationPreset_OnClick"
                                         AutomationProperties.Name="使用静止动画预设"
-                                        KeyboardNavigation.TabIndex="40" />
+                                        KeyboardNavigation.TabIndex="42" />
                                 <Button x:Name="AnimationGentlePresetButton"
                                         Grid.Column="1" Margin="6,0,0,0"
                                         Content="柔和" Tag="Gentle"
                                         Click="AnimationPreset_OnClick"
                                         AutomationProperties.Name="使用柔和动画预设"
-                                        KeyboardNavigation.TabIndex="41" />
+                                        KeyboardNavigation.TabIndex="43" />
                                 <Button x:Name="AnimationNoticeablePresetButton"
                                         Grid.Column="2" Margin="6,0,0,0"
                                         Content="明显" Tag="Noticeable"
                                         Click="AnimationPreset_OnClick"
                                         AutomationProperties.Name="使用明显动画预设"
-                                        KeyboardNavigation.TabIndex="42" />
+                                        KeyboardNavigation.TabIndex="44" />
                             </Grid>
                             <StackPanel Orientation="Horizontal" Margin="0,7,0,8">
                                 <TextBlock Foreground="{DynamicResource DesignerMutedTextBrush}"
@@ -464,7 +493,7 @@
                                         Value="{Binding Editor.Current.Theme.Animation.RefreshSpeedMultiplier, Mode=OneWay}"
                                         ValueChanged="EditorSlider_OnValueChanged"
                                         AutomationProperties.Name="刷新速度"
-                                        KeyboardNavigation.TabIndex="43" />
+                                        KeyboardNavigation.TabIndex="45" />
                             </Grid>
                             <Grid Margin="0,0,0,8">
                                 <Grid.RowDefinitions>
@@ -491,7 +520,7 @@
                                         Value="{Binding Editor.Current.Theme.Animation.RefreshHoldSeconds, Mode=OneWay}"
                                         ValueChanged="EditorSlider_OnValueChanged"
                                         AutomationProperties.Name="加速延续"
-                                        KeyboardNavigation.TabIndex="44" />
+                                        KeyboardNavigation.TabIndex="46" />
                             </Grid>
                             <Expander x:Name="AdvancedAnimationSection"
                                       Header="高级细调" IsExpanded="False">
@@ -507,21 +536,21 @@
                                             Value="{Binding Editor.Current.Theme.Animation.RotationIntensity, Mode=OneWay}"
                                             ValueChanged="EditorSlider_OnValueChanged"
                                             AutomationProperties.Name="装饰旋转动画强度"
-                                            KeyboardNavigation.TabIndex="45" />
+                                            KeyboardNavigation.TabIndex="47" />
                                     <TextBlock Style="{StaticResource FieldLabelStyle}"
                                                Text="中心呼吸 0–1" />
                                     <Slider Minimum="0" Maximum="1" Tag="BreathingIntensity"
                                             Value="{Binding Editor.Current.Theme.Animation.BreathingIntensity, Mode=OneWay}"
                                             ValueChanged="EditorSlider_OnValueChanged"
                                             AutomationProperties.Name="中心呼吸动画强度"
-                                            KeyboardNavigation.TabIndex="46" />
+                                            KeyboardNavigation.TabIndex="48" />
                                     <TextBlock Style="{StaticResource FieldLabelStyle}"
                                                Text="额度环光晕 0–1" />
                                     <Slider Minimum="0" Maximum="1" Tag="AnimationGlowIntensity"
                                             Value="{Binding Editor.Current.Theme.Animation.GlowIntensity, Mode=OneWay}"
                                             ValueChanged="EditorSlider_OnValueChanged"
                                             AutomationProperties.Name="额度环光晕动画强度"
-                                            KeyboardNavigation.TabIndex="47" />
+                                            KeyboardNavigation.TabIndex="49" />
                                     <TextBlock Style="{StaticResource FieldLabelStyle}"
                                                Text="装饰浮动 0–1" />
                                     <Slider Minimum="0" Maximum="1" Tag="FloatingIntensity"
@@ -529,7 +558,7 @@
                                             Value="{Binding Editor.Current.Theme.Animation.FloatingIntensity, Mode=OneWay}"
                                             ValueChanged="EditorSlider_OnValueChanged"
                                             AutomationProperties.Name="装饰浮动动画强度"
-                                            KeyboardNavigation.TabIndex="48" />
+                                            KeyboardNavigation.TabIndex="50" />
                                 </StackPanel>
                             </Expander>
                         </StackPanel>
@@ -587,7 +616,7 @@
                         <ComboBox x:Name="DisplayChoiceBox" SelectedIndex="0"
                                   SelectionChanged="DisplayChoice_OnSelectionChanged"
                                   AutomationProperties.Name="额度显示模式"
-                                  KeyboardNavigation.TabIndex="49">
+                                  KeyboardNavigation.TabIndex="51">
                             <ComboBoxItem Content="Dual" />
                             <ComboBoxItem Content="5h" />
                             <ComboBoxItem Content="Week" />
@@ -611,14 +640,14 @@
                                       ItemsSource="{Binding Synthetic.PercentPresets}"
                                       SelectedItem="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
                                       AutomationProperties.Name="五小时额度预设"
-                                      KeyboardNavigation.TabIndex="50" />
+                                      KeyboardNavigation.TabIndex="52" />
                         </Grid>
                         <Slider x:Name="FiveHourPercentSlider"
                                 Grid.Row="1" Margin="0,5,0,0"
                                 Minimum="0" Maximum="100"
                                 Value="{Binding Synthetic.FiveHourPercent, Mode=TwoWay}"
                                 AutomationProperties.Name="五小时额度百分比"
-                                KeyboardNavigation.TabIndex="51" />
+                                KeyboardNavigation.TabIndex="53" />
                     </Grid>
                     <Grid Grid.Column="2" Margin="14,0,0,0">
                         <Grid.RowDefinitions>
@@ -637,14 +666,14 @@
                                       ItemsSource="{Binding Synthetic.PercentPresets}"
                                       SelectedItem="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
                                       AutomationProperties.Name="每周额度预设"
-                                      KeyboardNavigation.TabIndex="52" />
+                                      KeyboardNavigation.TabIndex="54" />
                         </Grid>
                         <Slider x:Name="WeeklyPercentSlider"
                                 Grid.Row="1" Margin="0,5,0,0"
                                 Minimum="0" Maximum="100"
                                 Value="{Binding Synthetic.WeeklyPercent, Mode=TwoWay}"
                                 AutomationProperties.Name="每周额度百分比"
-                                KeyboardNavigation.TabIndex="53" />
+                                KeyboardNavigation.TabIndex="55" />
                     </Grid>
                     <TextBlock x:Name="DisplayRoleHintText"
                                Grid.Row="1" Grid.ColumnSpan="3"
@@ -669,18 +698,18 @@
                                 <CheckBox Content="详情"
                                           IsChecked="{Binding Synthetic.DetailsOpen, Mode=TwoWay}"
                                           AutomationProperties.Name="显示详情"
-                                          KeyboardNavigation.TabIndex="54" />
+                                          KeyboardNavigation.TabIndex="56" />
                                 <CheckBox x:Name="AnimationsEnabledCheckBox"
                                           Margin="12,0,0,0" Content="动画"
                                           IsChecked="{Binding Synthetic.AnimationsEnabled, Mode=TwoWay}"
                                           AutomationProperties.Name="启用预览动画"
-                                          KeyboardNavigation.TabIndex="55" />
+                                          KeyboardNavigation.TabIndex="57" />
                                 <CheckBox x:Name="RefreshStateCheckBox"
                                           Margin="12,0,0,0" Content="刷新中"
                                           IsChecked="{Binding Synthetic.IsRefreshing, Mode=TwoWay}"
                                           IsEnabled="{Binding PreviewTools.CanEditRefreshCheckbox}"
                                           AutomationProperties.Name="模拟刷新状态"
-                                          KeyboardNavigation.TabIndex="56" />
+                                          KeyboardNavigation.TabIndex="58" />
                             </StackPanel>
                         </Border>
                         <Border x:Name="PreviewToolsGroup"
@@ -699,7 +728,7 @@
                                           Content="构图参考线"
                                           IsChecked="{Binding PreviewTools.CompositionGuidesVisible, Mode=TwoWay}"
                                           AutomationProperties.Name="显示构图参考线"
-                                          KeyboardNavigation.TabIndex="57" />
+                                          KeyboardNavigation.TabIndex="59" />
                                 <TextBlock Margin="12,0,6,0"
                                            VerticalAlignment="Center"
                                            Text="单项动画预演" />
@@ -708,7 +737,7 @@
                                           SelectedValuePath="Tag"
                                           SelectedValue="{Binding PreviewTools.AnimationAudition, Mode=TwoWay}"
                                           AutomationProperties.Name="单项动画预演"
-                                          KeyboardNavigation.TabIndex="58">
+                                          KeyboardNavigation.TabIndex="60">
                                     <ComboBoxItem Content="全部"
                                                   Tag="{x:Static preview:DesignerAnimationAudition.All}" />
                                     <ComboBoxItem Content="转圈"
@@ -740,31 +769,31 @@
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Command="{Binding Synthetic.PreviewLeftEdgeCommand}"
                                         AutomationProperties.Name="预览左边缘停靠"
-                                        KeyboardNavigation.TabIndex="59" />
+                                        KeyboardNavigation.TabIndex="61" />
                                 <Button x:Name="PreviewRightButton" Content="右"
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.PreviewRightEdgeCommand}"
                                         AutomationProperties.Name="预览右边缘停靠"
-                                        KeyboardNavigation.TabIndex="60" />
+                                        KeyboardNavigation.TabIndex="62" />
                                 <Button x:Name="PreviewTopButton" Content="上"
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.PreviewTopEdgeCommand}"
                                         AutomationProperties.Name="预览上边缘停靠"
-                                        KeyboardNavigation.TabIndex="61" />
+                                        KeyboardNavigation.TabIndex="63" />
                                 <Button x:Name="PreviewBottomButton" Content="下"
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.PreviewBottomEdgeCommand}"
                                         AutomationProperties.Name="预览下边缘停靠"
-                                        KeyboardNavigation.TabIndex="62" />
+                                        KeyboardNavigation.TabIndex="64" />
                                 <Button x:Name="ExpandPreviewButton" Content="展开"
                                         MinHeight="30" Padding="10,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.ExpandCommand}"
                                         AutomationProperties.Name="展开预览 HUD"
-                                        KeyboardNavigation.TabIndex="63" />
+                                        KeyboardNavigation.TabIndex="65" />
                             </StackPanel>
                         </Border>
                     </WrapPanel>
@@ -786,17 +815,17 @@
                     <Button x:Name="SaveDraftButton" Content="保存草稿"
                             Click="SaveDraftButton_OnClick"
                             AutomationProperties.Name="保存草稿"
-                            KeyboardNavigation.TabIndex="64" />
+                            KeyboardNavigation.TabIndex="66" />
                     <Button x:Name="ApplyToHudButton" Margin="8,0,0,0" Content="应用到 HUD"
                             Command="{Binding Editor.Output.ApplyCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="应用到 HUD"
-                            KeyboardNavigation.TabIndex="65" />
+                            KeyboardNavigation.TabIndex="67" />
                     <Button x:Name="ExportPackageButton" Margin="8,0,0,0" Content="导出皮肤包"
                             Command="{Binding Editor.Output.ExportCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="导出皮肤包"
-                            KeyboardNavigation.TabIndex="66" />
+                            KeyboardNavigation.TabIndex="68" />
                 </StackPanel>
             </Grid>
         </Border>
