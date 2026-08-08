@@ -865,6 +865,10 @@ public sealed class MainWindowLayoutTests
             Assert.Equal("重做", redo.Content);
             Assert.Same(window.Editor.UndoCommand, undo.Command);
             Assert.Same(window.Editor.RedoCommand, redo.Command);
+            Assert.False(window.Editor.UndoCommand.CanExecute(null));
+            Assert.False(window.Editor.RedoCommand.CanExecute(null));
+            Assert.False(undo.IsEnabled);
+            Assert.False(redo.IsEnabled);
             Assert.Equal("撤销草稿编辑 (Ctrl+Z)", AutomationProperties.GetName(undo));
             Assert.Equal("重做草稿编辑 (Ctrl+Y)", AutomationProperties.GetName(redo));
 
@@ -875,8 +879,21 @@ public sealed class MainWindowLayoutTests
                 binding.Key == Key.Y && binding.Modifiers == ModifierKeys.Control).ToArray();
             var undoBinding = Assert.Single(undoBindings);
             var redoBinding = Assert.Single(redoBindings);
-            Assert.Same(undo.Command, undoBinding.Command);
-            Assert.Same(redo.Command, redoBinding.Command);
+            var undoCommand = Assert.IsAssignableFrom<ICommand>(undoBinding.Command);
+            var redoCommand = Assert.IsAssignableFrom<ICommand>(redoBinding.Command);
+            Assert.Same(undo.Command, undoCommand);
+            Assert.Same(redo.Command, redoCommand);
+
+            var draft = window.Editor.Current;
+            var revision = draft.Revision;
+            var content = DraftJsonCodec.Write(draft);
+            undoCommand.Execute(null);
+            redoCommand.Execute(null);
+            Assert.Same(draft, window.Editor.Current);
+            Assert.Equal(revision, window.Editor.Current.Revision);
+            Assert.Equal(content, DraftJsonCodec.Write(window.Editor.Current));
+            Assert.False(window.Editor.UndoCommand.CanExecute(null));
+            Assert.False(window.Editor.RedoCommand.CanExecute(null));
 
             var toolbar = Assert.IsType<Border>(window.FindName("EditHistoryToolbar"));
             var editor = Assert.IsType<ScrollViewer>(window.FindName("EditorScrollViewer"));
