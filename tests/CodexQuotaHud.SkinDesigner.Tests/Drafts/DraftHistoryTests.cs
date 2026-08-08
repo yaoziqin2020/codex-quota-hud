@@ -260,6 +260,31 @@ public sealed class DraftHistoryTests
         Assert.Equal(1, events);
     }
 
+    [Fact]
+    public void ImageBoundary_NoOpPreservesExistingHistoryAndDoesNotPublishChange()
+    {
+        var next = CreatedAt;
+        var session = new SkinDraftSession(
+            Draft(0),
+            () => next = next.AddSeconds(1));
+        Assert.True(session.Apply(current => current with { DisplayName = "Before image" }));
+        Assert.True(session.TryUndo());
+        Assert.False(session.CanUndo);
+        Assert.True(session.CanRedo);
+        var before = session.Current;
+        var events = 0;
+        session.MeaningfulChange += (_, _) => events++;
+
+        Assert.False(session.ApplyAsHistoryBoundary(current => current with { }));
+
+        Assert.False(session.CanUndo);
+        Assert.True(session.CanRedo);
+        Assert.Same(before, session.Current);
+        Assert.Equal(before.Revision, session.Current.Revision);
+        Assert.Equal(before.DisplayName, session.Current.DisplayName);
+        Assert.Equal(0, events);
+    }
+
     private static SkinDraftDocument Draft(long revision) =>
         SkinDraftFactory.CreateNew(
             DraftId,

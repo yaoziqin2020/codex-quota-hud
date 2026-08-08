@@ -45,7 +45,7 @@ public sealed class SkinDraftSession
         Func<SkinDraftDocument, SkinDraftDocument> edit) =>
         ApplyCore(
             edit,
-            requireStructuralChange: false,
+            requireStructuralChange: true,
             startsNewHistorySegment: true);
 
     private bool ApplyCore(
