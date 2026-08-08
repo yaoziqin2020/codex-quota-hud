@@ -1,6 +1,6 @@
 # Current Task
 
-## v1.3.0 fixed candidate — NOT RUN installed UI, not release-ready
+## v1.3.0 fixed candidate — user accepted, publication authorized
 
 Task 8 rebuilt and installed the fixed local candidate from source commit
 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`. Fresh serial Release verification
@@ -40,7 +40,7 @@ source/log hashes, the `b9fecdb` review-baseline parent readback, and aggregate
 smoke-root count `0`; it explicitly records that the literal backup/restore
 shell command transcript was not retained.
 
-Installed UI acceptance is `NOT RUN`. Both the Task 8 agent and root independently
+Automated installed UI acceptance is `NOT RUN`. Both the Task 8 agent and root independently
 read the Computer Use guidance/confirmation policy, selected the one exact
 installed Designer window, and stopped before input when `@oai/sky`
 `get_window`/`get_window_state` failed with
@@ -55,12 +55,14 @@ The controlled fixture and all launch-time state were removed by restoring the
 validated stable backup. Final state has 34/34 files with zero non-settings or
 stable-settings differences, both exchange packages exact, startup and the
 preview shortcut exact, the fixed formal HUD running, and Designer closed.
-Task 4's failed `fbdf23c` candidate remains historical evidence; the fixes are
-present in this source, but the installed rows still require a healthy
-Computer Use session or user manual smoke. Overall status remains
-`FAIL — candidate not release-ready`. The latest public release remains
-`v1.2.3`; no push, `main` integration, tag, GitHub Release, upload, or public
-readback is authorized.
+Task 4's failed `fbdf23c` candidate remains historical evidence. On
+2026-08-09, the user reported completing the installed hands-on checks,
+including the previously open rows, with no issues and accepted this exact
+candidate for publication. Automated rows remain `NOT RUN` as historical tool
+evidence; the user-manual acceptance gate is `PASS`. Overall status is
+`PASS — user accepted`; push, `main` integration, tag, GitHub Release, upload,
+and public readback are now authorized. The latest public release remains
+`v1.2.3` only until the v1.3.0 publication workflow completes.
 
 Public Setup behavior is unchanged: startup and the normal `Codex Quota HUD`
 desktop shortcut are selected by default and may be deselected; the normal

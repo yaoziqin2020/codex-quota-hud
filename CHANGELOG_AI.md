@@ -1,5 +1,20 @@
 # AI Change Log
 
+## 2026-08-09 — v1.3.0 installed candidate accepted for publication
+
+- The user completed the installed hands-on checks for the exact fixed
+  candidate built from `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`, reported
+  no issues, and accepted it for Git synchronization and public v1.3.0 release.
+- The ten automated Computer Use rows remain `NOT RUN` as honest historical
+  evidence because both automation sessions failed before input. They are not
+  rewritten as automated passes; the separate user-manual acceptance gate is
+  `PASS`.
+- Source `1561/1561`, Release build, package identity, installer matrix `9/9`,
+  real upgrade, state restoration, and evidence review remain unchanged and
+  green. Publication is now authorized; push, `main` integration, annotated
+  tag, GitHub Release asset upload, CI, and public readback are the remaining
+  closeout steps.
+
 ## 2026-08-08 — v1.3.0 fixed candidate rebuilt; installed UI blocked before input
 
 - Reverified exact source `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`

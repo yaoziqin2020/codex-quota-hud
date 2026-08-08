@@ -19,10 +19,10 @@ and a numeric tray icon without scraping web pages or storing credentials.
 > This is an independent open-source project and is not an official OpenAI
 > product.
 
-## v1.3.0 candidate installation / 候选安装
+## v1.3.0 accepted candidate / 已验收候选版
 
 The fixed local candidate from source
-`cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` is **not release-ready**.
+`cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` is **accepted for publication**.
 Fresh serial Release verification passed `1561/1561` with zero failed/skipped,
 the build passed with zero warnings/errors, packaging passed, the isolated
 installer matrix passed `9/9`, and the real upgrade preserved bounded user
@@ -31,8 +31,10 @@ attempts selected the unique exact Designer window but failed before input
 with `node_repl exec context not found`, including the documented recovery
 retry. Policy prohibited a UIA fallback, so the required fixed-path UI rows
 still need a healthy Computer Use session or user manual smoke. Overall
-candidate status is `FAIL`; no push, merge, tag, upload, or GitHub Release is
-authorized.
+automated evidence remains `NOT RUN`. On 2026-08-09, the user completed the
+installed hands-on checks, reported no issues, and accepted this exact
+candidate. User-manual acceptance is `PASS`; push, merge, tag, upload, and
+GitHub Release are authorized.
 
 Task 8 provenance supplements preserve two important qualifications. The
 historical `12-post-install.json` captured uninstall DisplayVersion as `null`;
@@ -45,18 +47,19 @@ replayable commands, raw-log hashes, and the zero aggregate smoke-root readback
 are in `21-command-state-provenance-supplement.json`. The literal backup/restore
 shell transcript was not retained; only the bounded method and before/after
 evidence are claimed.
-Until explicit acceptance and publication, the
+Until publication completes, the
 [latest public release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
 remains `v1.2.3`.
 
 从源码 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` 重建的 fixed 本地候选版
-**尚未达到发布条件**。fresh serial Release 测试 `1561/1561`、Release build、
+**已通过用户实装验收并获准发布**。fresh serial Release 测试 `1561/1561`、Release build、
 封包、九场景隔离安装器矩阵和本机升级均通过；但 installed UI 验收为 `NOT RUN`。
 两次独立 Computer Use 尝试都准确选中了唯一设计器窗口，却在任何输入前重复遇到
 `node_repl exec context not found`；按工具安全规则不得改用 UIA 后备路径。因此撤销/重做、
 图像 Discard/Save、旧包导入、托盘和关闭隔离等直接 installed 行仍需健康的 Computer Use
-会话或用户手测。候选整体为 `FAIL`，禁止 push、merge、tag、上传或创建 GitHub Release。
-在用户明确接受并公开发布前，[最新公开版本](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
+会话。2026-08-09，用户完成实装手测并反馈无问题；自动行仍诚实保留为 `NOT RUN`，
+独立的用户手测验收为 `PASS`。现已允许 push、merge、tag、上传和创建 GitHub Release。
+在 v1.3.0 正式发布完成前，[最新公开版本](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
 仍为 `v1.2.3`。
 
 Setup automatically offers Simplified Chinese or English, installs only for

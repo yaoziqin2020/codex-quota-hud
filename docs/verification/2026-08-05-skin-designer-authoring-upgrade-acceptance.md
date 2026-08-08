@@ -16,11 +16,12 @@ branch `feat/inno-setup-installer-20260731`, at current product source commit
 and Task 4 sections remain an audit trail; the current fixed-candidate section
 below supersedes them for release readiness.
 
-**Current decision: FAIL — the fixed Task 8 candidate is not release-ready.**
-Fresh source, package, matrix, upgrade, identity, and restoration gates pass,
-but every required installed UI row is `NOT RUN` because Computer Use failed
-before input in two independent compliant attempts. Source automation is not a
-substitute for the missing installed evidence.
+**Current decision: PASS — the fixed Task 8 candidate was accepted by the user.**
+Fresh source, package, matrix, upgrade, identity, and restoration gates pass.
+Every automated installed UI row remains `NOT RUN` because Computer Use failed
+before input in two independent compliant attempts; source automation is not a
+substitute for installed evidence. On 2026-08-09, the user separately completed
+the installed hands-on checks, reported no issues, and authorized publication.
 
 ## Automated source gates
 
@@ -650,6 +651,21 @@ between `15-process-launch.json` at 23:27:47.1376154 and
 | NOT RUN | Exact installed formal-HUD tray menu actions | No tray input was sent |
 | NOT RUN | Close Designer with guides On and non-All audition active, then prove formal HUD isolation | No guide/audition input was sent; the exact Designer was closed normally only for restoration |
 
+### User manual acceptance
+
+The automated rows above remain `NOT RUN` and are not rewritten. On
+2026-08-09, after the fixed v1.3.0 candidate was installed and handed off, the
+user reported that all installed hands-on checks were completed and no issues
+were found. This user-authored acceptance covers all ten required rows above,
+including Undo/Redo controls and shortcuts, Save/reopen, image Discard/Save,
+picker cancellation, six auditions, Apply/HUD switching, untouched v1.2.3
+import, formal tray actions, and guide/audition close isolation. Exact manual
+action timestamps and screenshots were not retained.
+
+| Status | Date (Asia/Tokyo) | Acceptance gate | Observed |
+|---|---|---|---|
+| PASS | 2026-08-09 | User hands-on installed smoke, all ten required rows | User reported all checks completed with no issues and accepted the candidate |
+
 ### Restoration and decision
 
 The blocked-run live state was moved into ignored recoverable evidence. The
@@ -669,13 +685,13 @@ Supplement `21` therefore does not fabricate it: it records the bounded method
 and names the shutdown, preinstall snapshot, process-close, pre-relaunch
 comparison, and final comparison artifacts supporting the restoration claim.
 
-**Final Task 8 decision: FAIL — candidate not release-ready.** Source,
-packaging, matrix, real upgrade, identity, and restoration gates are green, but
-every required installed UI row is `NOT RUN`. A fresh healthy Computer Use
-session or complete user manual smoke must run every row before acceptance.
-Task 4's two product defects are historical and were not re-observed or claimed
-fixed by installed UI evidence here. No push, merge, tag, upload, GitHub
-Release, public readback, or historical-asset mutation was performed.
+**Final Task 8 decision: PASS — user accepted for publication.** Source,
+packaging, matrix, real upgrade, identity, restoration, and user-manual gates
+are green. Automated rows remain `NOT RUN` as historical tool evidence. Task
+4's two product defects are historical and the user did not re-observe them in
+the fixed installed candidate. Push, merge, tag, upload, GitHub Release, and
+public readback are authorized; none had been performed at this acceptance
+checkpoint.
 
 ## Historical Task 4 undo/redo candidate acceptance
 

@@ -8,7 +8,7 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
-## v1.3.0 fixed local candidate — installed UI acceptance blocked
+## v1.3.0 fixed local candidate — user accepted for publication
 
 Task 8 rebuilt and installed the fixed candidate from
 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`. The authoring upgrade adds two
@@ -52,7 +52,7 @@ provenance respectively. The exact backup/restore shell transcript was not
 retained, so restoration claims are limited to the recorded bounded method and
 before/after comparisons.
 
-Installed UI acceptance did not run. The Task 8 agent and root independently
+Automated installed UI acceptance did not run. The Task 8 agent and root independently
 selected the unique exact installed Designer through Computer Use, but
 `get_window`/`get_window_state` failed with
 `node_repl exec context not found` before the first input. Refresh, kernel
@@ -69,9 +69,12 @@ only in ignored evidence, while live state is restored to 34/34 files with
 zero non-settings and stable-settings differences; both exchange packages,
 startup, and the maintainer preview shortcut are exact. The fixed formal HUD
 is running and Designer is closed. Task 4's `fbdf23c` failures remain
-historical; the fixed candidate still needs a healthy Computer Use session or
-user manual smoke. Overall status is `FAIL`, public `v1.2.3` remains latest,
-and remote release actions remain prohibited.
+historical. On 2026-08-09, the user reported completing all installed
+hands-on checks with no issues and accepted this exact candidate for
+publication. Automated rows remain `NOT RUN` as historical tool evidence;
+user-manual acceptance is `PASS`. Overall status is release-ready and remote
+publication is authorized. Public `v1.2.3` remains latest only until the
+v1.3.0 release workflow completes.
 
 Distribution boundaries remain fixed: ordinary Setup defaults startup plus
 the normal desktop shortcut, both deselectable and without `--preview`;
