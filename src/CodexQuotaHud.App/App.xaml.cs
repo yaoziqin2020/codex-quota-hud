@@ -466,7 +466,7 @@ public partial class App : System.Windows.Application
                 Math.Max(0, version.Major),
                 Math.Max(0, version.Minor),
                 Math.Max(0, version.Build));
-          var runtimeBaseline = SemanticVersion.Parse("1.2.3");
+          var runtimeBaseline = SemanticVersion.Parse("1.3.0");
         return detected.CompareTo(runtimeBaseline) >= 0
             ? detected
             : runtimeBaseline;

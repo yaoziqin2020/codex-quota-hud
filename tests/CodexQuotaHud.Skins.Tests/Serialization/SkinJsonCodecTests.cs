@@ -55,6 +55,39 @@ public sealed class SkinJsonCodecTests
         Assert.Equal(1.5d, theme.Animation.RefreshHoldSeconds);
     }
 
+    [Fact]
+    public void ParseTheme_LegacyJsonDefaultsNewTextLayoutFieldsToZero()
+    {
+        var result = SkinJsonCodec.ParseTheme(LegacyV123ThemeJson());
+
+        Assert.True(result.IsValid);
+        Assert.Equal(0d, result.Value!.TextOffsetY);
+        Assert.Equal(0d, result.Value.TextLineGap);
+    }
+
+    [Fact]
+    public void WriteAndParseTheme_RoundTripsTextLayoutFields()
+    {
+        var theme = ValidTheme() with { TextOffsetY = -7, TextLineGap = 4 };
+        var parsed = SkinJsonCodec.ParseTheme(SkinJsonCodec.WriteTheme(theme));
+
+        Assert.Equal(-7, parsed.Value!.TextOffsetY);
+        Assert.Equal(4, parsed.Value.TextLineGap);
+    }
+
+    [Fact]
+    public void ParseTheme_RejectsUnrelatedUnknownRootProperty()
+    {
+        var json = ValidThemeJson.Replace(
+            "\"animation\":",
+            "\"unrelated\":true,\"animation\":");
+
+        AssertError(
+            SkinJsonCodec.ParseTheme(Utf8(json)),
+            "json.unknown-property",
+            "$.unrelated");
+    }
+
     [Theory]
     [InlineData(0d, 0d)]
     [InlineData(2d, 1.5d)]
@@ -272,6 +305,9 @@ public sealed class SkinJsonCodecTests
 
         Assert.Equal(Utf8(CanonicalManifestJson.ReplaceLineEndings("\n")), manifestBytes);
         Assert.Equal(Utf8(CanonicalThemeJson.ReplaceLineEndings("\n")), themeBytes);
+        var canonicalTheme = Encoding.UTF8.GetString(themeBytes);
+        Assert.Equal(1, CountPropertyOccurrences(canonicalTheme, "textOffsetY"));
+        Assert.Equal(1, CountPropertyOccurrences(canonicalTheme, "textLineGap"));
         Assert.DoesNotContain((byte)'\r', manifestBytes);
         Assert.DoesNotContain((byte)'\r', themeBytes);
         Assert.False(manifestBytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }));
@@ -386,6 +422,8 @@ public sealed class SkinJsonCodecTests
           "labelTextSize": 12,
           "textWeight": "semiBold",
           "textPlacement": "numberAboveLabel",
+          "textOffsetY": 0,
+          "textLineGap": 0,
           "animation": {
             "rotationIntensity": 0.25,
             "breathingIntensity": 0.5,
@@ -398,6 +436,14 @@ public sealed class SkinJsonCodecTests
         """;
 
     private static byte[] Utf8(string value) => Encoding.UTF8.GetBytes(value);
+
+    private static byte[] LegacyV123ThemeJson() => Utf8(ValidThemeJson);
+
+    private static SkinTheme ValidTheme() =>
+        AssertValid(SkinJsonCodec.ParseTheme(Utf8(ValidThemeJson)));
+
+    private static int CountPropertyOccurrences(string json, string propertyName) =>
+        json.Split($"\"{propertyName}\"", StringSplitOptions.None).Length - 1;
 
     private static T AssertValid<T>(SkinValidationResult<T> result)
     {

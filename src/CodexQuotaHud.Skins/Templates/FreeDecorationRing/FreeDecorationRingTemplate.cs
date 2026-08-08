@@ -5,7 +5,7 @@ namespace CodexQuotaHud.Skins.Templates.FreeDecorationRing;
 public sealed class FreeDecorationRingTemplate : ISkinTemplate
 {
     private static readonly SemanticVersion MinimumSupportedHudVersion =
-        SemanticVersion.Parse("1.2.3");
+        SemanticVersion.Parse("1.3.0");
 
     public string TemplateId => SkinPackageLimits.FreeDecorationRingTemplateId;
 

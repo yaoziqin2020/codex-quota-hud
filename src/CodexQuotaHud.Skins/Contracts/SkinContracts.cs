@@ -75,7 +75,9 @@ public sealed record SkinTheme(
     double LabelTextSize,
     SkinTextWeight TextWeight,
     SkinTextPlacement TextPlacement,
-    SkinAnimationSettings Animation);
+    SkinAnimationSettings Animation,
+    double TextOffsetY = 0d,
+    double TextLineGap = 0d);
 
 public sealed record SkinAsset(
     SkinAssetSlot Slot,

@@ -166,6 +166,18 @@ public static class SkinContractValidator
             SkinPackageLimits.MaximumTextSizeDip,
             "$.labelTextSize",
             errors);
+        ValidateNumber(
+            theme.TextOffsetY,
+            SkinPackageLimits.MinimumTextOffsetYDip,
+            SkinPackageLimits.MaximumTextOffsetYDip,
+            "$.textOffsetY",
+            errors);
+        ValidateNumber(
+            theme.TextLineGap,
+            SkinPackageLimits.MinimumTextLineGapDip,
+            SkinPackageLimits.MaximumTextLineGapDip,
+            "$.textLineGap",
+            errors);
 
         if (!Enum.IsDefined(theme.TextWeight))
         {

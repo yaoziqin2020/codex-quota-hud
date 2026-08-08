@@ -13,8 +13,10 @@ public sealed class DesignerDocumentServiceTests
 {
     private static readonly SemanticVersion HudVersion =
         SemanticVersion.Parse("1.1.1");
-    private static readonly SemanticVersion TemplateMinimumHudVersion =
+    private static readonly SemanticVersion LegacyTemplateMinimumHudVersion =
         SemanticVersion.Parse("1.2.3");
+    private static readonly SemanticVersion TemplateMinimumHudVersion =
+        SemanticVersion.Parse("1.3.0");
 
     [Fact]
     public void CreateNew_UsesRefreshDefaultsAndTemplateCompatibility()
@@ -100,6 +102,59 @@ public sealed class DesignerDocumentServiceTests
     }
 
     [Fact]
+    public async Task OpenDraft_NormalizesV123MinimumWithoutChangingSkinContent()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new SkinStoragePaths(temporary.Path);
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var legacy = WithBackground(
+            SkinDraftFactory.CreateNew(
+                draftId,
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                DateTimeOffset.Parse("2026-08-02T01:02:03Z"),
+                LegacyTemplateMinimumHudVersion) with
+            {
+                PackageVersion = SemanticVersion.Parse("2.3.4")
+            },
+            "legacy.png");
+        var store = new DraftStore(paths);
+        await store.SaveNamedAsync(legacy);
+        var project = new DraftProjectPaths(paths.DraftsRoot, draftId);
+        await File.WriteAllBytesAsync(
+            project.NamedDraftPath,
+            RemoveTextLayoutFields(
+                await File.ReadAllBytesAsync(project.NamedDraftPath)));
+        Directory.CreateDirectory(project.AssetsRoot);
+        await File.WriteAllBytesAsync(
+            Path.Combine(project.AssetsRoot, "background.png"),
+            AlphaPng);
+        var sut = CreateService(
+            temporary,
+            Guid.NewGuid,
+            () => DateTimeOffset.Parse("2026-08-02T02:02:03Z"));
+
+        var result = sut.OpenDraft(draftId);
+
+        Assert.Empty(result.Errors);
+        var opened = Assert.IsType<SkinDraftDocument>(result.Draft);
+        Assert.Equal(TemplateMinimumHudVersion, opened.MinimumHudVersion);
+        Assert.Equal(legacy.SkinId, opened.SkinId);
+        Assert.Equal(legacy.PackageVersion, opened.PackageVersion);
+        Assert.Equal(legacy.Theme, opened.Theme);
+        Assert.Equal(
+            legacy.Assets.Keys.OrderBy(slot => slot),
+            opened.Assets.Keys.OrderBy(slot => slot));
+        foreach (var asset in legacy.Assets)
+        {
+            Assert.Equal(asset.Value, opened.Assets[asset.Key]);
+        }
+
+        await store.SaveNamedAsync(opened);
+        AssertCanonicalTextLayout(
+            await File.ReadAllBytesAsync(project.NamedDraftPath));
+    }
+
+    [Fact]
     public void EditInstalled_ClonesHealthyCustomMetadataAndAssetsWithoutChangingInstalledBytes()
     {
         using var temporary = new TemporaryDirectory();
@@ -148,7 +203,11 @@ public sealed class DesignerDocumentServiceTests
         var skinId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
         var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         var package = BuildPackage(temporary, skinId, "Imported Ocean");
-        RemoveRefreshAnimationFieldsFromPackage(package);
+        RewriteThemeInPackage(
+            package,
+            document => RemoveRefreshAnimationFields(
+                document,
+                draftDocument: false));
         var packageBefore = await File.ReadAllBytesAsync(package);
         var sut = CreateService(
             temporary,
@@ -171,6 +230,58 @@ public sealed class DesignerDocumentServiceTests
         Assert.True(File.Exists(Path.Combine(
             new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
             "background.png")));
+    }
+
+    [Fact]
+    public async Task ImportForEditing_NormalizesV123MinimumWithoutChangingSkinContent()
+    {
+        using var temporary = new TemporaryDirectory();
+        var skinId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var package = BuildPackage(
+            temporary,
+            skinId,
+            "Legacy Ocean",
+            minimumHudVersion: LegacyTemplateMinimumHudVersion);
+        RewriteThemeInPackage(
+            package,
+            document => RemoveTextLayoutFields(
+                document,
+                draftDocument: false));
+        var original = new SkinPackageReader().ValidateFile(
+            package,
+            SemanticVersion.Parse("9.0.0"),
+            CancellationToken.None);
+        Assert.True(original.IsValid, string.Join("; ", original.Errors));
+        var source = Assert.IsType<SkinPackageDocument>(original.Value);
+        var sut = CreateService(
+            temporary,
+            () => draftId,
+            () => DateTimeOffset.Parse("2026-08-02T03:00:00Z"));
+
+        var result = await sut.ImportForEditingAsync(
+            package,
+            SemanticVersion.Parse("9.0.0"));
+
+        Assert.Empty(result.Errors);
+        var draft = Assert.IsType<SkinDraftDocument>(result.Draft);
+        Assert.Equal(TemplateMinimumHudVersion, draft.MinimumHudVersion);
+        Assert.Equal(source.Manifest.SkinId, draft.SkinId);
+        Assert.Equal(source.Manifest.PackageVersion, draft.PackageVersion);
+        Assert.Equal(source.Theme, draft.Theme);
+        Assert.Equal(
+            source.Assets.Keys.OrderBy(slot => slot),
+            result.Assets.Keys.OrderBy(slot => slot));
+        foreach (var asset in source.Assets)
+        {
+            var copied = result.Assets[asset.Key];
+            Assert.Equal(asset.Value.Slot, copied.Slot);
+            Assert.Equal(asset.Value.RelativePath, copied.RelativePath);
+            Assert.Equal(asset.Value.Content, copied.Content);
+            Assert.Equal(asset.Value.PixelWidth, copied.PixelWidth);
+            Assert.Equal(asset.Value.PixelHeight, copied.PixelHeight);
+            Assert.Equal(asset.Value.HasAlpha, copied.HasAlpha);
+        }
     }
 
     [Fact]
@@ -458,11 +569,26 @@ public sealed class DesignerDocumentServiceTests
         return JsonSerializer.SerializeToUtf8Bytes(root);
     }
 
+    private static byte[] RemoveTextLayoutFields(
+        byte[] document,
+        bool draftDocument = true)
+    {
+        var root = Assert.IsType<JsonObject>(JsonNode.Parse(document));
+        var theme = draftDocument
+            ? Assert.IsType<JsonObject>(root["theme"])
+            : root;
+
+        Assert.True(theme.Remove("textOffsetY"));
+        Assert.True(theme.Remove("textLineGap"));
+
+        return JsonSerializer.SerializeToUtf8Bytes(root);
+    }
+
     private static void AssertCanonicalRefreshAnimation(byte[] document)
     {
         using var parsed = JsonDocument.Parse(document);
         Assert.Equal(
-            "1.2.3",
+            "1.3.0",
             parsed.RootElement.GetProperty("minimumHudVersion").GetString());
         var animation = parsed.RootElement
             .GetProperty("theme")
@@ -472,7 +598,18 @@ public sealed class DesignerDocumentServiceTests
         Assert.Equal(1.5d, animation.GetProperty("refreshHoldSeconds").GetDouble());
     }
 
-    private static void RemoveRefreshAnimationFieldsFromPackage(string packagePath)
+    private static void AssertCanonicalTextLayout(byte[] document)
+    {
+        using var parsed = JsonDocument.Parse(document);
+        var theme = parsed.RootElement.GetProperty("theme");
+
+        Assert.Equal(0d, theme.GetProperty("textOffsetY").GetDouble());
+        Assert.Equal(0d, theme.GetProperty("textLineGap").GetDouble());
+    }
+
+    private static void RewriteThemeInPackage(
+        string packagePath,
+        Func<byte[], byte[]> rewrite)
     {
         using var archive = ZipFile.Open(packagePath, ZipArchiveMode.Update);
         var entry = Assert.Single(
@@ -494,7 +631,7 @@ public sealed class DesignerDocumentServiceTests
             "theme.json",
             CompressionLevel.NoCompression);
         using var destination = replacement.Open();
-        destination.Write(RemoveRefreshAnimationFields(theme, draftDocument: false));
+        destination.Write(rewrite(theme));
     }
 
     private static void ExtractInstalled(

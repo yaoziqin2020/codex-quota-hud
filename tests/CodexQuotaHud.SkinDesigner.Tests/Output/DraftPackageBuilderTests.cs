@@ -23,10 +23,10 @@ public sealed class DraftPackageBuilderTests
             OutputTestFixture.CompleteDraft(),
             assets) with
         {
-            MinimumHudVersion = SemanticVersion.Parse("1.2.3")
+            MinimumHudVersion = SemanticVersion.Parse("1.3.0")
         };
 
-        var result = new DraftPackageBuilder(SemanticVersion.Parse("1.2.3"))
+        var result = new DraftPackageBuilder(SemanticVersion.Parse("1.3.0"))
             .Build(draft, assets);
 
         Assert.True(result.IsValid, Format(result.Errors));
@@ -39,7 +39,7 @@ public sealed class DraftPackageBuilderTests
         Assert.Equal("A deterministic package", request.Manifest.Description);
         Assert.Equal(draft.MinimumHudVersion, request.Manifest.MinimumHudVersion);
         Assert.Equal(
-            SemanticVersion.Parse("1.2.3"),
+            SemanticVersion.Parse("1.3.0"),
             request.Manifest.MinimumHudVersion);
         Assert.Equal(draft.Theme, request.Theme);
         Assert.Equal(2d, request.Theme.Animation.RefreshSpeedMultiplier);

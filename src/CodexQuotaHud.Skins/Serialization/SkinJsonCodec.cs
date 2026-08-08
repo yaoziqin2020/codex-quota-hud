@@ -49,6 +49,8 @@ public static class SkinJsonCodec
         "labelTextSize",
         "textWeight",
         "textPlacement",
+        "textOffsetY",
+        "textLineGap",
         "animation"
     ];
 
@@ -78,6 +80,13 @@ public static class SkinJsonCodec
         {
             "refreshSpeedMultiplier",
             "refreshHoldSeconds"
+        };
+
+    private static readonly IReadOnlySet<string> OptionalThemeProperties =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "textOffsetY",
+            "textLineGap"
         };
 
     private static readonly JsonDocumentOptions DocumentOptions = new()
@@ -195,7 +204,12 @@ public static class SkinJsonCodec
                 DocumentOptions);
             var errors = new List<SkinValidationError>();
             var root = document.RootElement;
-            if (!ValidateObject(root, "$", ThemeProperties, errors))
+            if (!ValidateObject(
+                    root,
+                    "$",
+                    ThemeProperties,
+                    errors,
+                    OptionalThemeProperties))
             {
                 return Invalid<SkinTheme>(errors);
             }
@@ -303,6 +317,18 @@ public static class SkinJsonCodec
                 root.GetProperty("textPlacement"),
                 "$.textPlacement",
                 errors);
+            var textOffsetY = ReadOptionalDouble(
+                root,
+                "textOffsetY",
+                "$.textOffsetY",
+                0d,
+                errors);
+            var textLineGap = ReadOptionalDouble(
+                root,
+                "textLineGap",
+                "$.textLineGap",
+                0d,
+                errors);
             var animation = ReadAnimation(
                 root.GetProperty("animation"),
                 "$.animation",
@@ -333,7 +359,9 @@ public static class SkinJsonCodec
                 labelTextSize,
                 textWeight,
                 textPlacement,
-                animation));
+                animation,
+                TextOffsetY: textOffsetY,
+                TextLineGap: textLineGap));
         }
         catch (JsonException)
         {
@@ -408,6 +436,8 @@ public static class SkinJsonCodec
             writer.WriteNumber("labelTextSize", theme.LabelTextSize);
             writer.WriteString("textWeight", WriteTextWeight(theme.TextWeight));
             writer.WriteString("textPlacement", WriteTextPlacement(theme.TextPlacement));
+            writer.WriteNumber("textOffsetY", theme.TextOffsetY);
+            writer.WriteNumber("textLineGap", theme.TextLineGap);
             writer.WriteStartObject("animation");
             writer.WriteNumber(
                 "rotationIntensity",

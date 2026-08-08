@@ -382,6 +382,26 @@ public sealed class SkinContractValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
+                error => error.Code == "number.out-of-range" &&
+                error.Location == $"$.{field}");
+    }
+
+    [Theory]
+    [InlineData("textOffsetY", double.NaN)]
+    [InlineData("textOffsetY", double.PositiveInfinity)]
+    [InlineData("textOffsetY", double.NegativeInfinity)]
+    [InlineData("textLineGap", double.NaN)]
+    [InlineData("textLineGap", double.PositiveInfinity)]
+    [InlineData("textLineGap", double.NegativeInfinity)]
+    public void ValidateTheme_RejectsProgrammaticNonFiniteTextLayoutValues(
+        string field,
+        double value)
+    {
+        var result = SkinContractValidator.ValidateTheme(WithThemeNumber(field, value));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
             error => error.Code == "number.out-of-range" &&
                 error.Location == $"$.{field}");
     }
@@ -428,6 +448,8 @@ public sealed class SkinContractValidatorTests
         yield return ["glowIntensity", 0d, 1d, -0.001d, 1.001d];
         yield return ["numberTextSize", 12d, 34d, 11.999d, 34.001d];
         yield return ["labelTextSize", 12d, 34d, 11.999d, 34.001d];
+        yield return ["textOffsetY", -32d, 32d, -32.001d, 32.001d];
+        yield return ["textLineGap", -16d, 32d, -16.001d, 32.001d];
         yield return ["animation.rotationIntensity", 0d, 1d, -0.001d, 1.001d];
         yield return ["animation.breathingIntensity", 0d, 1d, -0.001d, 1.001d];
         yield return ["animation.glowIntensity", 0d, 1d, -0.001d, 1.001d];
@@ -583,6 +605,8 @@ public sealed class SkinContractValidatorTests
             "glowIntensity" => theme with { GlowIntensity = value },
             "numberTextSize" => theme with { NumberTextSize = value },
             "labelTextSize" => theme with { LabelTextSize = value },
+            "textOffsetY" => theme with { TextOffsetY = value },
+            "textLineGap" => theme with { TextLineGap = value },
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
     }

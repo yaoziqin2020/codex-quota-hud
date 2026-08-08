@@ -41,6 +41,10 @@ public static class SkinPackageLimits
     public const double MaximumStartAngleDegrees = 359;
     public const double MinimumTextSizeDip = 12;
     public const double MaximumTextSizeDip = 34;
+    public const double MinimumTextOffsetYDip = -32;
+    public const double MaximumTextOffsetYDip = 32;
+    public const double MinimumTextLineGapDip = -16;
+    public const double MaximumTextLineGapDip = 32;
     public const double MinimumEffectIntensity = 0;
     public const double MaximumEffectIntensity = 1;
     public const double MinimumRefreshSpeedMultiplier = 0;
