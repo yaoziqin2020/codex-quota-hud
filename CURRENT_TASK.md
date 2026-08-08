@@ -1,5 +1,42 @@
 # Current Task
 
+## v1.3.0 installed candidate — awaiting user acceptance
+
+Task 9 is preparing a local `v1.3.0` release candidate from source commit
+`aecaea11f3ecf60738f46d8907ade63b3e081cb8`. Task 8 source verification is
+green at Core `75/75`, Skins `375/375`, App/UI `625/625`, and Designer
+`424/424`, totaling `1499/1499` with zero failed or skipped; the Release build
+reported zero warnings/errors and `git diff --check` passed. Those source
+results do not substitute for installed GUI acceptance.
+
+The candidate adds persisted text vertical-offset and line-gap controls,
+Designer-only composition guides, per-channel animation audition, Dual ring
+role guidance, a corrected native export start directory, and exact truthful
+Apply/Export result feedback. Old v1.2.x packages without the new fields read
+as `0/0`; new output declares minimum HUD `1.3.0` while schema remains `1`.
+
+Production packaging and identity inspection pass, including exact hashes,
+normal-only ZIP, App+Designer publish, `1.3.0` versions, and `NotSigned` status.
+All nine isolated installer scenarios pass. The real Setup upgrade exited `0`;
+installed App/Designer match publish, startup/uninstall/Start-menu are correct,
+and user data is unchanged except the expected refresh timestamp. Formal HUD
+and installed Designer are running. Bounded installed-GUI smoke is
+`6 PASS / 3 PARTIAL / 1 NOT RUN`; user practical acceptance remains `NOT RUN`.
+The partial rows are the unavailable installed Undo/Redo path plus unexecuted
+save/reopen subset, missing same-context v1.2.3 visual, and an unsuitable blank
+animation fixture. Apply is `NOT RUN` because its exact PID/HWND/title safety
+gate failed twice before input; no HUD or skin state changed. The latest public
+release remains `v1.2.3`; no push, `main` integration, tag, GitHub Release,
+upload, or public readback is authorized before explicit user acceptance.
+
+Public Setup behavior is unchanged: startup and the normal `Codex Quota HUD`
+desktop shortcut are selected by default and may be deselected; the normal
+shortcut has no `--preview`; Skin Designer is visible and unchecked by
+default; ZIP is normal-HUD-only; Setup removes Developer Preview entries. On
+the maintainer machine only, the pre-install `Codex Quota HUD 开发预览` shortcut
+was snapshotted and restored separately with exact `--preview` after the
+product install was verified. That restoration is not Setup behavior.
+
 ## v1.2.3 released — installed, accepted, and public assets verified
 
 The v1.2.3 release preserves every built-in skin's existing refresh-speed

@@ -1,5 +1,56 @@
 # AI Change Log
 
+## 2026-08-08 — v1.3.0 local candidate packaged and installed
+
+- Prepared candidate documentation for the Skin Designer authoring upgrade
+  without claiming package, installer, installed-GUI, user-acceptance, or
+  remote-release evidence before it exists.
+- The two new persisted controls are text vertical offset (`-32..32 DIP`) and
+  number/time line-gap increment (`-16..32 DIP`). Missing v1.2.x properties
+  default to `0/0`; new output declares minimum HUD `1.3.0` under schema `1`.
+- Added Designer-only click-through composition guides, non-persistent
+  animation-channel audition, and exact Dual/5h/Week/None role guidance.
+- Corrected the native export picker to start in the shared skin exchange
+  directory and expanded Apply/Export feedback to include exact identity and
+  truthful activation disposition.
+- Task 8 source evidence remains `1499/1499` with zero failed/skipped, a
+  zero-warning/error Release build, and clean diff check. Task 9 then executed
+  each of the ten installed-GUI rows individually with direct or honest blocked
+  evidence: `6 PASS / 3 PARTIAL / 1 NOT RUN`.
+- Packaged Setup `100,056,640` bytes / `ceccf8c0…e3ff`, normal-only ZIP
+  `68,341,872` bytes / `9b91351d…0fba`, and a 196-byte checksum manifest.
+  Manifest, exact ZIP/publish structure, App/Designer/Setup versions, and all
+  three `NotSigned` results pass.
+- All seven normal isolated installer scenarios and both committed-cleanup
+  failure scenarios passed. The one sandbox-denied diagnostic is excluded and
+  its exact root was safely removed; final smoke-root count is zero.
+- Real Setup selected startup + Designer and omitted the normal desktop icon;
+  exit was `0`. Installed App/Designer match publish at `1.3.0.0 + aecaea1`;
+  uninstall/startup/Start-menu are correct. Thirty-four state files and two
+  exchange packages were preserved, with only the expected refresh timestamp
+  advance.
+- Setup left zero product desktop links before local customization. The
+  maintainer preview shortcut was then separately restored from its exact
+  backup with `--preview`; this is explicitly not Setup behavior.
+- Formal HUD and installed Designer are running. Direct installed GUI checks
+  passed text offset, line gap, guides/click-through, refresh-state restore,
+  display semantics, and the export picker. Undo/redo/save/reopen, legacy
+  same-context visual equivalence, and distinct animation-channel visuals are
+  partial. Apply was stopped before input when the exact identity gate failed
+  twice and remains `NOT RUN`; user practical acceptance is also `NOT RUN`.
+- Removed only the Task 9-created temporary draft after exact absolute-boundary
+  and no-reparse validation, reopened the installed Designer, and reverified
+  `34` state files with non-settings diffs `0`, stable settings/selected skin,
+  and both exchange package names/hashes unchanged. No temporary installed skin
+  exists; only the normal refresh timestamp advanced.
+- Ordinary Setup contract remains unchanged: startup and normal desktop icon
+  default selected and deselectable, no `--preview`; Designer optional and
+  unchecked; ZIP normal-HUD-only; Setup removes preview entries. The
+  maintainer-only preview shortcut is snapshotted/restored separately and is
+  not Setup behavior.
+- No push, `main` integration, tag, GitHub Release, upload, public readback, or
+  historical-asset mutation is authorized before explicit user acceptance.
+
 ## 2026-08-05 — v1.2.3 public release completed
 
 - Fast-forwarded both `main` and the retained feature branch directly to

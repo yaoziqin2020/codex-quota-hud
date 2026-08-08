@@ -8,6 +8,44 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
+## v1.3.0 local candidate — installed, awaiting user acceptance
+
+Task 9 is building an installed candidate from
+`aecaea11f3ecf60738f46d8907ade63b3e081cb8`. The authoring upgrade adds two
+persisted schema-v1 theme properties, `textOffsetY` (`-32..32 DIP`) and
+`textLineGap` (`-16..32 DIP`). Both default to `0`, preserving v1.2.3 layout.
+New Designer output declares minimum HUD `1.3.0`; untouched v1.2.x packages
+remain readable and normalize to `0/0` in the v1.3.0 Designer.
+
+Designer preview tools now include default-off click-through composition
+guides, non-persistent per-channel animation audition, and explicit
+Dual/5h/Week/None role hints. The native Save dialog starts in
+`Documents\Codex Quota HUD Skins`, and Apply/Export result dialogs report the
+exact skin/version/ID and activation disposition without overstating a merely
+installed skin as live-switched.
+
+Task 8 source evidence is Core `75/75`, Skins `375/375`, App/UI `625/625`, and
+Designer `424/424`, totaling `1499/1499`, with zero failed/skipped; Release
+build and diff checks passed. The v1.3.0 package identity and nine-scenario
+installer matrix pass. Real Setup exited `0`; installed App/Designer match
+publish at `1.3.0.0 + aecaea1`, startup/uninstall/Start-menu are correct, and
+all state/exchange data stayed equal except a normal refresh timestamp advance.
+Bounded installed Designer GUI smoke is `6 PASS / 3 PARTIAL / 1 NOT RUN`.
+Text offset, line gap, guides/click-through, refresh-state restoration, display
+roles, and export-picker rows passed directly. Undo/redo/save/reopen, same-
+context legacy visual equivalence, and visually distinct animation channels
+remain partial; Apply was stopped before input by the exact identity gate and
+is not run. Temporary GUI-smoke state was removed, all pre-existing state was
+reverified, and the installed Designer remains open. User practical acceptance
+is still `NOT RUN`; the latest public accepted release remains `v1.2.3`.
+
+Distribution boundaries remain fixed: ordinary Setup defaults startup plus
+the normal desktop shortcut, both deselectable and without `--preview`;
+Designer is optional and unchecked; ZIP contains only the normal HUD fallback;
+Setup removes Developer Preview entries. A maintainer-only preview shortcut is
+local state and is restored separately with exact `--preview` after verified
+installation, never copied into Setup behavior.
+
 ## v1.2.3 released — installed, accepted, and public assets verified
 
 The v1.2.3 work combines two approved corrections. Skin Designer-owned

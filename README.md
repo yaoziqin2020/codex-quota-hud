@@ -19,16 +19,21 @@ and a numeric tray icon without scraping web pages or storing credentials.
 > This is an independent open-source project and is not an official OpenAI
 > product.
 
-## v1.2.3 installation / 安装
+## v1.3.0 candidate installation / 候选安装
 
-Download the primary installer `CodexQuotaHud-Setup-v1.2.3.exe` from the
-[latest GitHub Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3).
-This exact release was installed and accepted on the maintainer machine before
-publication.
+The local candidate installer is `CodexQuotaHud-Setup-v1.3.0.exe`. Packaging,
+the nine-scenario isolated installer matrix, and the verified local upgrade
+have passed. Bounded installed Designer GUI smoke is
+`6 PASS / 3 PARTIAL / 1 NOT RUN`; user practical acceptance remains open.
+Until explicit acceptance and publication, the
+[latest public release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
+remains `v1.2.3`.
 
-请从[最新 GitHub Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
-下载主要安装文件 `CodexQuotaHud-Setup-v1.2.3.exe`。公开发布前，这一完全相同的版本
-已在维护者机器上完成安装和实操验收。
+本地候选安装文件为 `CodexQuotaHud-Setup-v1.3.0.exe`，目前尚未公开。封包、九场景隔离安装器
+矩阵和已验证的本机升级已经通过；十行已安装设计器 GUI 检查为
+`6 PASS / 3 PARTIAL / 1 NOT RUN`，用户实操验收仍未完成。
+在用户明确接受并公开发布前，[最新公开版本](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
+仍为 `v1.2.3`。
 
 Setup automatically offers Simplified Chinese or English, installs only for
 the current Windows user, and needs no administrator permission. It installs
@@ -55,13 +60,13 @@ Setup 的任务页包含开机启动和创建正式版桌面快捷方式，两�
 快捷方式均直接启动真实 HUD，不带 `--preview`。Setup 不提供开发预览入口；源码和 ZIP
 用户可明确运行 `CodexQuotaHud.App.exe --preview` 进入预览模式。
 
-Install `v1.2.3` directly over `v1.0.0`, `v1.1.0`, `v1.1.1`, `v1.2.0`,
-`v1.2.1`, or `v1.2.2`; personal HUD
+Install `v1.3.0` directly over `v1.0.0`, `v1.1.0`, `v1.1.1`, `v1.2.0`,
+`v1.2.1`, `v1.2.2`, or `v1.2.3`; personal HUD
 settings, installed custom skins, Designer drafts, and Developer Preview window
 state are retained by default. Normal uninstall preserves user data. Select the
 explicit purge option only to remove the exact approved product-data roots.
 
-可从 `v1.0.0`、`v1.1.0`、`v1.1.1`、`v1.2.0`、`v1.2.1` 或 `v1.2.2`
+可从 `v1.0.0`、`v1.1.0`、`v1.1.1`、`v1.2.0`、`v1.2.1`、`v1.2.2` 或 `v1.2.3`
 直接升级，默认保留 HUD 设置、已安装皮肤、设计器草稿和开发预览窗口状态。
 普通卸载会保留用户数据；只有明确选择清除选项时，才会删除安装器批准的准确产品数据目录。
 
@@ -70,17 +75,17 @@ unknown-publisher warning. Verify its SHA-256 against `SHA256SUMS.txt` before
 running it:
 
 ```powershell
-Get-FileHash .\\CodexQuotaHud-Setup-v1.2.3.exe -Algorithm SHA256
+Get-FileHash .\\CodexQuotaHud-Setup-v1.3.0.exe -Algorithm SHA256
 ```
 
 当前 Setup 未签名，Windows SmartScreen 可能显示未知发布者提示。运行前请使用
 `SHA256SUMS.txt` 和上述命令核对 SHA-256。
 
-If Setup is unavailable, `CodexQuotaHud-v1.2.3-win-x64.zip` plus its bundled
+If Setup is unavailable, `CodexQuotaHud-v1.3.0-win-x64.zip` plus its bundled
 PowerShell script is the fallback. GitHub Packages is not used for this
 application or its release assets.
 
-若 Setup 不可用，`CodexQuotaHud-v1.2.3-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
+若 Setup 不可用，`CodexQuotaHud-v1.3.0-win-x64.zip` 及其中 PowerShell 脚本是后备路径；
 本应用和发布资产均不使用 GitHub Packages。
 
 ## v1.2.x Skin Designer / 皮肤设计器
@@ -136,6 +141,22 @@ dialogs while retaining native Windows open/save pickers.
 关闭动画、切换皮肤、解绑或退出都会立即取消。皮肤设计器也已用可访问的深色主题
 对话框替代自身原生消息框，同时保留 Windows 原生打开/保存文件选择器。
 
+`v1.3.0` adds persisted text vertical offset (`-32..32 DIP`) and number/time
+line-gap increment (`-16..32 DIP`) controls. Old v1.2.x packages without these
+schema-v1 properties default to `0/0`; new Designer output declares minimum
+HUD `1.3.0`. Designer preview also gains default-off click-through composition
+guides, non-persistent per-channel animation audition, and explicit Dual outer
+= 5h / inner = Week guidance. The native export picker now starts in
+`Documents\Codex Quota HUD Skins`, while Apply/Export dialogs report exact
+skin identity and truthful activation disposition.
+
+`v1.3.0` 新增持久化“文字整体上下偏移”（`-32..32 DIP`）和“数字/时间间距”
+（`-16..32 DIP`）。旧 v1.2.x 包缺少这两个 schema-v1 字段时按 `0/0` 读取，
+新输出最低 HUD 自动声明为 `1.3.0`。设计器预览还新增默认关闭且不拦截点击的构图
+参考线、不写入草稿的单项动画预演，以及 Dual 外圈为 5 小时、内圈为每周的明确
+说明。原生导出选择器从 `Documents\Codex Quota HUD Skins` 开始；应用/导出结果会
+显示准确皮肤身份和真实激活状态。
+
 The Setup shows an optional component named **Install
 Skin Designer**, with this description: “Optional visual editor for creating
 and exporting Codex Quota HUD skins. It is not required to run or import
@@ -186,9 +207,10 @@ as completed acceptance in the release record.
 
 ## 下载与安装 / Download
 
-在 v1.2.3 完成本机验收并获准公开发布后，从
+在 v1.3.0 完成本机验收、用户明确接受并公开发布后，可从
 [最新 Release](https://github.com/yaoziqin2020/codex-quota-hud/releases/latest)
-下载 ZIP 后备包 `CodexQuotaHud-v1.2.3-win-x64.zip`，解压后在该目录运行：
+下载 ZIP 后备包 `CodexQuotaHud-v1.3.0-win-x64.zip`，解压后在该目录运行。
+在此之前，最新公开版本仍为 v1.2.3：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
@@ -347,13 +369,13 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前 v1.2.3 发布源码包含 1447 项自动化测试：
+当前 v1.3.0 候选源码包含 1499 项自动化测试：
 
 - Core：75 项
-- Skins：355 项
-- App / UI：622 项
-- Skin Designer：395 项
-- Total：1447 项
+- Skins：375 项
+- App / UI：625 项
+- Skin Designer：424 项
+- Total：1499 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -364,15 +386,15 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 自包含发布检查。CI 包固定使用临时版本 `0.0.0`，只在 Runner 内做安装烟测，
 不会冒用或覆盖公开 Release 版本。
 
-当前 v1.2.3 的 fresh Release 测试为 `1447/1447`、跳过 `0`，Release build
-为 `0` warnings / `0` errors。刷新时序、旧包默认值、0x 暂停、对话框契约与
-Designer 控件均有自动化覆盖；最终 Setup 已本地安装，安装后身份/哈希/数据保留、
-正式启动和核心 Designer GUI 冒烟通过。精确 GUI 动画时序、全部对话框类型、旧包
-输出与重启矩阵仍为 `PARTIAL` 或 `NOT RUN`；用户已对最终安装候选完成实操验收。
-历史 v1.2.0 的未复现存储异常仍按原记录保留。详见
-[`docs/verification/2026-08-02-optional-skin-designer-acceptance.md`](docs/verification/2026-08-02-optional-skin-designer-acceptance.md)。
+当前 v1.3.0 候选源码的 fresh serial Release 测试为 `1499/1499`、失败 `0`、
+跳过 `0`，Release build 为 `0` warnings / `0` errors。旧包 `0/0` 默认值、
+规范写出、共享文字/参考线几何、预览工具不持久化、Dual 语义、原生选择器目录和
+结果反馈均有自动化覆盖。生产封包、九场景安装器矩阵、本机升级、已安装身份/数据
+保留、十行已安装 Designer GUI 冒烟和用户实操验收在 Task 9 按实际执行结果记录；
+在未执行时一律为 `NOT RUN`。详见
+[`docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md`](docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md)。
 
-v1.2.3 的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已
+上一公开版 v1.2.3 的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已
 完整记录在验收文档中。注释标签 `v1.2.3` 指向通过 CI 的提交 `0f42c5d`；公开 Release
 为 Latest、非草稿、非预发布，三个上传资产的在线大小和重新下载后的 SHA-256 均与本地一致。
 

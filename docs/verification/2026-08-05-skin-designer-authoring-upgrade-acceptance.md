@@ -285,7 +285,7 @@ shutdown of, this documented `15:40:47 +09:00` source launch.
 | NOT RUN | 2026-08-08 15:40–15:43 +09:00 | Undo, redo, save, and reopen | Both non-zero values restore exactly | Blocked before input; no GUI draft copy was created | Runtime ownership diagnostics |
 | NOT RUN | 2026-08-08 15:40–15:43 +09:00 | Set text layout to `0/0` | Appearance matches the v1.2.3 baseline | Blocked before input; numerical/compatibility tests are not visual evidence | Runtime ownership diagnostics |
 | NOT RUN | 2026-08-08 15:40–15:43 +09:00 | Enable `构图参考线` | Guides align with outer/inner rings, peak center container, and both text lines; overlay remains click-through | Blocked before input | Runtime ownership diagnostics |
-| NOT RUN | 2026-08-08 15:40–15:43 +09:00 | Switch audition selector through `全部`, `中心呼吸`, `光晕脉冲`, `环形运动`, `进度明暗`, and `刷新加速` | Every mode is visibly distinct; returning to `全部` restores the saved animation mix | Blocked before input; no mode was visually observed | Runtime ownership diagnostics |
+| NOT RUN | 2026-08-08 15:40–15:43 +09:00 | Switch audition selector through `全部`, `转圈`, `呼吸`, `光晕`, `浮动`, and `刷新加速` | Every mode is visibly distinct; returning to `全部` restores the saved animation mix | Blocked before input; no mode was visually observed | Runtime ownership diagnostics |
 | NOT RUN | 2026-08-08 15:40–15:43 +09:00 | Enter and leave `刷新加速` | Former `刷新中` checkbox state is restored | Blocked before input | Runtime ownership diagnostics |
 | NOT RUN | 2026-08-08 15:40–15:43 +09:00 | Switch Dual / 5h / Week / None | Hints match displayed rings; Dual outer = 5h and inner = Week | Blocked before input | Runtime ownership diagnostics |
 | NOT RUN | 2026-08-08 15:40–15:43 +09:00 | Open export picker | Native picker starts in `C:\Users\yaozi\Documents\Codex Quota HUD Skins` with a leaf `.cqskin` filename | Blocked before input; production option-builder coverage passed in the full Designer suite, but no native picker was observed | Runtime ownership diagnostics |
@@ -485,3 +485,71 @@ Get-Date -Format "END yyyy-MM-dd HH:mm:ss.fff zzz"
   ten table rows individually under the correctly installed application
   identity. Until all ten have direct evidence, Task 8 remains `PARTIAL` and
   is neither full manual acceptance nor release-ready evidence.
+
+## Task 9 installed-candidate acceptance
+
+Task 9 targets product source
+`aecaea11f3ecf60738f46d8907ade63b3e081cb8`. It must stop after local
+installed-candidate handoff and explicit user acceptance request. No `main`
+integration, push, `v1.3.0` tag, GitHub Release, upload, public readback, or
+historical-asset mutation is part of Steps 1–6.
+
+### Candidate, installer, and local-upgrade gates
+
+| Status | Date/time (Asia/Tokyo) | Gate | Expected | Observed / evidence |
+|---|---|---|---|---|
+| PASS | 2026-08-08 15:54:07–15:56:51 +09:00 | Task 8 serial source suites | All four Release assemblies pass with zero skipped | Core `75/75`, Skins `375/375`, App/UI `625/625`, Designer `424/424`; total `1499/1499`, failed `0`, skipped `0` |
+| PASS | 2026-08-08 15:56:57–15:57:00 +09:00 | Task 8 Release build and diff | Zero warnings/errors and clean diff | Build warnings `0`, errors `0`; `git diff --check` no output |
+| PASS | 2026-08-08 16:54:56–16:57:20 +09:00 | `.\scripts\package-release.ps1 -Version 1.3.0` | Produce Setup, normal-only ZIP, and two-line checksum manifest from one publish payload | Initial sandbox run failed only on blocked NuGet (`NU1301/NU1900`) and cleaned up; authorized identical rerun exited `0`, published App/Designer, and Inno Setup 6.7.3 compiled Setup successfully in `72.047 s` |
+| PASS | 2026-08-08 17:06:51.943 +09:00 | Candidate identity/boundaries | Exact sizes/SHA-256, manifest/ZIP/publish identity, App/Designer/Setup versions, `NotSigned`; ordinary Setup contract unchanged | Setup `100,056,640` / `ceccf8c0…e3ff`; ZIP `68,341,872` / `9b91351d…0fba`; manifest `196` / `9f0be51c…f771`; two manifest hashes match; ZIP exactly five normal-HUD entries; publish exactly App + Designer; App/Designer `1.3.0.0` + `aecaea1`; Setup `1.3.0`; all three `NotSigned` with no certificates. Full local record: `artifacts/release/v1.3.0-candidate-identity.txt` |
+| PASS | 2026-08-08 approximately 17:10–17:27 +09:00 | `.\scripts\test-installer.ps1 -Version 1.3.0 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.3.0.exe` | Seven normal and two committed-cleanup scenarios pass; zero final smoke roots/processes; production install/data untouched | Authorized identical rerun exited `0`: `fresh-default`, `fresh-designer`, `add-designer`, `remove-designer`, `upgrade-selected`, `uninstall-preserve`, `uninstall-purge`, `cleanup-legacy-failure`, and `cleanup-designer-failure` all passed with checked cleanup. Initial sandbox run is excluded: isolated HKCU key creation was denied with error `5`. Its exact diagnostic root was inspected, validated within system temp with no reparse tree, removed, and final smoke-root count was `0` at 17:28:16.718. Full local record: `artifacts/release/v1.3.0-installer-matrix.txt` |
+| PASS | 2026-08-08 17:30:34.354 +09:00 | Bounded pre-install snapshot | Record installed binaries/hashes/version, uninstall/startup, settings/selected skin, installed skins, drafts/recovery/imports/exchange, and shortcuts | Before snapshot captured v1.2.3 App/Designer/uninstall, exact `--background` startup, selected `custom:75c7b76e-7b3a-4e51-83db-c404555a7a7e`, `34` state files (`10` installed-skin, `22` Designer draft-tree including `2` recovery, `0` imports), `2` exchange files, normal+Designer Start links, one desktop preview link with exact `--preview`, and one formal HUD process. Preview binary backup hash matched; `before.json` SHA `3c84c365…8a10` |
+| PASS | 2026-08-08 17:32:26.920–17:32:47.211 +09:00 | Real silent v1.3.0 upgrade | Exit `0`; select Designer + startup and omit normal desktop icon to preserve maintainer preference | Verified Setup hash then invoked `/SILENT /SUPPRESSMSGBOXES /NORESTART /TASKS="startup" /TYPE=custom /COMPONENTS=designer`; exit `0`; retained 6,197-byte install log SHA `428b9824…a09b` |
+| PASS | 2026-08-08 17:33:43.791 +09:00 | Post-install product verification | Installed App/Designer `1.3.0.0`, hashes match publish, data unchanged except expected refresh timestamps, startup `--background`, Start menu correct, no Setup preview entry | App/Designer hashes match publish and product versions contain full `aecaea1`; uninstall `1.3.0`; exact startup; `34` state files with non-settings diffs `0`; stable settings equal and only `LastSuccessfulRefresh` advanced; exchange `2/2` diffs `0`; desktop product links `0`; Start menu normal+Designer with no arguments. Snapshot SHA `22de5e20…af1f` |
+| PASS | 2026-08-08 17:34:07.995 +09:00 | Maintainer preview restoration | After product verification, separately recreate/restore only `Codex Quota HUD 开发预览` with exact `--preview`; explicitly not Setup behavior | Copied the exact preinstall `.lnk` backup only after product verification; source/destination SHA both `6afe8a88…4abf`; standard installed App target, exact `--preview`, final product desktop count `1`. Restoration record explicitly labels separate maintainer customization |
+| PASS | 2026-08-08 17:34:23.855–17:34:34.939 +09:00 | Formal HUD and installed Designer launch | Both exact installed binaries launch; Designer remains open for installed-GUI acceptance | Formal HUD PID `17188`; installed Designer PID `11716`, HWND `983264`, title `Codex Quota HUD 皮肤设计器`; both exact installed paths and responding. Window2 failed twice with `node_repl exec context not found`, so the authorized fallback below attached only to this revalidated PID/HWND |
+| PASS | 2026-08-08 18:09:33–18:10:54 +09:00 | GUI-smoke state restoration | Remove only Task 9 temporary state, preserve all pre-existing user state, and leave the installed applications running | After the bounded GUI run, the exact Task 9 temporary draft `e5adef09-aaa4-41c0-8741-132c7fe109b2` was removed only after the installed Designer stopped and the absolute drafts-root boundary plus complete no-reparse tree were revalidated. The never-created temporary installed skin is absent. Final state is back to `34` files with non-settings path/hash diffs `0`; stable settings fields and selected skin are equal; the two exchange packages have identical names/hashes; only the expected refresh timestamp advanced. Formal HUD PID `17188` remains responding; installed Designer was reopened from the exact v1.3.0 path as PID `21728`, HWND `1312598`, and left open. Ignored evidence: `artifacts/acceptance-task9-uia/state-backup/final-restored-state.json` (`de83fccb…12c4`) |
+| NOT RUN | — | User practical acceptance | User tests and explicitly accepts the exact installed candidate | Not run |
+
+Public installer contract for this candidate remains: startup and the normal
+`Codex Quota HUD` desktop shortcut are selected by default and may be
+deselected; the shortcut has no `--preview`; Designer is visible and unchecked
+by default; ZIP contains the normal HUD fallback only; Setup removes Developer
+Preview entries. The maintainer real-install command intentionally selects
+startup and Designer while omitting the normal desktop icon to preserve this
+machine's existing preference. The later preview-shortcut restoration is a
+separate local customization, not an installer result.
+
+### Installed Designer GUI rows
+
+Window2 identified the installed Designer uniquely, but two capture attempts
+failed with `node_repl exec context not found`. Per the authorized bounded
+fallback, an ignored temporary .NET `System.Windows.Automation` harness
+attached only after validating the exact installed executable, PID `11716`,
+HWND `983264`, title, and responding state. It enumerated `192` accessible
+nodes, interacted only with that Designer, captured only process-owned windows,
+and wrote screenshots/JSON under ignored
+`artifacts/acceptance-task9-uia/evidence/`. Each status below comes from direct
+installed-UI observation; source tests do not substitute for missing visual
+evidence.
+
+| Status | Date/time (Asia/Tokyo) | Installed action | Expected | Observed / evidence |
+|---|---|---|---|---|
+| PASS | 2026-08-08 17:50:02–17:50:27 +09:00 | Text offset control on a copied/temporary draft | Both text lines move together | At `0`, Number/Label tops were `241/274`; at `+12 DIP`, both became `247/280`, the same `+6 px` movement at preview scale. Direct before/after screenshots agree. Restored `0` and original geometry |
+| PASS | 2026-08-08 17:50:53–17:51:05 +09:00 | Positive and negative line-gap control | Lines expand/contract equally without changing their midpoint | `+16 DIP` produced line centers `256/285.5`; `-8 DIP` produced `262/279.5`. Both share midpoint `270.75`, while direct screenshots show expansion/contraction. Restored `0` and original `241/274` tops |
+| PARTIAL | 2026-08-08 17:43:43–18:08:41 +09:00 | Undo, redo, save, and reopen | Both non-zero values restore exactly | The exact `192`-node installed tree exposes Save/Open but no Undo/Redo control, and the installed window has no input binding for those operations. Save/reopen was not attempted after the later identity gate failed twice before input. The full expected chain therefore cannot be claimed; temporary values were independently restored |
+| PARTIAL | 2026-08-08 17:49:33 +09:00 | Set text layout to `0/0` | Appearance matches the v1.2.3 baseline | Installed v1.3.0 at exact `0/0` was directly captured and measured (`241/274` text tops), but no v1.2.3 same-context visual capture exists. Compatibility tests are not visual evidence, so visual equivalence remains unproven |
+| PASS | 2026-08-08 17:52:16–17:53:35 +09:00 | Enable `构图参考线` | Guides align with both rings, peak center container, and text lines and remain click-through | Direct screenshots show dashed outer/inner rings, peak center box, and both text guides aligned. UIA FromPoint at four preview locations returned the same underlying custom/number/label targets with guides off and on, so the overlay did not intercept them. Restored Off |
+| PARTIAL | 2026-08-08 17:59:57–18:00:37 +09:00 | Switch `全部`, `转圈`, `呼吸`, `光晕`, `浮动`, `刷新加速` | Modes are distinct; returning to `全部` restores saved mix | All six actual installed labels were selected individually and direct screenshots/state were captured, then `全部` was restored. The temporary blank draft had no decoration and saved rotation/floating intensity `0`, so every channel could not be shown as visually distinct in this context |
+| PASS | 2026-08-08 18:00:29–18:01:26 +09:00 | Enter and leave `刷新加速` | Former `刷新中` checkbox state restores | From saved Off, audition forced On+disabled and leaving restored Off+enabled. From saved On, audition kept On+disabled and leaving restored On+enabled. Final state returned to the original Off+enabled and `全部` |
+| PASS | 2026-08-08 17:58:02–17:58:34 +09:00 | Switch Dual / 5h / Week / None | Hints match rings; Dual outer = 5h, inner = Week | 5h showed `5h：单圈显示 5 小时额度` and `68%/5小时`; Week showed `Week：单圈显示每周额度` and `34%/每周`; None hid the preview. Dual restored the preview, double rings, and exact `Dual：外圈 = 5 小时，内圈 = 每周` hint |
+| PASS | 2026-08-08 18:02:51–18:04:01 +09:00 | Open export picker | Native picker starts in `C:\Users\yaozi\Documents\Codex Quota HUD Skins` with a leaf `.cqskin` name | The process-owned native picker opened at breadcrumb `文档 > Codex Quota HUD Skins`; filename was leaf-only `未命名皮肤.cqskin` with the CQSKIN filter. Escape cancelled without saving; the app-owned `操作已取消` result was dismissed, and exchange files remained unchanged |
+| NOT RUN | 2026-08-08 18:07:57–18:08:41 +09:00 | Apply copied/temporary skin to HUD | Result shows exact display name/version/skin ID and truthful activation disposition | Both the action attempt and the one explicitly authorized read-only retry stopped before input because the harness observed the expected path/responding process but transient `MainWindowHandle=0` and empty title, failing the exact identity gate. Apply was never invoked, the HUD was never contacted, selected skin stayed `custom:75c7b76e-7b3a-4e51-83db-c404555a7a7e`, and no temporary installed skin was created |
+
+Installed-GUI total: `6 PASS / 3 PARTIAL / 1 NOT RUN`. Overall Task 9 is
+`PARTIAL — installed candidate handed off, user acceptance pending`.
+Packaging, isolated installer testing, the real upgrade, and bounded installed
+GUI evidence are recorded honestly. The row 3 installed-UI contract gap, row 4
+missing same-context legacy visual, row 6 unsuitable animation fixture, row 10
+identity-gate block, and user practical acceptance remain open. No Step 7
+remote release action is authorized.
