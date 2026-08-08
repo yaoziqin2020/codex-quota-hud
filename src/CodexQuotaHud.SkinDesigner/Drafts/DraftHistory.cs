@@ -33,6 +33,14 @@ public sealed class DraftHistory
 
     public bool CanRedo => _index < _states.Count - 1;
 
+    public void Reset(SkinDraftDocument state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        _states.Clear();
+        _states.Add(DraftSnapshot.Clone(state));
+        _index = 0;
+    }
+
     public bool Push(SkinDraftDocument state)
     {
         ArgumentNullException.ThrowIfNull(state);

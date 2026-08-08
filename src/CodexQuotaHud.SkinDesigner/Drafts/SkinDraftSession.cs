@@ -25,6 +25,10 @@ public sealed class SkinDraftSession
 
     public SkinDraftDocument Current => _current;
 
+    public bool CanUndo => _history.CanUndo;
+
+    public bool CanRedo => _history.CanRedo;
+
     public bool HasUnsavedChanges => !DraftSnapshot.StructuralEquals(
         _current,
         _namedSavedBaseline,
@@ -37,9 +41,17 @@ public sealed class SkinDraftSession
         Func<SkinDraftDocument, SkinDraftDocument> edit)
         => ApplyCore(edit, requireStructuralChange: false);
 
+    internal bool ApplyAsHistoryBoundary(
+        Func<SkinDraftDocument, SkinDraftDocument> edit) =>
+        ApplyCore(
+            edit,
+            requireStructuralChange: false,
+            startsNewHistorySegment: true);
+
     private bool ApplyCore(
         Func<SkinDraftDocument, SkinDraftDocument> edit,
-        bool requireStructuralChange)
+        bool requireStructuralChange,
+        bool startsNewHistorySegment = false)
     {
         ArgumentNullException.ThrowIfNull(edit);
         var edited = edit(DraftSnapshot.Clone(_current)) ??
@@ -58,7 +70,11 @@ public sealed class SkinDraftSession
             CreatedAtUtc = _current.CreatedAtUtc,
             UpdatedAtUtc = NextTimestamp()
         };
-        if (!_history.Push(accepted))
+        if (startsNewHistorySegment)
+        {
+            _history.Reset(accepted);
+        }
+        else if (!_history.Push(accepted))
         {
             return false;
         }

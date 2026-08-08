@@ -205,6 +205,61 @@ public sealed class DraftHistoryTests
         Assert.True(session.HasUnsavedChanges);
     }
 
+    [Fact]
+    public void SessionAvailability_TracksEditUndoRedoAndBranchedEdit()
+    {
+        var next = CreatedAt;
+        var session = new SkinDraftSession(
+            Draft(0),
+            () => next = next.AddSeconds(1));
+        Assert.False(session.CanUndo);
+        Assert.False(session.CanRedo);
+
+        Assert.True(session.Apply(current => current with { DisplayName = "One" }));
+        Assert.True(session.CanUndo);
+        Assert.False(session.CanRedo);
+
+        Assert.True(session.TryUndo());
+        Assert.False(session.CanUndo);
+        Assert.True(session.CanRedo);
+
+        Assert.True(session.Apply(current => current with { DisplayName = "Branch" }));
+        Assert.True(session.CanUndo);
+        Assert.False(session.CanRedo);
+    }
+
+    [Fact]
+    public void ImageBoundary_KeepsAcceptedDraftDirtyAndClearsBothDirections()
+    {
+        var next = CreatedAt;
+        var session = new SkinDraftSession(
+            Draft(0),
+            () => next = next.AddSeconds(1));
+        Assert.True(session.Apply(current => current with { DisplayName = "Before image" }));
+        Assert.True(session.TryUndo());
+        Assert.True(session.CanRedo);
+        var events = 0;
+        session.MeaningfulChange += (_, _) => events++;
+
+        Assert.True(session.ApplyAsHistoryBoundary(current => current with
+        {
+            Assets = ReadOnly(new Dictionary<SkinAssetSlot, DraftAssetReference>
+            {
+                [SkinAssetSlot.Center] = new(
+                    SkinAssetSlot.Center,
+                    "assets/center.png",
+                    "center.png")
+            })
+        }));
+
+        Assert.False(session.CanUndo);
+        Assert.False(session.CanRedo);
+        Assert.False(session.TryUndo());
+        Assert.True(session.HasUnsavedChanges);
+        Assert.True(session.Current.Assets.ContainsKey(SkinAssetSlot.Center));
+        Assert.Equal(1, events);
+    }
+
     private static SkinDraftDocument Draft(long revision) =>
         SkinDraftFactory.CreateNew(
             DraftId,
