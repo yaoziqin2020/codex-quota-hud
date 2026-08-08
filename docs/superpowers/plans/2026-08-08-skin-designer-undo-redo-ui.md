@@ -137,7 +137,7 @@ internal bool ApplyAsHistoryBoundary(
     Func<SkinDraftDocument, SkinDraftDocument> edit) =>
     ApplyCore(
         edit,
-        requireStructuralChange: false,
+        requireStructuralChange: true,
         startsNewHistorySegment: true);
 ```
 
