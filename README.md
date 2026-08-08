@@ -21,28 +21,29 @@ and a numeric tray icon without scraping web pages or storing credentials.
 
 ## v1.3.0 candidate installation / 候选安装
 
-The rebuilt local candidate from source
-`fbdf23c659cc524224bcd51d2b1581efde43153f` is **not release-ready**.
-Fresh serial Release verification passed `1508/1508` with zero failed/skipped,
+The fixed local candidate from source
+`cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` is **not release-ready**.
+Fresh serial Release verification passed `1561/1561` with zero failed/skipped,
 the build passed with zero warnings/errors, packaging passed, the isolated
 installer matrix passed `9/9`, and the real upgrade preserved bounded user
-state. Direct installed undo/redo smoke then found a release-blocking defect:
-Undo/Redo changed the preview and history availability but left the edited
-slider/value stale. A second defect left `draft.json` referencing a physically
-deleted decoration after the user chose Discard. Installed Task 4 rows are
-`5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`; old-package import and tray-menu
-operation stopped at their exact input safety gates. Overall candidate status
-is `FAIL`; no push, merge, tag, upload, or GitHub Release is authorized.
+state. Installed UI acceptance is `NOT RUN`: both independent Computer Use
+attempts selected the unique exact Designer window but failed before input
+with `node_repl exec context not found`, including the documented recovery
+retry. Policy prohibited a UIA fallback, so the required fixed-path UI rows
+still need a healthy Computer Use session or user manual smoke. Overall
+candidate status is `FAIL`; no push, merge, tag, upload, or GitHub Release is
+authorized.
 Until explicit acceptance and publication, the
 [latest public release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
 remains `v1.2.3`.
 
-从源码 `fbdf23c659cc524224bcd51d2b1581efde43153f` 重建的本地候选版**尚未达到发布条件**。
-fresh serial Release 测试 `1508/1508`、Release build、封包、九场景隔离安装器矩阵和本机升级均通过，
-但直接 installed undo/redo 冒烟发现阻塞缺陷：撤销/重做虽然改变预览和历史可用状态，滑块和值却保持
-旧编辑值；图像删除后选择 Discard 还会留下引用已删除装饰文件的草稿。Task 4 installed 行汇总为
-`5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`；旧包导入与托盘菜单在准确输入安全门失败后停止。
-候选整体为 `FAIL`，禁止 push、merge、tag、上传或创建 GitHub Release。
+从源码 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` 重建的 fixed 本地候选版
+**尚未达到发布条件**。fresh serial Release 测试 `1561/1561`、Release build、
+封包、九场景隔离安装器矩阵和本机升级均通过；但 installed UI 验收为 `NOT RUN`。
+两次独立 Computer Use 尝试都准确选中了唯一设计器窗口，却在任何输入前重复遇到
+`node_repl exec context not found`；按工具安全规则不得改用 UIA 后备路径。因此撤销/重做、
+图像 Discard/Save、旧包导入、托盘和关闭隔离等直接 installed 行仍需健康的 Computer Use
+会话或用户手测。候选整体为 `FAIL`，禁止 push、merge、tag、上传或创建 GitHub Release。
 在用户明确接受并公开发布前，[最新公开版本](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
 仍为 `v1.2.3`。
 
@@ -384,13 +385,13 @@ docs/                         设计、实现计划、验收记录和预览资�
 
 ## 验证 / Verification
 
-当前 v1.3.0 候选源码包含 1508 项自动化测试：
+当前 v1.3.0 候选源码包含 1561 项自动化测试：
 
 - Core：75 项
 - Skins：375 项
 - App / UI：625 项
-- Skin Designer：433 项
-- Total：1508 项
+- Skin Designer：486 项
+- Total：1561 项
 
 ```powershell
 dotnet test .\CodexQuotaHud.sln -c Release --no-restore
@@ -401,15 +402,15 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 自包含发布检查。CI 包固定使用临时版本 `0.0.0`，只在 Runner 内做安装烟测，
 不会冒用或覆盖公开 Release 版本。
 
-当前 v1.3.0 候选源码的 fresh serial Release 测试为 `1508/1508`、失败 `0`、
+当前 v1.3.0 候选源码的 fresh serial Release 测试为 `1561/1561`、失败 `0`、
 跳过 `0`，Release build 为 `0` warnings / `0` errors。旧包 `0/0` 默认值、
 规范写出、共享文字/参考线几何、预览工具不持久化、`free-decoration-ring`
 预览的 Dual 圈层说明、原生选择器目录和
 结果反馈均有自动化覆盖。生产封包、九场景安装器矩阵、本机升级、已安装身份/数据
-保留和 installed GUI 冒烟均按实际执行结果记录。Task 4 直接发现 undo/redo 控件值未同步和
-Discard 后装饰文件未恢复两项产品缺陷；旧包导入与托盘菜单在输入安全门失败后为 `NOT RUN`。
-Designer 关闭后正式 HUD 隔离检查为 `PARTIAL`：关闭前参考线已为 Off、单项预演已为“全部”，
-只证明未激活状态未泄露，未直接验证关闭会清除激活中的参考线/单项预演。源码自动化不能替代这些 installed 观察。详见
+保留均按实际执行结果记录。Task 8 的 installed GUI 行全部为 `NOT RUN`：两次独立
+Computer Use 尝试在任何输入前重复遇到 `node_repl exec context not found`，工具安全规则
+禁止改用 UIA 后备路径。Task 4 的旧缺陷观察保留为历史证据；源码自动化不能替代 fixed
+candidate 的 installed 观察。详见
 [`docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md`](docs/verification/2026-08-05-skin-designer-authoring-upgrade-acceptance.md)。
 
 上一公开版 v1.2.3 的 Setup/ZIP 结构、隔离安装器矩阵、哈希、签名状态、本地安装和用户验收证据已

@@ -1,56 +1,55 @@
 # Current Task
 
-## v1.3.0 undo/redo candidate — FAIL, not release-ready
+## v1.3.0 fixed candidate — NOT RUN installed UI, not release-ready
 
-Task 4 rebuilt and installed the local `v1.3.0` candidate from source commit
-`fbdf23c659cc524224bcd51d2b1581efde43153f`. Fresh serial verification passed
-Core `75/75`, Skins `375/375`, App/UI `625/625`, and Designer `433/433`,
-totaling `1508/1508` with zero failed or skipped. The Release build reported
+Task 8 rebuilt and installed the fixed local candidate from source commit
+`cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`. Fresh serial Release verification
+passed Core `75/75`, Skins `375/375`, App/UI `625/625`, and Designer `486/486`,
+totaling `1561/1561` with zero failed or skipped. The Release build reported
 zero warnings/errors and `git diff --check` emitted no output.
 
-The candidate adds persisted text vertical-offset and line-gap controls,
-Designer-only composition guides, per-channel animation audition,
-`free-decoration-ring` preview Dual-role guidance, a corrected native export
-start directory, and exact truthful Apply/Export result feedback. Old v1.2.x
-packages without the new fields read
-as `0/0`; new output declares minimum HUD `1.3.0` while schema remains `1`.
-
 Production packaging and identity inspection passed. Current assets are Setup
-`100,056,769` bytes / `a3352f5e74e186cb698431897d0b991fde41a2e1de86047547e6a9d5c55a8d2d`,
-normal-HUD ZIP `68,342,354` bytes /
-`61d9d04b2c5495dc041fc2e2a528dfa31908b4a196449303b353cbe88f32a2ef`,
+`100,073,545` bytes / `3d2a2e83275afa23c45debc641ae0efcdabde201a018bac9b788ce42dc3cc355`,
+normal-HUD ZIP `68,342,651` bytes /
+`f3c91d28812af5305499fb65ba8e80ff27f95ebbcc3728dddf546e17560c1f8b`,
 and 196-byte `SHA256SUMS.txt` /
-`df99aad23eed4882e173076bbac2ed1f924ba94a1be9b96d9da202cccb8b1751`.
-App/Designer are `1.3.0.0` + full `fbdf23c`; Setup/App/Designer are `NotSigned`.
-All nine isolated installer scenarios passed. The real Setup upgrade exited
-`0`; installed App `940ca077…f5bc` and Designer `27521dcc…95f0` match publish,
-startup remains exact `--background`, and bounded state was preserved.
+`15ee7c679d363ea1dfcc141d1228953d080178af72066dfcec069cbfd23dba00`.
+The manifest has exactly two matching lowercase lines and the ZIP has exactly
+the five approved normal-HUD entries with no Designer. App/Designer are
+`1.3.0.0` + full `cd5634c`; Setup/App/Designer are `NotSigned`.
 
-The installed undo/redo flow is release-blocking. With `文字整体偏移` changed
-from `0` to `12`, Undo restored the preview and history availability but left
-the slider/value at `12`; Redo repeated the same stale-control behavior.
-`Ctrl+Z`/`Ctrl+Y` share the defect. Save/reopen did persist final `8/5`, redo
-branch invalidation passed, and image mutation history boundaries passed.
-However, after removing the decoration and choosing Discard, the physical
-`assets\decoration.png` remained deleted while saved `draft.json` still
-referenced it, producing `document.asset-missing` on reopen.
+All nine isolated installer scenarios passed with checked cleanup. The real
+Setup upgrade used startup plus Designer and no ordinary desktop shortcut,
+exited `0`, and installed App
+`8bf7cbbf51894338178e8fe3a17ceab2e9e6a1ba123ef87ad8d1dac87f4b638f`
+and Designer
+`ec4c947077af3575bc4236f6cc7753eaa224767e113906e904aa1c1c2b55b7ea`,
+exactly matching publish. Uninstall reports `1.3.0`; startup remains exact
+`--background`; 34 state files, two exchange packages, and stable settings
+were preserved. Setup removed the preview shortcut; the exact maintainer
+standard-App `--preview` shortcut was restored separately.
 
-Installed Task 4 rows total `5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`.
-Six nonzero animation auditions and Apply-to-HUD identity/result/actual
-formal-HUD selection passed. Post-Designer-close isolation is `PARTIAL` because
-guides were Off and audition was All before close; active-state cleanup was not
-exercised. Old-package import is
-`NOT RUN` because the native filename input did not round-trip exactly; the
-picker was safely cancelled. Tray-menu operation is `NOT RUN` because the
-exact tray-icon center hit-test failed before input; no right-click was sent.
-All user state was restored: 33 non-settings files are byte/hash exact,
-settings stable fields and selected skin are exact with only the allowed
-refresh advance, both exchange packages and the maintainer `--preview`
-shortcut are exact, formal HUD is running, and Designer is closed.
+Installed UI acceptance is `NOT RUN`. Both the Task 8 agent and root independently
+read the Computer Use guidance/confirmation policy, selected the one exact
+installed Designer window, and stopped before input when `@oai/sky`
+`get_window`/`get_window_state` failed with
+`node_repl exec context not found`. Each followed the documented refresh/reset
+recovery; the failure repeated. The non-negotiable policy prohibited the prior
+PowerShell/UIA fallback, so Undo/Redo, image Discard/Save, picker cancellation,
+six auditions, Apply, v1.2.3 import, tray actions, and active guide/audition
+close isolation are all honestly `NOT RUN`. Source automation is not a
+substitute for these installed rows.
 
-Overall status is `FAIL — candidate not release-ready`. The latest public
-release remains `v1.2.3`. No push, `main` integration, tag, GitHub Release,
-upload, public readback, or historical-asset mutation is authorized.
+The controlled fixture and all launch-time state were removed by restoring the
+validated stable backup. Final state has 34/34 files with zero non-settings or
+stable-settings differences, both exchange packages exact, startup and the
+preview shortcut exact, the fixed formal HUD running, and Designer closed.
+Task 4's failed `fbdf23c` candidate remains historical evidence; the fixes are
+present in this source, but the installed rows still require a healthy
+Computer Use session or user manual smoke. Overall status remains
+`FAIL — candidate not release-ready`. The latest public release remains
+`v1.2.3`; no push, `main` integration, tag, GitHub Release, upload, or public
+readback is authorized.
 
 Public Setup behavior is unchanged: startup and the normal `Codex Quota HUD`
 desktop shortcut are selected by default and may be deselected; the normal

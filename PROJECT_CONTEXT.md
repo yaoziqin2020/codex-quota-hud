@@ -8,10 +8,10 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
-## v1.3.0 undo/redo local candidate — failed installed acceptance
+## v1.3.0 fixed local candidate — installed UI acceptance blocked
 
-Task 4 rebuilt and installed the candidate from
-`fbdf23c659cc524224bcd51d2b1581efde43153f`. The authoring upgrade adds two
+Task 8 rebuilt and installed the fixed candidate from
+`cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`. The authoring upgrade adds two
 persisted schema-v1 theme properties, `textOffsetY` (`-32..32 DIP`) and
 `textLineGap` (`-16..32 DIP`). Both default to `0`, preserving v1.2.3 layout.
 New Designer output declares minimum HUD `1.3.0`; untouched v1.2.x packages
@@ -27,36 +27,39 @@ exact skin/version/ID and activation disposition without overstating a merely
 installed skin as live-switched.
 
 Fresh source evidence is Core `75/75`, Skins `375/375`, App/UI `625/625`, and
-Designer `433/433`, totaling `1508/1508`, with zero failed/skipped; Release
-build and diff checks passed. Current assets are Setup `100,056,769` bytes /
-`a3352f5e…a8d2`, normal-HUD ZIP `68,342,354` bytes / `61d9d04b…a2ef`, and a
-196-byte checksum file / `df99aad2…1751`; all identities, exact ZIP/publish
-boundaries, and unsigned status passed. The nine-scenario matrix passed `9/9`.
-The real upgrade exited `0`; installed App `940ca077…f5bc` and Designer
-`27521dcc…95f0` match publish at `1.3.0.0 + fbdf23c`; startup, uninstall,
-Start-menu, state, exchange packages, and shortcuts were verified.
+Designer `486/486`, totaling `1561/1561`, with zero failed/skipped; Release
+build and diff checks passed. Current assets are Setup `100,073,545` bytes /
+`3d2a2e83…c355`, normal-HUD ZIP `68,342,651` bytes / `f3c91d28…1f8b`, and a
+196-byte checksum file / `15ee7c67…ba00`; manifest, ZIP/publish boundaries,
+versions, source identity, and unsigned status passed. The exact nine-scenario
+matrix passed `9/9` with checked cleanup.
 
-Installed undo/redo acceptance failed. Undo and Redo changed preview geometry
-and command availability, but the edited slider/value remained stale; keyboard
-shortcuts share this defect. A separate destructive defect was observed after
-image removal: choosing Discard closed the dirty draft but did not restore the
-deleted decoration file, so the saved JSON referenced a missing asset on
-reopen. The Task 4 installed aggregate is
-`5 PASS / 1 FAIL / 3 PARTIAL / 2 NOT RUN`. Nonzero animation auditions and
-Apply-to-HUD passed. Post-Designer-close formal-HUD isolation is `PARTIAL`:
-guides were already Off and audition already All before close, so active-state
-cleanup was not exercised. Old-package
-import and tray-menu operation are `NOT RUN` because their exact input gates
-failed before a safe action; no guess was made.
+The real upgrade exited `0`; installed App `8bf7cbbf…b638f` and Designer
+`ec4c9470…b7ea` match publish at `1.3.0.0 + cd5634c`; uninstall `1.3.0`, exact
+startup, Start-menu targets, state, exchange packages, and shortcut behavior
+were verified. Setup removed the maintainer preview link; its exact backup was
+restored separately with `--preview`, explicitly outside Setup behavior.
 
-State restoration passed after the smoke: all 34 state paths are present, 33
-non-settings files match preinstall bytes/hashes, settings stable fields and
-selected skin match with only the allowed refresh timestamp advance, both
-exchange packages are exact, startup is exact `--background`, and the exact
-maintainer standard-App `--preview` shortcut is restored separately from
-Setup. Formal HUD is running and Designer is closed. Overall candidate status
-is `FAIL`, the latest public accepted release remains `v1.2.3`, and remote
-release actions remain prohibited.
+Installed UI acceptance did not run. The Task 8 agent and root independently
+selected the unique exact installed Designer through Computer Use, but
+`get_window`/`get_window_state` failed with
+`node_repl exec context not found` before the first input. Refresh, kernel
+reset, reinitialization, and the permitted retry reproduced the same runtime
+failure. The Computer Use policy prohibited mixing the earlier UIA fallback,
+so every required direct row is `NOT RUN`: Undo/Redo and shortcuts, branch and
+save/reopen, Discard/Save image bytes, picker cancellation, six auditions,
+Apply, untouched v1.2.3 import with effective `0/0`, formal tray actions, and
+active guide/audition close isolation. Automated tests support the fixed code
+but do not replace installed observation.
+
+Restoration passed: the controlled fixture and launch-time changes are kept
+only in ignored evidence, while live state is restored to 34/34 files with
+zero non-settings and stable-settings differences; both exchange packages,
+startup, and the maintainer preview shortcut are exact. The fixed formal HUD
+is running and Designer is closed. Task 4's `fbdf23c` failures remain
+historical; the fixed candidate still needs a healthy Computer Use session or
+user manual smoke. Overall status is `FAIL`, public `v1.2.3` remains latest,
+and remote release actions remain prohibited.
 
 Distribution boundaries remain fixed: ordinary Setup defaults startup plus
 the normal desktop shortcut, both deselectable and without `--preview`;

@@ -1,5 +1,55 @@
 # AI Change Log
 
+## 2026-08-08 — v1.3.0 fixed candidate rebuilt; installed UI blocked before input
+
+- Reverified exact source `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`
+  through fresh serial Release suites: Core `75/75`, Skins `375/375`, App/UI
+  `625/625`, and Designer `486/486`; total `1561/1561`, failed `0`, skipped
+  `0`. Release build warnings/errors were `0/0`; `git diff --check` emitted no
+  output.
+- Rebuilt Setup `100,073,545` bytes /
+  `3d2a2e83275afa23c45debc641ae0efcdabde201a018bac9b788ce42dc3cc355`,
+  normal-HUD ZIP `68,342,651` bytes /
+  `f3c91d28812af5305499fb65ba8e80ff27f95ebbcc3728dddf546e17560c1f8b`,
+  and 196-byte `SHA256SUMS.txt` /
+  `15ee7c679d363ea1dfcc141d1228953d080178af72066dfcec069cbfd23dba00`.
+  The manifest has exactly two matching lowercase lines; ZIP has exactly the
+  five approved normal-HUD entries and no Designer. Setup/App/Designer are
+  `NotSigned`.
+- Passed the exact isolated installer matrix `9/9`: all seven normal scenarios
+  and both committed-cleanup failure scenarios completed with checked cleanup.
+- Took a bounded stable backup after gracefully stopping the exact formal HUD.
+  Real Setup selected startup plus Designer, omitted the ordinary desktop
+  shortcut, and exited `0`. Installed App
+  `8bf7cbbf51894338178e8fe3a17ceab2e9e6a1ba123ef87ad8d1dac87f4b638f`
+  and Designer
+  `ec4c947077af3575bc4236f6cc7753eaa224767e113906e904aa1c1c2b55b7ea`
+  exactly match publish at `1.3.0.0 + cd5634c`; uninstall is `1.3.0`, startup
+  is exact `--background`, Start-menu targets are exact, and bounded state was
+  preserved. The maintainer preview shortcut was restored separately with
+  exact `--preview`, not by Setup.
+- Installed UI acceptance is entirely `NOT RUN`. The Task 8 agent and root
+  independently read the full Computer Use guidance/confirmation policy,
+  selected the unique exact installed Designer window, and received
+  `node_repl exec context not found` from `get_window`/`get_window_state`
+  before the first input. The documented refresh/reset/reinitialize/retry
+  recovery reproduced the failure. The non-negotiable policy prohibited the
+  prior UIA fallback, and source tests were not substituted for direct
+  installed evidence.
+- Therefore Undo/Redo and shortcuts, branch/save/reopen, image Discard/Save
+  byte identity, picker cancellation, six auditions, Apply identity/actual HUD
+  switch, untouched v1.2.3 import with effective `0/0`, tray actions, and
+  active guide/audition close isolation all remain `NOT RUN`.
+- Preserved the blocked-run state under ignored evidence, restored the stable
+  backup exactly, and removed the controlled live fixture. Final state has
+  34/34 files with zero non-settings and stable-settings differences; both
+  exchange packages, startup, and preview shortcut are exact. The fixed formal
+  HUD is running and Designer is closed.
+- Overall status remains `FAIL — candidate not release-ready`. Task 4's
+  `fbdf23c` failures remain historical evidence. No product-code change, push,
+  merge, tag, upload, GitHub Release, public readback, or historical-asset
+  mutation was performed.
+
 ## 2026-08-08 — v1.3.0 undo/redo candidate rejected after installed smoke
 
 - Reverified source `fbdf23c659cc524224bcd51d2b1581efde43153f` with fresh

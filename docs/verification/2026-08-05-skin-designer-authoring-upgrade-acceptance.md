@@ -2,27 +2,25 @@
 
 ## Scope and decision rule
 
-This record covers Task 8 source verification and source-Designer acceptance
-for the v1.3.0 authoring upgrade. Evidence states are `PASS`, `FAIL`,
+This record covers the v1.3.0 authoring upgrade through the current Task 8
+fixed-candidate verification and preserves earlier task evidence as history.
+Evidence states are `PASS`, `FAIL`,
 `PARTIAL`, and `NOT RUN`. A row is `PASS` only when the exact automated or
 manual behavior was directly observed. Automated coverage does not promote an
 unobserved visual row.
 
 The source under test is the canonical worktree
 `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud\.worktrees\inno-setup-installer-20260731`,
-branch `feat/inno-setup-installer-20260731`, at source commit
-`39f44b265deaf8bb9973152b5aa018e987b3e676`
-(`fix: distinguish cancelled cleanup warnings`). The initial acceptance
-evidence was recorded separately by commit
-`a42863ec73eb1e3d5cdce7b4b56d55373ff7d9d9`
-(`test: record designer authoring upgrade acceptance`). No Setup, install,
-package, tag, push, or release action is in this task.
+branch `feat/inno-setup-installer-20260731`, at current product source commit
+`cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`. The earlier source-only, Task 9,
+and Task 4 sections remain an audit trail; the current fixed-candidate section
+below supersedes them for release readiness.
 
-**Current decision: FAIL — the Task 4 candidate is not release-ready.** The
-historical Task 8/9 evidence below remains as an audit trail, but the final
-Task 4 record at the end supersedes it for the current candidate. Fresh source,
-package, matrix, and upgrade gates pass; direct installed smoke finds a stale
-Undo/Redo control defect and destructive image Discard behavior.
+**Current decision: FAIL — the fixed Task 8 candidate is not release-ready.**
+Fresh source, package, matrix, upgrade, identity, and restoration gates pass,
+but every required installed UI row is `NOT RUN` because Computer Use failed
+before input in two independent compliant attempts. Source automation is not a
+substitute for the missing installed evidence.
 
 ## Automated source gates
 
@@ -567,12 +565,97 @@ Setup exit/identity, data preservation, startup/shortcut/uninstall state, and
 binary launch; it does not include the unrun tray/import/isolation checks.
 Remote release Step 7 remains prohibited.
 
-## Task 4 final undo/redo candidate acceptance
+## Task 8 fixed-candidate acceptance
 
-This section is the current record for source
-`fbdf23c659cc524224bcd51d2b1581efde43153f`. It supersedes the earlier Task 9
-candidate identities and aggregates above. No source/product-code change was
-made during Task 4.
+This is the current local candidate record for source
+`cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`. Task 4's `fbdf23c` failures below
+remain historical evidence. Task 8 changed no product code and performed no
+remote action.
+
+### Fresh serial source gates
+
+| Status | Date/time (Asia/Tokyo) | Exact command | Observed |
+|---|---|---|---|
+| PASS | 2026-08-08 22:53:11.250–22:53:16.713 +09:00 | `dotnet test .\tests\CodexQuotaHud.Core.Tests\CodexQuotaHud.Core.Tests.csproj -c Release --no-restore` | `75/75`; failed `0`; skipped `0`; exit `0` |
+| PASS | 2026-08-08 22:53:31.072–22:53:44.371 +09:00 | `dotnet test .\tests\CodexQuotaHud.Skins.Tests\CodexQuotaHud.Skins.Tests.csproj -c Release --no-restore` | `375/375`; failed `0`; skipped `0`; exit `0` |
+| PASS | 2026-08-08 22:53:54.942–22:56:20.091 +09:00 | `dotnet test .\tests\CodexQuotaHud.App.Tests\CodexQuotaHud.App.Tests.csproj -c Release --no-restore` | `625/625`; failed `0`; skipped `0`; exit `0` |
+| PASS | 2026-08-08 22:56:30.258–22:56:54.660 +09:00 | `dotnet test .\tests\CodexQuotaHud.SkinDesigner.Tests\CodexQuotaHud.SkinDesigner.Tests.csproj -c Release --no-restore` | `486/486`; failed `0`; skipped `0`; exit `0` |
+| PASS | 2026-08-08 22:53:11.250–22:56:54.660 +09:00 | Four serial commands above | `1561/1561`; failed `0`; skipped `0` |
+| PASS | 2026-08-08 22:57:05.125–22:57:09.280 +09:00 | `dotnet build .\CodexQuotaHud.sln -c Release --no-restore` | warnings `0`; errors `0`; exit `0` |
+| PASS | 2026-08-08 22:57 +09:00 | `git diff --check` | no output; exit `0` |
+
+### Package, matrix, and real upgrade
+
+| Status | Date/time (Asia/Tokyo) | Gate | Observed |
+|---|---|---|---|
+| PASS | 2026-08-08 22:57:36.705–22:59:15.357 +09:00 | `.\scripts\package-release.ps1 -Version 1.3.0` | Setup `100,073,545` bytes / `3d2a2e83275afa23c45debc641ae0efcdabde201a018bac9b788ce42dc3cc355`; ZIP `68,342,651` / `f3c91d28812af5305499fb65ba8e80ff27f95ebbcc3728dddf546e17560c1f8b`; checksum file `196` / `15ee7c679d363ea1dfcc141d1228953d080178af72066dfcec069cbfd23dba00` |
+| PASS | 2026-08-08 23:00 +09:00 | Identity/boundaries | manifest exactly two matching lowercase lines; ZIP exactly five approved normal-HUD entries and no Designer; App `170,548,632` / `8bf7cbbf51894338178e8fe3a17ceab2e9e6a1ba123ef87ad8d1dac87f4b638f`; Designer `171,065,208` / `ec4c947077af3575bc4236f6cc7753eaa224767e113906e904aa1c1c2b55b7ea`; both `1.3.0.0 + cd5634c`; Setup `1.3.0`; all three executables `NotSigned`, no signer/timestamper |
+| PASS | 2026-08-08 23:00:23.881–23:19:29.293 +09:00 | `.\scripts\test-installer.ps1 -Version 1.3.0 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.3.0.exe` | `9/9`: `fresh-default`, `fresh-designer`, `add-designer`, `remove-designer`, `upgrade-selected`, `uninstall-preserve`, `uninstall-purge`, `cleanup-legacy-failure`, `cleanup-designer-failure`; every isolated root completed checked cleanup |
+| PASS | 2026-08-08 23:22:33.754 +09:00 | Stable preinstall backup | Exact formal HUD stopped through its product shutdown event; non-reparse state/exchange roots copied and rehashed; `34` state files and two exchange packages matched the backup exactly; startup and preview shortcut captured |
+| PASS | 2026-08-08 23:22:51.557–23:23:14.971 +09:00 | Real Setup upgrade | `/SILENT /SUPPRESSMSGBOXES /NORESTART /TASKS="startup" /TYPE=custom /COMPONENTS=designer`; exact Setup rehashed immediately before launch; exit `0`; 6,210-byte log SHA `9d0c5e017e8ea31730058daf3d11dde218e42a3dc5260642fe4d598e41f480ea` |
+| PASS | 2026-08-08 23:23:52.909 +09:00 | Installed identity/state | installed App/Designer hashes exactly match publish; both `1.3.0.0 + cd5634c`; uninstall `1.3.0`; startup exact `--background`; `34` state files with zero non-settings and stable-settings differences; exchange `2/2` exact; normal and Designer Start links exact; zero product desktop links |
+| PASS | 2026-08-08 23:24:55.108 +09:00 | Maintainer preview restoration | exact backup/destination SHA `6afe8a88685af47d67a374ca04782c6aa10da28c567a39799577f87c9d174abf`; standard installed App target and exact `--preview`; separate maintainer behavior, not Setup |
+
+### Installed UI runtime blocker
+
+The exact installed formal HUD and Designer were launched only after all
+non-UI gates. Designer identity was PID `24928`, executable
+`C:\Users\yaozi\AppData\Local\Programs\CodexQuotaHud\designer\CodexQuotaHud.SkinDesigner.exe`,
+title `Codex Quota HUD 皮肤设计器`, HWND `8456316`, and responding. Computer
+Use `list_windows()` returned exactly that one Designer window.
+
+Before any UI input, the Task 8 agent read the full disk `guidance.md`,
+`confirmations.md`, and API reference. `get_window`, `activate_window`, and
+`get_window_state` failed with `node_repl exec context not found`. The agent
+followed the documented lightweight refresh, kernel reset, `@oai/sky`
+reinitialization, exact-window reselection, and one final retry; the error
+repeated. Root then independently read the same guidance/confirmations,
+selected the same unique exact window, and reproduced the same pre-input
+failure and permitted retry failure. Zero UI input was sent. The policy
+explicitly prohibited mixing the earlier PowerShell/UIA fallback, so source
+automation is not substituted for installed observation.
+
+| Status | Required installed row | Direct result |
+|---|---|---|
+| NOT RUN | Undo/Redo buttons and `Ctrl+Z`/`Ctrl+Y` restore model, preview, every visible bound/manual control, and history availability | Computer Use failed before first input |
+| NOT RUN | New edit clears Redo; Save/reopen persists | Computer Use failed before first input |
+| NOT RUN | Replace/remove then Discard reopens exact old JSON/image bytes without `document.asset-missing` | Controlled copy and exact pre-hashes were prepared, but the draft was never opened and no input occurred |
+| NOT RUN | Replace then Save reopens exact new bytes | Controlled replacement bytes were prepared, but no input occurred |
+| NOT RUN | Picker cancellation preserves history | No picker was opened |
+| NOT RUN | Six animation auditions are distinct | No audition selection was made |
+| NOT RUN | Apply dialog reports exact name/version/ID and the formal HUD actually switches | Apply was not invoked |
+| NOT RUN | Untouched v1.2.3 import completes and displays effective offset/gap `0/0` | No picker/import was invoked |
+| NOT RUN | Exact installed formal-HUD tray menu actions | No tray input was sent |
+| NOT RUN | Close Designer with guides On and non-All audition active, then prove formal HUD isolation | No guide/audition input was sent; the exact Designer was closed normally only for restoration |
+
+### Restoration and decision
+
+The blocked-run live state was moved into ignored recoverable evidence. The
+validated stable backup was restored byte-for-byte to the exact live state
+root, removing the controlled fixture from live data. At
+2026-08-08 23:32:50.076 +09:00, final checks showed:
+
+- state `34/34`, non-settings differences `0`, stable-settings differences `0`;
+- exchange packages `2/2` exact;
+- startup exact standard App `--background`;
+- maintainer preview shortcut exact SHA/target/`--preview`;
+- installed App/Designer still exact fixed-candidate hashes;
+- formal HUD PID `10492` running and responding; Designer process count `0`.
+
+**Final Task 8 decision: FAIL — candidate not release-ready.** Source,
+packaging, matrix, real upgrade, identity, and restoration gates are green, but
+every required installed UI row is `NOT RUN`. A fresh healthy Computer Use
+session or complete user manual smoke must run every row before acceptance.
+Task 4's two product defects are historical and were not re-observed or claimed
+fixed by installed UI evidence here. No push, merge, tag, upload, GitHub
+Release, public readback, or historical-asset mutation was performed.
+
+## Historical Task 4 undo/redo candidate acceptance
+
+This section is the historical record for source
+`fbdf23c659cc524224bcd51d2b1581efde43153f`. It superseded the earlier Task 9
+candidate identities at that time; the fixed-candidate Task 8 section above is
+now current. No source/product-code change was made during Task 4.
 
 ### Fresh serial source gates
 
