@@ -550,21 +550,14 @@ internal sealed class WindowsDraftAssetsLease : IDesignerDraftAssetsLease
 
     public bool FileExists(string canonicalLeafName)
     {
-        DraftStorageName.ValidateAssetLeaf(canonicalLeafName);
-        using var file = _assets.OpenDesignerAssetFile(
-            canonicalLeafName,
-            create: false,
-            deleteAccess: false);
+        using var file = _assets.OpenReadableDesignerAssetFile(canonicalLeafName);
         return file is not null;
     }
 
     public byte[] ReadAllBytes(string canonicalLeafName)
     {
-        DraftStorageName.ValidateAssetLeaf(canonicalLeafName);
-        using var file = _assets.OpenDesignerAssetFile(
-            canonicalLeafName,
-            create: false,
-            deleteAccess: false) ?? throw new FileNotFoundException(
+        using var file = _assets.OpenReadableDesignerAssetFile(
+            canonicalLeafName) ?? throw new FileNotFoundException(
                 "The draft asset does not exist.",
                 canonicalLeafName);
         return file.ReadAllBytes();
@@ -1000,6 +993,38 @@ internal sealed class WindowsDraftDirectoryLease : IDisposable
         }
     }
 
+    internal WindowsDraftFileLease? OpenReadableDesignerAssetFile(string leafName)
+    {
+        DraftStorageName.ValidateReadableAssetLeaf(leafName);
+        var expectedPath = Path.Combine(ExpectedPath, leafName);
+        var handle = UseValidatedHandle(parent =>
+            DraftNative.TryOpenRelativeFileReadOnly(parent, leafName));
+        if (handle is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var identity = DraftNative.ValidateFile(handle, expectedPath);
+            if (identity.VolumeSerialNumber != _identity.VolumeSerialNumber)
+            {
+                throw new DraftUnsafePathException(
+                    "The readable draft asset moved to a different volume.");
+            }
+
+            return new WindowsDraftFileLease(
+                handle,
+                Path.GetFullPath(expectedPath),
+                FileAccess.Read);
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
     internal WindowsDraftFileLease? OpenDesignerOperationFileForDelete(
         string operationLeafName)
     {
@@ -1305,12 +1330,21 @@ internal static class DraftStorageName
 
     internal static void ValidateAssetLeaf(string leafName)
     {
-        if (leafName is not (
-            "background.png" or "background.jpg" or
-            "center.png" or "center.jpg" or "decoration.png"))
+        if (!IsFixedAssetLeaf(leafName))
         {
             throw new DraftUnsafePathException(
                 "The draft asset leaf name is not fixed by the schema.");
+        }
+    }
+
+    internal static void ValidateReadableAssetLeaf(string leafName)
+    {
+        ValidateSegment(leafName);
+        if (!IsFixedAssetLeaf(leafName) &&
+            !DraftAssetStorage.IsValidContentLeaf(leafName))
+        {
+            throw new DraftUnsafePathException(
+                "The readable draft asset leaf name is invalid.");
         }
     }
 
@@ -1356,6 +1390,10 @@ internal static class DraftStorageName
                 "The immutable draft asset leaf name is invalid.");
         }
     }
+
+    private static bool IsFixedAssetLeaf(string leafName) => leafName is
+        "background.png" or "background.jpg" or
+        "center.png" or "center.jpg" or "decoration.png";
 
     private static void ValidateSegment(string name)
     {
@@ -1489,6 +1527,19 @@ internal static class DraftNative
             FileNonDirectoryFile | FileSynchronousIoNonAlert | FileOpenReparsePoint,
             FileAttributeNormal)!;
 
+    internal static SafeFileHandle? TryOpenRelativeFileReadOnly(
+        IntPtr parentHandle,
+        string name) =>
+        OpenRelative(
+            parentHandle,
+            name,
+            GenericRead | FileReadAttributes | Synchronize,
+            FileShareRead | FileShareWrite | FileShareDelete,
+            FileOpen,
+            FileNonDirectoryFile | FileSynchronousIoNonAlert | FileOpenReparsePoint,
+            FileAttributeNormal,
+            nullOnNameNotFound: true);
+
     internal static SafeFileHandle OpenRelativeFileForDelete(
         IntPtr parentHandle,
         string name) =>
@@ -1603,7 +1654,8 @@ internal static class DraftNative
         uint createDisposition,
         uint createOptions,
         uint fileAttributes,
-        bool nullOnNameCollision = false)
+        bool nullOnNameCollision = false,
+        bool nullOnNameNotFound = false)
     {
         var nameBuffer = Marshal.StringToHGlobalUni(name);
         var unicodeStringPointer = IntPtr.Zero;
@@ -1649,6 +1701,12 @@ internal static class DraftNative
                 if (nullOnNameCollision && status == unchecked((int)0xC0000035))
                 {
                     return null!;
+                }
+
+                if (nullOnNameNotFound && status is
+                    unchecked((int)0xC0000034) or unchecked((int)0xC000003A))
+                {
+                    return null;
                 }
 
                 throw NtStatusError(

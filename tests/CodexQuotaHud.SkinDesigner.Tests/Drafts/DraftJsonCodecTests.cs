@@ -97,6 +97,32 @@ public sealed class DraftJsonCodecTests
     }
 
     [Fact]
+    public void WriteParseWrite_AddressedJpgPreservesPackageAndStoragePaths()
+    {
+        var draft = ValidDraft();
+        var assets = draft.Assets.ToDictionary(pair => pair.Key, pair => pair.Value);
+        assets[SkinAssetSlot.Center] = assets[SkinAssetSlot.Center] with
+        {
+            RelativePath = "assets/center.jpg",
+            StorageRelativePath =
+                "assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+        };
+        draft = draft with { Assets = ReadOnly(assets) };
+
+        var firstBytes = DraftJsonCodec.Write(draft);
+        var parsed = DraftJsonCodec.Parse(firstBytes);
+
+        Assert.True(parsed.IsValid, string.Join("; ", parsed.Errors));
+        var parsedDraft = Assert.IsType<SkinDraftDocument>(parsed.Value);
+        var center = parsedDraft.Assets[SkinAssetSlot.Center];
+        Assert.Equal("assets/center.jpg", center.RelativePath);
+        Assert.Equal(
+            "assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+            center.StorageRelativePath);
+        Assert.Equal(firstBytes, DraftJsonCodec.Write(parsedDraft));
+    }
+
+    [Fact]
     public void Parse_RejectsDuplicateStorageRelativePath()
     {
         var canonical = AddressedLiteralDraftJson.Replace("\r\n", "\n");

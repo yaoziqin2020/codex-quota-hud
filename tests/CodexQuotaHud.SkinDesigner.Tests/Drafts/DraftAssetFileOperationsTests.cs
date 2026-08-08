@@ -13,6 +13,8 @@ public sealed class DraftAssetFileOperationsTests
         "8ff3052044472bb44cfea3d2f45203d1bd74bc868a8628eb1fd0ab0a1aa2e2b3";
     private const string ContentLeaf = "sha256-" + Hash + ".png";
     private const string ContentPath = "assets/" + ContentLeaf;
+    private const string JpgContentLeaf = "sha256-" + Hash + ".jpg";
+    private const string JpgContentPath = "assets/" + JpgContentLeaf;
 
     [Fact]
     public void ContentHelpers_AddressExactBytesAndResolveLegacyOrImmutableLeaf()
@@ -23,6 +25,12 @@ public sealed class DraftAssetFileOperationsTests
             "assets/center.png",
             "center.png");
         var immutable = legacy with { StorageRelativePath = ContentPath };
+        var jpg = legacy with
+        {
+            RelativePath = "assets/center.jpg",
+            OriginalFileName = "center.jpg",
+            StorageRelativePath = JpgContentPath
+        };
 
         Assert.Equal(
             ContentPath,
@@ -36,6 +44,13 @@ public sealed class DraftAssetFileOperationsTests
         Assert.False(DraftAssetStorage.MatchesContent(
             immutable,
             "immutable-png-changed"u8));
+        Assert.Equal(
+            JpgContentPath,
+            DraftAssetStorage.CreateContentRelativePath(jpg.RelativePath, bytes));
+        Assert.True(DraftAssetStorage.IsValidContentRelativePath(
+            jpg.StorageRelativePath,
+            jpg.RelativePath));
+        Assert.True(DraftAssetStorage.MatchesContent(jpg, bytes));
     }
 
     [Fact]
@@ -57,6 +72,8 @@ public sealed class DraftAssetFileOperationsTests
         assets.WriteAndFlushNew(firstOperation, firstBytes, CancellationToken.None);
         assets.MoveOperationToImmutable(firstOperation, ContentLeaf);
         assets.ReleaseOperation(firstOperation);
+        Assert.True(assets.FileExists(ContentLeaf));
+        Assert.Equal(firstBytes, assets.ReadAllBytes(ContentLeaf));
         assets.WriteAndFlushNew(secondOperation, secondBytes, CancellationToken.None);
 
         Assert.ThrowsAny<IOException>(() =>
@@ -66,6 +83,28 @@ public sealed class DraftAssetFileOperationsTests
             ContentLeaf)));
         Assert.Equal(secondBytes, assets.ReadOperationBytes(secondOperation));
         assets.DeleteOperation(secondOperation);
+    }
+
+    [Fact]
+    public void PhysicalLease_PromotedJpgIsReadableThroughReadOnlyAssetPath()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var root = new TemporaryRoot();
+        using var project = OpenProject(root);
+        using var assets = project.OpenAssets(create: true);
+        var operation = OperationLeaf("center.jpg", "aaaaaaaa");
+        var bytes = "immutable-png"u8.ToArray();
+
+        assets.WriteAndFlushNew(operation, bytes, CancellationToken.None);
+        assets.MoveOperationToImmutable(operation, JpgContentLeaf);
+        assets.ReleaseOperation(operation);
+
+        Assert.True(assets.FileExists(JpgContentLeaf));
+        Assert.Equal(bytes, assets.ReadAllBytes(JpgContentLeaf));
     }
 
     [Fact]
@@ -128,6 +167,61 @@ public sealed class DraftAssetFileOperationsTests
                 .Select(path => Path.GetFileName(path)!)
                 .ToArray());
         assets.DeleteOperation(operation);
+    }
+
+    [Theory]
+    [InlineData("../sha256-8ff3052044472bb44cfea3d2f45203d1bd74bc868a8628eb1fd0ab0a1aa2e2b3.png")]
+    [InlineData("assets/sha256-8ff3052044472bb44cfea3d2f45203d1bd74bc868a8628eb1fd0ab0a1aa2e2b3.png")]
+    [InlineData("sha256-8FF3052044472BB44CFEA3D2F45203D1BD74BC868A8628EB1FD0AB0A1AA2E2B3.png")]
+    [InlineData("sha256-8ff3052044472bb44cfea3d2f45203d1bd74bc868a8628eb1fd0ab0a1aa2e2b3.gif")]
+    public void PhysicalLease_ReadOnlyAssetPathRejectsTraversalOrMalformedLeaf(
+        string invalidLeaf)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var root = new TemporaryRoot();
+        using var project = OpenProject(root);
+        using var assets = project.OpenAssets(create: true);
+
+        Assert.Throws<DraftUnsafePathException>(() => assets.FileExists(invalidLeaf));
+        Assert.Throws<DraftUnsafePathException>(() => assets.ReadAllBytes(invalidLeaf));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(root.ProjectPaths.AssetsRoot));
+    }
+
+    [Fact]
+    public void PhysicalLease_ReadOnlyAssetPathRejectsReparseBeforeExternalAccess()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var root = new TemporaryRoot();
+        using var project = OpenProject(root);
+        using var assets = project.OpenAssets(create: true);
+        var outside = Path.Combine(root.Path, "outside-readable-leaf");
+        Directory.CreateDirectory(outside);
+        var sentinel = Path.Combine(outside, "sentinel.bin");
+        File.WriteAllBytes(sentinel, "outside"u8.ToArray());
+        var reparseLeaf = Path.Combine(root.ProjectPaths.AssetsRoot, ContentLeaf);
+        CreateJunction(reparseLeaf, outside);
+        try
+        {
+            Assert.ThrowsAny<IOException>(() => assets.FileExists(ContentLeaf));
+            Assert.ThrowsAny<IOException>(() => assets.ReadAllBytes(ContentLeaf));
+            Assert.Equal("outside"u8.ToArray(), File.ReadAllBytes(sentinel));
+            Assert.Equal(["sentinel.bin"], Directory
+                .EnumerateFileSystemEntries(outside)
+                .Select(path => Path.GetFileName(path)!)
+                .ToArray());
+        }
+        finally
+        {
+            Directory.Delete(reparseLeaf);
+        }
     }
 
     [Fact]
