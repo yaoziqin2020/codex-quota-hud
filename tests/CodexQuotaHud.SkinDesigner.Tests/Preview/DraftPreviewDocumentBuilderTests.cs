@@ -171,6 +171,49 @@ public sealed class DraftPreviewDocumentBuilderTests
         Assert.True(result.IsValid, Format(result.Errors));
     }
 
+    [Fact]
+    public void Build_AddressedDraftExposesOnlyCanonicalRuntimePath()
+    {
+        var draft = CreateDraft([SkinAssetSlot.Background]);
+        var reference = draft.Assets[SkinAssetSlot.Background] with
+        {
+            StorageRelativePath = DraftAssetStorage.CreateContentRelativePath(
+                "assets/background.png",
+                AlphaPng)
+        };
+        draft = draft with
+        {
+            Assets = new Dictionary<SkinAssetSlot, DraftAssetReference>
+            {
+                [SkinAssetSlot.Background] = reference
+            }
+        };
+
+        var result = DraftPreviewDocumentBuilder.Build(
+            draft,
+            new Dictionary<SkinAssetSlot, SkinAsset>
+            {
+                [SkinAssetSlot.Background] =
+                    CreateAsset(SkinAssetSlot.Background)
+            });
+
+        Assert.True(result.IsValid, Format(result.Errors));
+        var package = Assert.IsType<SkinPackageDocument>(result.Value);
+        var declaration = Assert.Single(package.Manifest.Assets);
+        Assert.Equal("assets/background.png", declaration.Path);
+        Assert.Equal(
+            "assets/background.png",
+            package.Assets[SkinAssetSlot.Background].RelativePath);
+        Assert.DoesNotContain(
+            "sha256-",
+            declaration.Path,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "sha256-",
+            package.Assets[SkinAssetSlot.Background].RelativePath,
+            StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("missing", "preview.asset.missing")]
     [InlineData("extra", "preview.asset.extra")]

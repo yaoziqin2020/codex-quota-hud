@@ -92,6 +92,8 @@ public sealed class DesignerDocumentServiceTests
         Assert.Equal(1.5d, opened.Theme.Animation.RefreshHoldSeconds);
         Assert.Equal(legacyRecovery, await File.ReadAllBytesAsync(project.RecoveryPath));
         var asset = Assert.Single(result.Assets).Value;
+        Assert.Null(opened.Assets[SkinAssetSlot.Background].StorageRelativePath);
+        Assert.Equal("assets/background.png", asset.RelativePath);
         Assert.Equal(AlphaPng, asset.Content);
         Assert.Equal(1, asset.PixelWidth);
         Assert.Equal(1, asset.PixelHeight);
@@ -99,6 +101,89 @@ public sealed class DesignerDocumentServiceTests
         await store.SaveRecoveryAsync(opened);
         AssertCanonicalRefreshAnimation(
             await File.ReadAllBytesAsync(project.RecoveryPath));
+    }
+
+    [Fact]
+    public async Task OpenDraft_NamedAndRecoveryResolveTheirIndependentAddressedBlobs()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new SkinStoragePaths(temporary.Path);
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var named = WithAddressedBackground(
+            SkinDraftFactory.CreateNew(
+                draftId,
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                DateTimeOffset.Parse("2026-08-02T00:00:00Z"),
+                HudVersion) with { Revision = 1 },
+            AlphaPng,
+            "named.png");
+        var recovery = WithAddressedBackground(
+            named with { Revision = 2, DisplayName = "Recovery" },
+            OpaquePng,
+            "recovery.png");
+        var store = new DraftStore(paths);
+        await store.SaveNamedAsync(named);
+        await store.SaveRecoveryAsync(recovery);
+        WriteAddressedAsset(paths, named);
+        WriteAddressedAsset(paths, recovery);
+        var sut = CreateService(temporary, Guid.NewGuid, () => recovery.UpdatedAtUtc);
+
+        var recovered = sut.OpenDraft(draftId);
+
+        Assert.Empty(recovered.Errors);
+        Assert.Equal(recovery.Assets[SkinAssetSlot.Background],
+            recovered.Draft?.Assets[SkinAssetSlot.Background]);
+        var recoveredAsset = Assert.Single(recovered.Assets).Value;
+        Assert.Equal("assets/background.png", recoveredAsset.RelativePath);
+        Assert.Equal(OpaquePng, recoveredAsset.Content);
+
+        Assert.True(await store.DiscardWorkingCopyAsync(draftId, recovery.Revision));
+        var reopenedNamed = sut.OpenDraft(draftId);
+
+        Assert.Empty(reopenedNamed.Errors);
+        Assert.Equal(named.Assets[SkinAssetSlot.Background],
+            reopenedNamed.Draft?.Assets[SkinAssetSlot.Background]);
+        var namedAsset = Assert.Single(reopenedNamed.Assets).Value;
+        Assert.Equal("assets/background.png", namedAsset.RelativePath);
+        Assert.Equal(AlphaPng, namedAsset.Content);
+    }
+
+    [Theory]
+    [InlineData(false, "document.asset-missing")]
+    [InlineData(true, "document.asset-hash-mismatch")]
+    public async Task OpenDraft_AddressedBlobMissingOrHashMismatchFailsAtAssetLocation(
+        bool writeMismatchedBlob,
+        string expectedCode)
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new SkinStoragePaths(temporary.Path);
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var draft = WithAddressedBackground(
+            SkinDraftFactory.CreateNew(
+                draftId,
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                DateTimeOffset.Parse("2026-08-02T00:00:00Z"),
+                HudVersion),
+            AlphaPng,
+            "source.png");
+        await new DraftStore(paths).SaveNamedAsync(draft);
+        if (writeMismatchedBlob)
+        {
+            var reference = draft.Assets[SkinAssetSlot.Background];
+            var leaf = DraftAssetStorage.ResolveOwnedLeaf(reference);
+            var path = Path.Combine(
+                new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
+                leaf);
+            await File.WriteAllBytesAsync(path, OpaquePng);
+        }
+        var sut = CreateService(temporary, Guid.NewGuid, () => draft.UpdatedAtUtc);
+
+        var result = sut.OpenDraft(draftId);
+
+        Assert.Null(result.Draft);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(expectedCode, error.Code);
+        Assert.Equal("$.assets[0]", error.Location);
     }
 
     [Fact]
@@ -187,10 +272,17 @@ public sealed class DesignerDocumentServiceTests
         Assert.Equal("Fixture description", draft.Description);
         Assert.Equal(TemplateMinimumHudVersion, draft.MinimumHudVersion);
         Assert.Equal(installedBefore, File.ReadAllBytes(installedAsset));
+        var reference = draft.Assets[SkinAssetSlot.Background];
+        Assert.Equal("assets/background.png", reference.RelativePath);
+        var storageRelativePath = Assert.IsType<string>(
+            reference.StorageRelativePath);
         var owned = Path.Combine(
             new DraftProjectPaths(paths.DraftsRoot, newDraftId).AssetsRoot,
-            "background.png");
+            Path.GetFileName(storageRelativePath));
         Assert.Equal(installedBefore, File.ReadAllBytes(owned));
+        Assert.False(File.Exists(Path.Combine(
+            new DraftProjectPaths(paths.DraftsRoot, newDraftId).AssetsRoot,
+            "background.png")));
         Assert.Equal(installedBefore,
             result.Assets[SkinAssetSlot.Background].Content);
     }
@@ -227,9 +319,17 @@ public sealed class DesignerDocumentServiceTests
         Assert.Equal(packageBefore, await File.ReadAllBytesAsync(package));
         Assert.False(Directory.Exists(paths.InstalledSkinsRoot));
         Assert.Single(result.Assets);
+        var reference = draft.Assets[SkinAssetSlot.Background];
+        var storageRelativePath = Assert.IsType<string>(
+            reference.StorageRelativePath);
+        Assert.Equal(
+            DraftAssetStorage.CreateContentRelativePath(
+                reference.RelativePath,
+                result.Assets[SkinAssetSlot.Background].Content),
+            storageRelativePath);
         Assert.True(File.Exists(Path.Combine(
             new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
-            "background.png")));
+            Path.GetFileName(storageRelativePath))));
     }
 
     [Fact]
@@ -489,6 +589,42 @@ public sealed class DesignerDocumentServiceTests
                     originalFileName)
             }
         };
+
+    private static SkinDraftDocument WithAddressedBackground(
+        SkinDraftDocument draft,
+        byte[] content,
+        string originalFileName)
+    {
+        const string relativePath = "assets/background.png";
+        return draft with
+        {
+            Assets = new Dictionary<SkinAssetSlot, DraftAssetReference>
+            {
+                [SkinAssetSlot.Background] = new(
+                    SkinAssetSlot.Background,
+                    relativePath,
+                    originalFileName,
+                    DraftAssetStorage.CreateContentRelativePath(
+                        relativePath,
+                        content))
+            }
+        };
+    }
+
+    private static void WriteAddressedAsset(
+        SkinStoragePaths paths,
+        SkinDraftDocument draft)
+    {
+        var reference = draft.Assets[SkinAssetSlot.Background];
+        var leaf = DraftAssetStorage.ResolveOwnedLeaf(reference);
+        var path = Path.Combine(
+            new DraftProjectPaths(paths.DraftsRoot, draft.DraftId).AssetsRoot,
+            leaf);
+        var content = reference.OriginalFileName == "recovery.png"
+            ? OpaquePng
+            : AlphaPng;
+        File.WriteAllBytes(path, content);
+    }
 
     private static string BuildPackage(
         TemporaryDirectory temporary,
@@ -766,6 +902,13 @@ public sealed class DesignerDocumentServiceTests
                 string canonicalLeafName) =>
                 inner.MoveOperationToCanonical(operationLeafName, canonicalLeafName);
 
+            public void MoveOperationToImmutable(
+                string operationLeafName,
+                string contentAddressedLeafName) =>
+                inner.MoveOperationToImmutable(
+                    operationLeafName,
+                    contentAddressedLeafName);
+
             public void DeleteCanonical(string canonicalLeafName) =>
                 inner.DeleteCanonical(canonicalLeafName);
 
@@ -783,4 +926,7 @@ public sealed class DesignerDocumentServiceTests
 
     private static readonly byte[] AlphaPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAANSURBVBhXY/j//z8DAAj8Av6IXwbgAAAAAElFTkSuQmCC");
+
+    private static readonly byte[] OpaquePng = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
 }

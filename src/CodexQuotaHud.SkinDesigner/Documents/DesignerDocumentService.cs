@@ -205,7 +205,10 @@ public sealed class DesignerDocumentService
                 pair => new DraftAssetReference(
                     pair.Key,
                     pair.Value.RelativePath,
-                    Path.GetFileName(pair.Value.RelativePath))));
+                    Path.GetFileName(pair.Value.RelativePath),
+                    DraftAssetStorage.CreateContentRelativePath(
+                        pair.Value.RelativePath,
+                        pair.Value.Content))));
         var draft = new SkinDraftDocument(
             DraftSchemaVersion: 1,
             DraftId: draftId,
@@ -307,10 +310,9 @@ public sealed class DesignerDocumentService
                         "The package asset relationship is invalid.");
                 }
 
-                var destinationLeaf = ResolveOwnedAssetLeaf(
-                    slot,
-                    reference.RelativePath);
-                var operationLeaf = AssetOperationLeaf(destinationLeaf);
+                var destinationLeaf = ResolveOwnedAssetLeaf(slot, reference);
+                var operationLeaf = AssetOperationLeaf(
+                    Path.GetFileName(reference.RelativePath));
                 assets.WriteAndFlushNew(
                     operationLeaf,
                     source.Content,
@@ -342,7 +344,7 @@ public sealed class DesignerDocumentService
                         "The copied draft assets exceed the decoded pixel budget.");
                 }
 
-                assets.MoveOperationToCanonical(operationLeaf, destinationLeaf);
+                assets.MoveOperationToImmutable(operationLeaf, destinationLeaf);
                 ownedAssets.Add(slot, source with { Content = [.. copied] });
             }
 
@@ -412,9 +414,7 @@ public sealed class DesignerDocumentService
             long decodedPixels = 0;
             foreach (var pair in draft.Assets.OrderBy(pair => pair.Key))
             {
-                var leaf = ResolveOwnedAssetLeaf(
-                    pair.Key,
-                    pair.Value.RelativePath);
+                var leaf = ResolveOwnedAssetLeaf(pair.Key, pair.Value);
                 if (!owned.FileExists(leaf))
                 {
                     return Invalid(
@@ -430,6 +430,15 @@ public sealed class DesignerDocumentService
                         "image.too-large",
                         $"$.assets[{(int)pair.Key}]",
                         "A draft-owned image exceeds the encoded byte limit.");
+                }
+
+                if (pair.Value.StorageRelativePath is not null &&
+                    !DraftAssetStorage.MatchesContent(pair.Value, content))
+                {
+                    return Invalid(
+                        "document.asset-hash-mismatch",
+                        $"$.assets[{(int)pair.Key}]",
+                        "A draft-owned immutable image does not match its content address.");
                 }
 
                 var decoded = SkinImageDecoder.Decode(
@@ -470,7 +479,7 @@ public sealed class DesignerDocumentService
 
     private static string ResolveOwnedAssetLeaf(
         SkinAssetSlot slot,
-        string relativePath)
+        DraftAssetReference reference)
     {
         var expectedLeaves = slot switch
         {
@@ -482,11 +491,24 @@ public sealed class DesignerDocumentService
         foreach (var leaf in expectedLeaves)
         {
             if (string.Equals(
-                    relativePath,
+                    reference.RelativePath,
                     $"assets/{leaf}",
                     StringComparison.Ordinal))
             {
-                return leaf;
+                if (reference.StorageRelativePath is null)
+                {
+                    return leaf;
+                }
+
+                if (!DraftAssetStorage.IsValidContentRelativePath(
+                        reference.StorageRelativePath,
+                        reference.RelativePath))
+                {
+                    throw new IOException(
+                        "The draft asset storage locator leaves owned storage.");
+                }
+
+                return DraftAssetStorage.ResolveOwnedLeaf(reference);
             }
         }
 

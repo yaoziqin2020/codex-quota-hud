@@ -76,9 +76,10 @@ public sealed class DesignerImageCommitterIntegrationTests
         Assert.Equal(canRedoBefore, session.CanRedo);
         Assert.Empty(session.Current.Assets);
         Assert.Empty(designer.Assets);
-        Assert.False(File.Exists(Path.Combine(
-            new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
-            "background.png")));
+        var unreferenced = DraftAssetStorage.CreateContentRelativePath(
+            "assets/background.png",
+            AlphaPng);
+        Assert.True(File.Exists(OwnedPath(paths, draftId, unreferenced)));
     }
 
     [Fact]
@@ -143,6 +144,11 @@ public sealed class DesignerImageCommitterIntegrationTests
         Assert.Equal(1, session.Current.Revision);
         var reference = session.Current.Assets[SkinAssetSlot.Background];
         Assert.Equal("assets/background.png", reference.RelativePath);
+        Assert.Equal(
+            DraftAssetStorage.CreateContentRelativePath(
+                "assets/background.png",
+                AlphaPng),
+            reference.StorageRelativePath);
         var asset = designer.Assets[SkinAssetSlot.Background];
         Assert.Equal(AlphaPng, asset.Content);
         var preview = Assert.Single(previews);
@@ -175,9 +181,9 @@ public sealed class DesignerImageCommitterIntegrationTests
         Assert.True(first.Succeeded, Format(first.Errors));
         var referenceBefore = session.Current.Assets[SkinAssetSlot.Background];
         var assetBefore = designer.Assets[SkinAssetSlot.Background];
-        var ownedPath = Path.Combine(
-            new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
-            "background.png");
+        var oldStoragePath = Assert.IsType<string>(
+            referenceBefore.StorageRelativePath);
+        var ownedPath = OwnedPath(paths, draftId, oldStoragePath);
         var bytesBefore = await File.ReadAllBytesAsync(ownedPath);
         var revisionBefore = session.Current.Revision;
         accept = false;
@@ -199,6 +205,10 @@ public sealed class DesignerImageCommitterIntegrationTests
         Assert.Same(assetBefore,
             designer.Assets[SkinAssetSlot.Background]);
         Assert.Equal(bytesBefore, await File.ReadAllBytesAsync(ownedPath));
+        var rejectedStoragePath = DraftAssetStorage.CreateContentRelativePath(
+            "assets/background.png",
+            DesignerImageServiceTests.CreateGrayscalePngForIntegration(1, 1));
+        Assert.True(File.Exists(OwnedPath(paths, draftId, rejectedStoragePath)));
         Assert.Equal(1, previewCount);
     }
 
@@ -231,6 +241,8 @@ public sealed class DesignerImageCommitterIntegrationTests
         Assert.True(slot.HasAsset);
         Assert.True(slot.RemoveCommand.CanExecute(null));
         Assert.Equal(1, session.Current.Revision);
+        var storagePath = Assert.IsType<string>(
+            slot.LastMutation?.Reference?.StorageRelativePath);
 
         await slot.RemoveCommand.ExecuteAsync();
 
@@ -240,10 +252,14 @@ public sealed class DesignerImageCommitterIntegrationTests
         Assert.False(session.Current.Assets.ContainsKey(SkinAssetSlot.Background));
         Assert.Equal(2, session.Current.Revision);
         Assert.Equal(2, previewCount);
+        Assert.True(File.Exists(OwnedPath(
+            new SkinStoragePaths(temporary.Path),
+            draftId,
+            storagePath)));
     }
 
     [Fact]
-    public async Task CrossExtensionImport_WhenRealCommitterRejectsKeepsOldCanonicalAssetOnly()
+    public async Task CrossExtensionImport_WhenRealCommitterRejectsKeepsOldReferenceAndBothBlobs()
     {
         using var temporary = new TemporaryDirectory();
         var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
@@ -280,12 +296,19 @@ public sealed class DesignerImageCommitterIntegrationTests
             session.Current.Assets[SkinAssetSlot.Background]);
         Assert.Same(assetBefore,
             designer.Assets[SkinAssetSlot.Background]);
-        var assetsRoot = new DraftProjectPaths(
-            paths.DraftsRoot,
-            draftId).AssetsRoot;
+        var oldStoragePath = Assert.IsType<string>(
+            referenceBefore.StorageRelativePath);
         Assert.Equal(AlphaPng,
-            await File.ReadAllBytesAsync(Path.Combine(assetsRoot, "background.png")));
-        Assert.False(File.Exists(Path.Combine(assetsRoot, "background.jpg")));
+            await File.ReadAllBytesAsync(OwnedPath(paths, draftId, oldStoragePath)));
+        var rejectedStoragePath = DraftAssetStorage.CreateContentRelativePath(
+            "assets/background.jpg",
+            DesignerImageServiceTests.OneByOneJpeg);
+        Assert.Equal(
+            DesignerImageServiceTests.OneByOneJpeg,
+            await File.ReadAllBytesAsync(OwnedPath(
+                paths,
+                draftId,
+                rejectedStoragePath)));
     }
 
     [Fact]
@@ -312,9 +335,9 @@ public sealed class DesignerImageCommitterIntegrationTests
         var referenceBefore = session.Current.Assets[SkinAssetSlot.Background];
         var assetBefore = designer.Assets[SkinAssetSlot.Background];
         var revisionBefore = session.Current.Revision;
-        var owned = Path.Combine(
-            new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
-            "background.png");
+        var storagePath = Assert.IsType<string>(
+            referenceBefore.StorageRelativePath);
+        var owned = OwnedPath(paths, draftId, storagePath);
         accept = false;
 
         var rejected = await service.RemoveAsync(
@@ -334,7 +357,7 @@ public sealed class DesignerImageCommitterIntegrationTests
     }
 
     [Fact]
-    public async Task Remove_WhenOwnedFileIsLockedDoesNotCommitOrLoseCurrentState()
+    public async Task Remove_AfterUndoClearsBothHistoryDirectionsAndRetainsLockedBlob()
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -359,36 +382,35 @@ public sealed class DesignerImageCommitterIntegrationTests
             draftId,
             SkinAssetSlot.Background,
             source)).Succeeded);
-        var owned = Path.Combine(
-            new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
-            "background.png");
-        var revisionBefore = session.Current.Revision;
         var referenceBefore = session.Current.Assets[SkinAssetSlot.Background];
-        var assetBefore = designer.Assets[SkinAssetSlot.Background];
-        var previewBefore = Assert.Single(previews);
+        var storagePath = Assert.IsType<string>(
+            referenceBefore.StorageRelativePath);
+        var owned = OwnedPath(paths, draftId, storagePath);
         var bytesBefore = await File.ReadAllBytesAsync(owned);
+        Assert.True(designer.Text.SetTextOffsetY(12).Succeeded);
+        Assert.True(session.TryUndo());
+        Assert.False(session.CanUndo);
+        Assert.True(session.CanRedo);
 
         await using var locked = new FileStream(
             owned,
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
-        var rejected = await service.RemoveAsync(
+        var removed = await service.RemoveAsync(
             draftId,
             SkinAssetSlot.Background);
 
-        Assert.False(rejected.Succeeded);
-        Assert.Contains(rejected.Errors, error => error.Code == "image.prepare-failed");
-        Assert.Equal(revisionBefore, session.Current.Revision);
-        Assert.Same(referenceBefore,
-            session.Current.Assets[SkinAssetSlot.Background]);
-        Assert.Same(assetBefore, designer.Assets[SkinAssetSlot.Background]);
-        Assert.Same(previewBefore, Assert.Single(previews));
+        Assert.True(removed.Succeeded, Format(removed.Errors));
+        Assert.False(session.CanUndo);
+        Assert.False(session.CanRedo);
+        Assert.False(session.Current.Assets.ContainsKey(SkinAssetSlot.Background));
+        Assert.False(designer.Assets.ContainsKey(SkinAssetSlot.Background));
         Assert.Equal(bytesBefore, await File.ReadAllBytesAsync(owned));
     }
 
     [Fact]
-    public async Task CrossExtensionImport_WhenOldCanonicalFileIsLockedRollsBackBeforeCommit()
+    public async Task CrossExtensionImport_WhenOldBlobIsLockedAppendsNewBlobAndCommits()
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -413,13 +435,10 @@ public sealed class DesignerImageCommitterIntegrationTests
             draftId,
             SkinAssetSlot.Background,
             pngSource)).Succeeded);
-        var assetsRoot = new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot;
-        var pngOwned = Path.Combine(assetsRoot, "background.png");
-        var jpgOwned = Path.Combine(assetsRoot, "background.jpg");
-        var revisionBefore = session.Current.Revision;
         var referenceBefore = session.Current.Assets[SkinAssetSlot.Background];
-        var assetBefore = designer.Assets[SkinAssetSlot.Background];
-        var previewBefore = Assert.Single(previews);
+        var oldStoragePath = Assert.IsType<string>(
+            referenceBefore.StorageRelativePath);
+        var pngOwned = OwnedPath(paths, draftId, oldStoragePath);
         var bytesBefore = await File.ReadAllBytesAsync(pngOwned);
         var jpegSource = Path.Combine(temporary.SourceRoot, "background.jpg");
         await File.WriteAllBytesAsync(
@@ -431,21 +450,27 @@ public sealed class DesignerImageCommitterIntegrationTests
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
-        var rejected = await service.ImportAsync(
+        var imported = await service.ImportAsync(
             draftId,
             SkinAssetSlot.Background,
             jpegSource);
 
-        Assert.False(rejected.Succeeded);
-        Assert.Contains(rejected.Errors, error => error.Code == "image.promote-failed");
-        Assert.Equal(revisionBefore, session.Current.Revision);
-        Assert.Same(referenceBefore,
-            session.Current.Assets[SkinAssetSlot.Background]);
-        Assert.Same(assetBefore, designer.Assets[SkinAssetSlot.Background]);
-        Assert.Same(previewBefore, Assert.Single(previews));
+        Assert.True(imported.Succeeded, Format(imported.Errors));
+        var current = session.Current.Assets[SkinAssetSlot.Background];
+        Assert.Equal("assets/background.jpg", current.RelativePath);
+        var jpgStoragePath = Assert.IsType<string>(current.StorageRelativePath);
         Assert.Equal(bytesBefore, await File.ReadAllBytesAsync(pngOwned));
-        Assert.False(File.Exists(jpgOwned));
+        Assert.Equal(
+            DesignerImageServiceTests.OneByOneJpeg,
+            await File.ReadAllBytesAsync(OwnedPath(paths, draftId, jpgStoragePath)));
     }
+
+    private static string OwnedPath(
+        SkinStoragePaths paths,
+        Guid draftId,
+        string relativePath) => Path.Combine(
+        new DraftProjectPaths(paths.DraftsRoot, draftId).ProjectRoot,
+        relativePath.Replace('/', Path.DirectorySeparatorChar));
 
     private static SkinDraftSession CreateSession(Guid draftId)
     {

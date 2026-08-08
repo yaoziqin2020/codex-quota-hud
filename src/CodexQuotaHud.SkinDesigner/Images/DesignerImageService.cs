@@ -172,6 +172,7 @@ public sealed class DesignerImageService
                     normalizedSource,
                     relativePath,
                     content,
+                    decoded,
                     cancellationToken);
             }
             catch (OperationCanceledException) when (
@@ -210,33 +211,8 @@ public sealed class DesignerImageService
         await _mutationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            try
-            {
-                using var project = _storage.OpenDesignerProject(
-                    _draftsRoot,
-                    draftId,
-                    DesignerDraftProjectOpenMode.OpenExisting);
-                if (project is null)
-                {
-                    return CommitRemove(slot);
-                }
-
-                using var assets = project.OpenAssets(create: false);
-                return RemoveOwned(assets, slot, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception) when (
-                exception is IOException or UnauthorizedAccessException or
-                    DirectoryNotFoundException)
-            {
-                return Invalid(
-                    "image.prepare-failed",
-                    "$image",
-                    "The owned image files could not be prepared safely.");
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return CommitRemove(slot);
         }
         finally
         {
@@ -250,6 +226,7 @@ public sealed class DesignerImageService
         string normalizedSource,
         string relativePath,
         byte[] content,
+        SkinDecodedImage decoded,
         CancellationToken cancellationToken)
     {
         var operation = _operationId();
@@ -261,81 +238,103 @@ public sealed class DesignerImageService
                 "The image operation identity is invalid.");
         }
 
-        var destinationLeaf = Path.GetFileName(relativePath);
-        var temporaryLeaf = OperationLeaf(destinationLeaf, "tmp", operation);
-        var previous = SnapshotCanonicalFiles(assets, slot, cancellationToken);
-        var moved = new Dictionary<string, string>(StringComparer.Ordinal);
-        var promoted = false;
-        var promotionStarted = false;
+        var storageRelativePath = DraftAssetStorage.CreateContentRelativePath(
+            relativePath,
+            content);
+        var destinationLeaf = Path.GetFileName(storageRelativePath);
+        var temporaryLeaf = OperationLeaf(
+            Path.GetFileName(relativePath),
+            "tmp",
+            operation);
+        var reference = new DraftAssetReference(
+            slot,
+            relativePath,
+            Path.GetFileName(normalizedSource),
+            storageRelativePath);
+        var operationCreated = false;
         try
         {
-            assets.WriteAndFlushNew(temporaryLeaf, content, cancellationToken);
-            var verifiedBytes = assets.ReadOperationBytes(temporaryLeaf);
-            if (!verifiedBytes.AsSpan().SequenceEqual(content))
+            if (assets.FileExists(destinationLeaf))
             {
-                return Invalid(
-                    "image.stage-verify",
-                    "$image",
-                    "The staged image bytes changed before promotion.");
-            }
-
-            SkinDecodedImage verified;
-            try
-            {
-                verified = SkinImageDecoder.Decode(slot, relativePath, verifiedBytes);
-            }
-            catch (IOException exception)
-            {
-                return DecodeInvalid(exception);
-            }
-
-            if (slot == SkinAssetSlot.Decoration && !verified.HasAlpha)
-            {
-                return Invalid(
-                    "image.decoration-alpha",
-                    "$image",
-                    "Decoration images must use an alpha-capable PNG pixel format.");
-            }
-
-            var aggregateError = ValidateAggregatePixels(slot, verified);
-            if (aggregateError is not null)
-            {
-                return aggregateError;
-            }
-
-            promotionStarted = true;
-            foreach (var leaf in previous.Keys)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var tomb = OperationLeaf(leaf, "tomb", operation);
-                if (!assets.MoveCanonicalToOperation(leaf, tomb))
+                var existing = assets.ReadAllBytes(destinationLeaf);
+                if (!existing.AsSpan().SequenceEqual(content) ||
+                    !DraftAssetStorage.MatchesContent(reference, existing))
                 {
-                    throw new IOException(
-                        "A previously read canonical asset disappeared before quarantine.");
+                    return StorageHashMismatch();
+                }
+            }
+            else
+            {
+                assets.WriteAndFlushNew(temporaryLeaf, content, cancellationToken);
+                operationCreated = true;
+                var verifiedBytes = assets.ReadOperationBytes(temporaryLeaf);
+                if (!verifiedBytes.AsSpan().SequenceEqual(content))
+                {
+                    return Invalid(
+                        "image.stage-verify",
+                        "$image",
+                        "The staged image bytes changed before promotion.");
                 }
 
-                moved.Add(leaf, tomb);
+                SkinDecodedImage verified;
+                try
+                {
+                    verified = SkinImageDecoder.Decode(
+                        slot,
+                        relativePath,
+                        verifiedBytes);
+                }
+                catch (IOException exception)
+                {
+                    return DecodeInvalid(exception);
+                }
+
+                if (slot == SkinAssetSlot.Decoration && !verified.HasAlpha)
+                {
+                    return Invalid(
+                        "image.decoration-alpha",
+                        "$image",
+                        "Decoration images must use an alpha-capable PNG pixel format.");
+                }
+
+                var aggregateError = ValidateAggregatePixels(slot, verified);
+                if (aggregateError is not null)
+                {
+                    return aggregateError;
+                }
+
+                try
+                {
+                    assets.MoveOperationToImmutable(
+                        temporaryLeaf,
+                        destinationLeaf);
+                    operationCreated = false;
+                    assets.ReleaseOperation(temporaryLeaf);
+                }
+                catch (IOException)
+                {
+                    if (!assets.FileExists(destinationLeaf))
+                    {
+                        throw;
+                    }
+
+                    var winner = assets.ReadAllBytes(destinationLeaf);
+                    if (!winner.AsSpan().SequenceEqual(content) ||
+                        !DraftAssetStorage.MatchesContent(reference, winner))
+                    {
+                        return StorageHashMismatch();
+                    }
+                }
             }
 
-            assets.MoveOperationToCanonical(temporaryLeaf, destinationLeaf);
-            promoted = true;
-            foreach (var tomb in moved.Values)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                assets.DeleteOperation(tomb);
-            }
-
+            cancellationToken.ThrowIfCancellationRequested();
             var asset = new SkinAsset(
                 slot,
                 relativePath,
                 [.. content],
-                verified.PixelWidth,
-                verified.PixelHeight,
-                verified.HasAlpha);
-            var reference = new DraftAssetReference(
-                slot,
-                relativePath,
-                Path.GetFileName(normalizedSource));
+                decoded.PixelWidth,
+                decoded.PixelHeight,
+                decoded.HasAlpha);
             bool accepted;
             try
             {
@@ -348,200 +347,31 @@ public sealed class DesignerImageService
 
             if (!accepted)
             {
-                if (!TryRestoreMovedFiles(
-                        assets,
-                        operation,
-                        temporaryLeaf,
-                        promoted,
-                        moved,
-                        previous))
-                {
-                    return RollbackFailed();
-                }
-
-                promoted = false;
-                moved.Clear();
                 return Invalid(
                     "image.session-rejected",
                     "$image",
                     "The draft session rejected the staged image mutation.");
             }
 
-            assets.ReleaseOperation(temporaryLeaf);
-            promoted = false;
-            moved.Clear();
             return new ImageMutationResult(true, asset, reference, []);
-        }
-        catch (OperationCanceledException) when (
-            cancellationToken.IsCancellationRequested)
-        {
-            if (moved.Count > 0 || promoted)
-            {
-                if (!TryRestoreMovedFiles(
-                        assets,
-                        operation,
-                        temporaryLeaf,
-                        promoted,
-                        moved,
-                        previous))
-                {
-                    return RollbackFailed();
-                }
-
-                promoted = false;
-                moved.Clear();
-            }
-
-            throw;
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException)
         {
-            if ((moved.Count > 0 || promoted) &&
-                !TryRestoreMovedFiles(
-                    assets,
-                    operation,
-                    temporaryLeaf,
-                    promoted,
-                    moved,
-                    previous))
-            {
-                return RollbackFailed();
-            }
-
-            promoted = false;
-            moved.Clear();
             return Invalid(
-                promotionStarted
+                operationCreated
                     ? "image.promote-failed"
                     : "image.prepare-failed",
                 "$image",
-                promotionStarted
-                    ? "The staged image could not replace the owned canonical image safely."
+                operationCreated
+                    ? "The staged image could not become an immutable draft asset safely."
                     : "The owned image files could not be prepared safely.");
         }
         finally
         {
-            if (!promoted)
+            if (operationCreated)
             {
                 TryDeleteOperation(assets, temporaryLeaf);
-            }
-
-            foreach (var tomb in moved.Values)
-            {
-                TryDeleteOperation(assets, tomb);
-            }
-        }
-    }
-
-    private ImageMutationResult RemoveOwned(
-        IDesignerDraftAssetsLease assets,
-        SkinAssetSlot slot,
-        CancellationToken cancellationToken)
-    {
-        var operation = _operationId();
-        if (operation == Guid.Empty)
-        {
-            return Invalid(
-                "image.operation-id",
-                "$image",
-                "The image operation identity is invalid.");
-        }
-
-        var previous = SnapshotCanonicalFiles(assets, slot, cancellationToken);
-        if (previous.Count == 0)
-        {
-            return CommitRemove(slot);
-        }
-
-        var moved = new Dictionary<string, string>(StringComparer.Ordinal);
-        try
-        {
-            foreach (var leaf in previous.Keys)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var tomb = OperationLeaf(leaf, "tomb", operation);
-                if (!assets.MoveCanonicalToOperation(leaf, tomb))
-                {
-                    throw new IOException(
-                        "A previously read canonical asset disappeared before quarantine.");
-                }
-
-                moved.Add(leaf, tomb);
-            }
-
-            foreach (var tomb in moved.Values)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                assets.DeleteOperation(tomb);
-            }
-
-            var committed = CommitRemove(slot);
-            if (!committed.Succeeded)
-            {
-                if (!TryRestoreMovedFiles(
-                        assets,
-                        operation,
-                        promotedOperationLeaf: null,
-                        promoted: false,
-                        moved,
-                        previous))
-                {
-                    return RollbackFailed();
-                }
-
-                moved.Clear();
-            }
-
-            return committed;
-        }
-        catch (OperationCanceledException) when (
-            cancellationToken.IsCancellationRequested)
-        {
-            if (moved.Count > 0)
-            {
-                if (!TryRestoreMovedFiles(
-                        assets,
-                        operation,
-                        promotedOperationLeaf: null,
-                        promoted: false,
-                        moved,
-                        previous))
-                {
-                    return RollbackFailed();
-                }
-
-                moved.Clear();
-            }
-
-            throw;
-        }
-        catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException)
-        {
-            if (moved.Count > 0 &&
-                !TryRestoreMovedFiles(
-                    assets,
-                    operation,
-                    promotedOperationLeaf: null,
-                    promoted: false,
-                    moved,
-                    previous))
-            {
-                return RollbackFailed();
-            }
-
-            moved.Clear();
-            return Invalid(
-                "image.prepare-failed",
-                "$image",
-                "The owned image files could not be prepared safely.");
-        }
-        finally
-        {
-            foreach (var tomb in moved.Values)
-            {
-                TryDeleteOperation(assets, tomb);
             }
         }
     }
@@ -564,64 +394,6 @@ public sealed class DesignerImageService
                 "image.session-rejected",
                 "$image",
                 "The draft session rejected the image removal.");
-    }
-
-    private static Dictionary<string, byte[]> SnapshotCanonicalFiles(
-        IDesignerDraftAssetsLease assets,
-        SkinAssetSlot slot,
-        CancellationToken cancellationToken)
-    {
-        var snapshots = new Dictionary<string, byte[]>(StringComparer.Ordinal);
-        foreach (var leaf in CanonicalLeaves(slot))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (assets.FileExists(leaf))
-            {
-                snapshots.Add(leaf, assets.ReadAllBytes(leaf));
-            }
-        }
-
-        return snapshots;
-    }
-
-    private static bool TryRestoreMovedFiles(
-        IDesignerDraftAssetsLease assets,
-        Guid operation,
-        string? promotedOperationLeaf,
-        bool promoted,
-        IReadOnlyDictionary<string, string> moved,
-        IReadOnlyDictionary<string, byte[]> previous)
-    {
-        try
-        {
-            if (promoted && promotedOperationLeaf is not null)
-            {
-                assets.DeleteOperation(promotedOperationLeaf);
-            }
-
-            foreach (var tomb in moved.Values)
-            {
-                assets.DeleteOperation(tomb);
-            }
-
-            foreach (var leaf in moved.Keys)
-            {
-                var rollback = OperationLeaf(leaf, "rollback", operation);
-                assets.WriteAndFlushNew(
-                    rollback,
-                    previous[leaf],
-                    CancellationToken.None);
-                assets.MoveOperationToCanonical(rollback, leaf);
-                assets.ReleaseOperation(rollback);
-            }
-
-            return true;
-        }
-        catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
     }
 
     private ImageMutationResult? ValidateAggregatePixels(
@@ -671,24 +443,15 @@ public sealed class DesignerImageService
         }
         catch
         {
-            // The committed canonical asset is never targeted by operation cleanup.
+            // A promoted immutable asset is never targeted by operation cleanup.
         }
     }
 
-    private static ImageMutationResult RollbackFailed() =>
+    private static ImageMutationResult StorageHashMismatch() =>
         Invalid(
-            "image.rollback-failed",
+            "image.storage-hash-mismatch",
             "$image",
-            "The image transaction could not restore the previous owned bytes.");
-
-    private static IReadOnlyList<string> CanonicalLeaves(SkinAssetSlot slot) =>
-        slot switch
-        {
-            SkinAssetSlot.Background => ["background.png", "background.jpg"],
-            SkinAssetSlot.Center => ["center.png", "center.jpg"],
-            SkinAssetSlot.Decoration => ["decoration.png"],
-            _ => throw new ArgumentOutOfRangeException(nameof(slot))
-        };
+            "An existing immutable draft asset does not match its content address.");
 
     private static string RelativePath(
         SkinAssetSlot slot,
@@ -700,28 +463,6 @@ public sealed class DesignerImageService
             "assets/decoration.png",
         _ => throw new ArgumentOutOfRangeException(nameof(slot))
     };
-
-    private static void EnsureNoExistingReparsePoint(string path)
-    {
-        var current = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
-        while (!string.IsNullOrEmpty(current))
-        {
-            if ((Directory.Exists(current) || File.Exists(current)) &&
-                (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new IOException("The owned image path contains a reparse point.");
-            }
-
-            var parent = Path.GetDirectoryName(current);
-            if (string.IsNullOrEmpty(parent) ||
-                string.Equals(parent, current, StringComparison.OrdinalIgnoreCase))
-            {
-                break;
-            }
-
-            current = Path.TrimEndingDirectorySeparator(parent);
-        }
-    }
 
     private static ImageMutationResult DecodeInvalid(IOException exception)
     {
@@ -747,16 +488,6 @@ public sealed class DesignerImageService
         string location,
         string message) =>
         new(false, null, null, [new SkinValidationError(code, location, message)]);
-
-    private static ImageMutationResult CleanupWarning() =>
-        new(
-            true,
-            null,
-            null,
-            [new SkinValidationError(
-                "image.cleanup-warning",
-                "$image",
-                "The image was removed from the draft, but an unreferenced owned file remains for later cleanup.")]);
 
     private sealed class AcceptingCommitter : IDesignerImageMutationCommitter
     {

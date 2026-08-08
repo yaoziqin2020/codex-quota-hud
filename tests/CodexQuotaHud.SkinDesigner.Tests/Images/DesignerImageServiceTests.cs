@@ -20,7 +20,7 @@ public sealed class DesignerImageServiceTests
     [InlineData(SkinAssetSlot.Center, "source.jpg", "assets/center.jpg")]
     [InlineData(SkinAssetSlot.Center, "source.png", "assets/center.png")]
     [InlineData(SkinAssetSlot.Decoration, "source.png", "assets/decoration.png")]
-    public async Task ImportAsync_DecodesAndOwnsCanonicalAssetIndependentOfSource(
+    public async Task ImportAsync_DecodesAndOwnsContentAddressedAssetIndependentOfSource(
         SkinAssetSlot slot,
         string sourceLeaf,
         string expectedRelativePath)
@@ -39,6 +39,11 @@ public sealed class DesignerImageServiceTests
         Assert.True(result.Succeeded, Format(result.Errors));
         Assert.Equal(expectedRelativePath, result.Reference?.RelativePath);
         Assert.Equal(sourceLeaf, result.Reference?.OriginalFileName);
+        var storageRelativePath = Assert.IsType<string>(
+            result.Reference?.StorageRelativePath);
+        Assert.Equal(
+            DraftAssetStorage.CreateContentRelativePath(expectedRelativePath, bytes),
+            storageRelativePath);
         var asset = Assert.IsType<SkinAsset>(result.Asset);
         Assert.Equal(slot, asset.Slot);
         Assert.Equal(expectedRelativePath, asset.RelativePath);
@@ -51,21 +56,17 @@ public sealed class DesignerImageServiceTests
         }
 
         File.Delete(sourcePath);
-        var owned = OwnedPath(storage, DraftId, expectedRelativePath);
+        var owned = OwnedPath(storage, DraftId, storageRelativePath);
         Assert.Equal(bytes, await File.ReadAllBytesAsync(owned));
+        Assert.False(File.Exists(OwnedPath(storage, DraftId, expectedRelativePath)));
         Assert.DoesNotContain(
             Directory.EnumerateFiles(Path.GetDirectoryName(owned)!),
             path => Path.GetFileName(path).Contains(".tmp-", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task ImportAsync_WhenAtomicReplaceFailsPreservesExactOldBytes()
+    public async Task ImportAsync_ReplacingSlotRetainsExactOldBytesAndCreatesNewBlob()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         using var temporary = new TemporaryDirectory();
         var storage = new SkinStoragePaths(temporary.Path);
         var sourcePath = Path.Combine(temporary.SourceRoot, "background.png");
@@ -76,30 +77,101 @@ public sealed class DesignerImageServiceTests
             SkinAssetSlot.Background,
             sourcePath);
         Assert.True(first.Succeeded, Format(first.Errors));
-        var ownedPath = OwnedPath(
-            storage,
-            DraftId,
-            "assets/background.png");
-        var oldBytes = await File.ReadAllBytesAsync(ownedPath);
+        var firstReference = Assert.IsType<DraftAssetReference>(first.Reference);
+        var oldStoragePath = Assert.IsType<string>(firstReference.StorageRelativePath);
+        var oldOwnedPath = OwnedPath(storage, DraftId, oldStoragePath);
+        var oldBytes = await File.ReadAllBytesAsync(oldOwnedPath);
         var replacement = CreateGrayscalePngForIntegration(1, 1);
         await File.WriteAllBytesAsync(sourcePath, replacement);
 
-        await using var lockStream = new FileStream(
-            ownedPath,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read);
-        var failed = await sut.ImportAsync(
+        var replaced = await sut.ImportAsync(
             DraftId,
             SkinAssetSlot.Background,
             sourcePath);
 
-        Assert.False(failed.Succeeded);
-        Assert.Contains(failed.Errors, error => error.Code == "image.promote-failed");
-        Assert.Equal(oldBytes, await File.ReadAllBytesAsync(ownedPath));
+        Assert.True(replaced.Succeeded, Format(replaced.Errors));
+        var replacedReference = Assert.IsType<DraftAssetReference>(replaced.Reference);
+        var replacementStoragePath = Assert.IsType<string>(
+            replacedReference.StorageRelativePath);
+        Assert.NotEqual(oldStoragePath, replacementStoragePath);
+        Assert.Equal(oldBytes, await File.ReadAllBytesAsync(oldOwnedPath));
+        Assert.Equal(
+            replacement,
+            await File.ReadAllBytesAsync(OwnedPath(
+                storage,
+                DraftId,
+                replacementStoragePath)));
+        Assert.False(File.Exists(OwnedPath(
+            storage,
+            DraftId,
+            "assets/background.png")));
         Assert.DoesNotContain(
-            Directory.EnumerateFiles(Path.GetDirectoryName(ownedPath)!),
+            Directory.EnumerateFiles(Path.GetDirectoryName(oldOwnedPath)!),
             path => Path.GetFileName(path).Contains(".tmp-", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ImportAsync_ReusesExistingAddressedBlobOnlyWhenBytesMatchHash()
+    {
+        using var temporary = new TemporaryDirectory();
+        var storage = new SkinStoragePaths(temporary.Path);
+        var sourcePath = Path.Combine(temporary.SourceRoot, "background.png");
+        await File.WriteAllBytesAsync(sourcePath, AlphaPng);
+        var sut = new DesignerImageService(storage);
+
+        var first = await sut.ImportAsync(
+            DraftId,
+            SkinAssetSlot.Background,
+            sourcePath);
+        var second = await sut.ImportAsync(
+            DraftId,
+            SkinAssetSlot.Background,
+            sourcePath);
+
+        Assert.True(first.Succeeded, Format(first.Errors));
+        Assert.True(second.Succeeded, Format(second.Errors));
+        var storagePath = Assert.IsType<string>(first.Reference?.StorageRelativePath);
+        Assert.Equal(storagePath, second.Reference?.StorageRelativePath);
+        var assetsRoot = new DraftProjectPaths(storage.DraftsRoot, DraftId).AssetsRoot;
+        Assert.Equal(
+            [Path.GetFileName(storagePath)],
+            Directory.EnumerateFiles(assetsRoot)
+                .Select(path => Path.GetFileName(path)!)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray());
+        Assert.Equal(AlphaPng, await File.ReadAllBytesAsync(
+            OwnedPath(storage, DraftId, storagePath)));
+    }
+
+    [Fact]
+    public async Task ImportAsync_WhenExistingAddressedBlobDoesNotMatchHashFailsClosed()
+    {
+        using var temporary = new TemporaryDirectory();
+        var storage = new SkinStoragePaths(temporary.Path);
+        var sourcePath = Path.Combine(temporary.SourceRoot, "background.png");
+        await File.WriteAllBytesAsync(sourcePath, AlphaPng);
+        var storagePath = DraftAssetStorage.CreateContentRelativePath(
+            "assets/background.png",
+            AlphaPng);
+        var ownedPath = OwnedPath(storage, DraftId, storagePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(ownedPath)!);
+        var mismatched = CreateGrayscalePngForIntegration(1, 1);
+        await File.WriteAllBytesAsync(ownedPath, mismatched);
+        var committer = new RecordingCommitter();
+        var sut = new DesignerImageService(storage, committer);
+
+        var result = await sut.ImportAsync(
+            DraftId,
+            SkinAssetSlot.Background,
+            sourcePath);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors,
+            error => error.Code == "image.storage-hash-mismatch");
+        Assert.Equal(mismatched, await File.ReadAllBytesAsync(ownedPath));
+        Assert.Null(committer.Reference);
+        Assert.Null(committer.PreviewAsset);
+        Assert.Equal(0, committer.AcceptedCount);
     }
 
     [Fact]
@@ -116,10 +188,9 @@ public sealed class DesignerImageServiceTests
             SkinAssetSlot.Background,
             sourcePath);
         Assert.True(first.Succeeded, Format(first.Errors));
-        var ownedPath = OwnedPath(
-            storage,
-            DraftId,
-            "assets/background.png");
+        var firstReference = Assert.IsType<DraftAssetReference>(first.Reference);
+        var oldStoragePath = Assert.IsType<string>(firstReference.StorageRelativePath);
+        var ownedPath = OwnedPath(storage, DraftId, oldStoragePath);
         var oldBytes = await File.ReadAllBytesAsync(ownedPath);
         var oldReference = committer.Reference;
         var oldPreview = committer.PreviewAsset;
@@ -137,55 +208,54 @@ public sealed class DesignerImageServiceTests
         Assert.Contains(rejected.Errors,
             error => error.Code == "image.session-rejected");
         Assert.Equal(oldBytes, await File.ReadAllBytesAsync(ownedPath));
+        var rejectedStoragePath = DraftAssetStorage.CreateContentRelativePath(
+            "assets/background.png",
+            CreateGrayscalePngForIntegration(1, 1));
+        Assert.True(File.Exists(OwnedPath(storage, DraftId, rejectedStoragePath)));
         Assert.Same(oldReference, committer.Reference);
         Assert.Same(oldPreview, committer.PreviewAsset);
         Assert.Equal(1, committer.AcceptedCount);
     }
 
     [Fact]
-    public async Task ImportAsync_WhenCancellationRollbackFailsReturnsExplicitIntegrityError()
+    public async Task ImportAsync_WhenCancelledPreservesPriorReferenceAndBlob()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         using var temporary = new TemporaryDirectory();
         var storage = new SkinStoragePaths(temporary.Path);
+        var committer = new RecordingCommitter();
         var sourcePath = Path.Combine(temporary.SourceRoot, "background.png");
         await File.WriteAllBytesAsync(sourcePath, AlphaPng);
-        var first = await new DesignerImageService(storage).ImportAsync(
+        var sut = new DesignerImageService(storage, committer);
+        var first = await sut.ImportAsync(
             DraftId,
             SkinAssetSlot.Background,
             sourcePath);
         Assert.True(first.Succeeded, Format(first.Errors));
-        await File.WriteAllBytesAsync(
-            sourcePath,
-            CreateGrayscalePngForIntegration(1, 1));
-        using var cancellation = new CancellationTokenSource();
-        var faultingStorage = new RollbackFailingStorage(cancellation);
-        var sut = new DesignerImageService(
-            storage,
-            new RecordingCommitter(),
-            storage: faultingStorage);
+        var referenceBefore = Assert.IsType<DraftAssetReference>(committer.Reference);
+        var assetBefore = Assert.IsType<SkinAsset>(committer.PreviewAsset);
+        var storagePath = Assert.IsType<string>(referenceBefore.StorageRelativePath);
+        var bytesBefore = await File.ReadAllBytesAsync(
+            OwnedPath(storage, DraftId, storagePath));
 
-        var failed = await sut.ImportAsync(
+        await Assert.ThrowsAsync<OperationCanceledException>(() => sut.ImportAsync(
             DraftId,
             SkinAssetSlot.Background,
             sourcePath,
-            cancellation.Token);
+            new CancellationToken(canceled: true)));
 
-        Assert.False(failed.Succeeded);
-        Assert.Contains(failed.Errors,
-            error => error.Code == "image.rollback-failed");
+        Assert.Same(referenceBefore, committer.Reference);
+        Assert.Same(assetBefore, committer.PreviewAsset);
+        Assert.Equal(bytesBefore, await File.ReadAllBytesAsync(
+            OwnedPath(storage, DraftId, storagePath)));
     }
 
     [Fact]
-    public async Task RemoveAsync_DeletesOnlyTheSelectedCanonicalSlotFiles()
+    public async Task RemoveAsync_RemovesOnlyReferenceAndRetainsEveryPhysicalBlob()
     {
         using var temporary = new TemporaryDirectory();
         var storage = new SkinStoragePaths(temporary.Path);
         var sut = new DesignerImageService(storage);
+        var references = new Dictionary<SkinAssetSlot, DraftAssetReference>();
         foreach (var (slot, leaf, bytes) in new[]
                  {
                      (SkinAssetSlot.Background, "background.png", AlphaPng),
@@ -195,7 +265,9 @@ public sealed class DesignerImageServiceTests
         {
             var source = Path.Combine(temporary.SourceRoot, leaf);
             await File.WriteAllBytesAsync(source, bytes);
-            Assert.True((await sut.ImportAsync(DraftId, slot, source)).Succeeded);
+            var imported = await sut.ImportAsync(DraftId, slot, source);
+            Assert.True(imported.Succeeded, Format(imported.Errors));
+            references.Add(slot, Assert.IsType<DraftAssetReference>(imported.Reference));
         }
 
         var result = await sut.RemoveAsync(DraftId, SkinAssetSlot.Center);
@@ -203,9 +275,11 @@ public sealed class DesignerImageServiceTests
         Assert.True(result.Succeeded, Format(result.Errors));
         Assert.Null(result.Asset);
         Assert.Null(result.Reference);
-        Assert.True(File.Exists(OwnedPath(storage, DraftId, "assets/background.png")));
-        Assert.False(File.Exists(OwnedPath(storage, DraftId, "assets/center.jpg")));
-        Assert.True(File.Exists(OwnedPath(storage, DraftId, "assets/decoration.png")));
+        foreach (var reference in references.Values)
+        {
+            var storagePath = Assert.IsType<string>(reference.StorageRelativePath);
+            Assert.True(File.Exists(OwnedPath(storage, DraftId, storagePath)));
+        }
     }
 
     [Fact]
@@ -217,11 +291,14 @@ public sealed class DesignerImageServiceTests
         var sut = new DesignerImageService(storage, committer);
         var source = Path.Combine(temporary.SourceRoot, "background.png");
         await File.WriteAllBytesAsync(source, AlphaPng);
-        Assert.True((await sut.ImportAsync(
+        var imported = await sut.ImportAsync(
             DraftId,
             SkinAssetSlot.Background,
-            source)).Succeeded);
-        var owned = OwnedPath(storage, DraftId, "assets/background.png");
+            source);
+        Assert.True(imported.Succeeded, Format(imported.Errors));
+        var storagePath = Assert.IsType<string>(
+            imported.Reference?.StorageRelativePath);
+        var owned = OwnedPath(storage, DraftId, storagePath);
         var bytesBefore = await File.ReadAllBytesAsync(owned);
         committer.Accept = false;
 
@@ -534,92 +611,6 @@ public sealed class DesignerImageServiceTests
         }
 
         public bool TryRemove(SkinAssetSlot slot) => Accept;
-    }
-
-    private sealed class RollbackFailingStorage(CancellationTokenSource cancellation) :
-        IDesignerDraftStorageLeaseProvider
-    {
-        public IDesignerDraftProjectLease? OpenDesignerProject(
-            string draftsRoot,
-            Guid draftId,
-            DesignerDraftProjectOpenMode mode)
-        {
-            var inner = PhysicalDraftFileOperations.Instance.OpenDesignerProject(
-                draftsRoot,
-                draftId,
-                mode);
-            return inner is null ? null : new Project(inner, cancellation);
-        }
-
-        public IDesignerSourceFileLease OpenDesignerSource(string absolutePath) =>
-            PhysicalDraftFileOperations.Instance.OpenDesignerSource(absolutePath);
-
-        private sealed class Project(
-            IDesignerDraftProjectLease inner,
-            CancellationTokenSource cancellation) : IDesignerDraftProjectLease
-        {
-            public bool WasCreated => inner.WasCreated;
-
-            public IDesignerDraftAssetsLease OpenAssets(bool create) =>
-                new Assets(inner.OpenAssets(create), cancellation);
-
-            public void DeleteOwnedProjectIfEmpty() => inner.DeleteOwnedProjectIfEmpty();
-
-            public void Dispose() => inner.Dispose();
-        }
-
-        private sealed class Assets(
-            IDesignerDraftAssetsLease inner,
-            CancellationTokenSource cancellation) : IDesignerDraftAssetsLease
-        {
-            public bool FileExists(string canonicalLeafName) =>
-                inner.FileExists(canonicalLeafName);
-
-            public byte[] ReadAllBytes(string canonicalLeafName) =>
-                inner.ReadAllBytes(canonicalLeafName);
-
-            public void WriteAndFlushNew(
-                string operationLeafName,
-                ReadOnlySpan<byte> bytes,
-                CancellationToken cancellationToken)
-            {
-                if (operationLeafName.Contains(".rollback-", StringComparison.Ordinal))
-                {
-                    throw new IOException("Injected rollback write failure.");
-                }
-
-                inner.WriteAndFlushNew(operationLeafName, bytes, cancellationToken);
-            }
-
-            public byte[] ReadOperationBytes(string operationLeafName) =>
-                inner.ReadOperationBytes(operationLeafName);
-
-            public bool MoveCanonicalToOperation(
-                string canonicalLeafName,
-                string operationLeafName) =>
-                inner.MoveCanonicalToOperation(canonicalLeafName, operationLeafName);
-
-            public void MoveOperationToCanonical(
-                string operationLeafName,
-                string canonicalLeafName)
-            {
-                inner.MoveOperationToCanonical(operationLeafName, canonicalLeafName);
-                cancellation.Cancel();
-            }
-
-            public void DeleteCanonical(string canonicalLeafName) =>
-                inner.DeleteCanonical(canonicalLeafName);
-
-            public void DeleteOperation(string operationLeafName) =>
-                inner.DeleteOperation(operationLeafName);
-
-            public void ReleaseOperation(string operationLeafName) =>
-                inner.ReleaseOperation(operationLeafName);
-
-            public void DeleteDirectoryIfEmpty() => inner.DeleteDirectoryIfEmpty();
-
-            public void Dispose() => inner.Dispose();
-        }
     }
 
     private sealed class PixelBudgetCommitter(params SkinAsset[] assets) :

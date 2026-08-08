@@ -1,5 +1,8 @@
+using System.IO.Compression;
+using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Output;
 using CodexQuotaHud.Skins.Contracts;
+using CodexQuotaHud.Skins.Packaging;
 
 namespace CodexQuotaHud.SkinDesigner.Tests.Output;
 
@@ -105,6 +108,56 @@ public sealed class DraftPackageBuilderTests
         Assert.Contains(
             result.Errors,
             error => error.Code == "version.incompatible");
+    }
+
+    [Fact]
+    public void Build_AddressedDraftWritesOnlyCanonicalPackagePath()
+    {
+        var assets = OutputTestFixture.Assets(SkinAssetSlot.Background);
+        var draft = OutputTestFixture.WithReferences(
+            OutputTestFixture.CompleteDraft(),
+            assets);
+        var reference = draft.Assets[SkinAssetSlot.Background];
+        var storageRelativePath = DraftAssetStorage.CreateContentRelativePath(
+            reference.RelativePath,
+            assets[SkinAssetSlot.Background].Content);
+        draft = draft with
+        {
+            Assets = new Dictionary<SkinAssetSlot, DraftAssetReference>
+            {
+                [SkinAssetSlot.Background] = reference with
+                {
+                    StorageRelativePath = storageRelativePath
+                }
+            }
+        };
+
+        var built = new DraftPackageBuilder(OutputTestFixture.HudVersion)
+            .Build(draft, assets);
+
+        Assert.True(built.IsValid, Format(built.Errors));
+        var request = Assert.IsType<SkinPackageBuildRequest>(built.Value);
+        Assert.Equal(
+            "assets/background.png",
+            request.Assets[SkinAssetSlot.Background].RelativePath);
+        using var package = new MemoryStream();
+        new SkinPackageWriter().Write(
+            package,
+            request,
+            CancellationToken.None);
+        package.Position = 0;
+        using var archive = new ZipArchive(package, ZipArchiveMode.Read);
+        Assert.Contains(archive.Entries,
+            entry => entry.FullName == "assets/background.png");
+        Assert.DoesNotContain(archive.Entries,
+            entry => entry.FullName.Contains("sha256-", StringComparison.Ordinal));
+        using var manifestReader = new StreamReader(
+            Assert.Single(archive.Entries, entry => entry.FullName == "manifest.json")
+                .Open());
+        Assert.DoesNotContain(
+            storageRelativePath,
+            manifestReader.ReadToEnd(),
+            StringComparison.Ordinal);
     }
 
     private static string Format(IReadOnlyList<SkinValidationError> errors) =>
