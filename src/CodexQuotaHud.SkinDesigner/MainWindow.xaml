@@ -573,6 +573,10 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid x:Name="SyntheticQuotaRow">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="128" />
                         <ColumnDefinition Width="*" />
@@ -642,6 +646,12 @@
                                 AutomationProperties.Name="每周额度百分比"
                                 KeyboardNavigation.TabIndex="53" />
                     </Grid>
+                    <TextBlock x:Name="DisplayRoleHintText"
+                               Grid.Row="1" Grid.ColumnSpan="3"
+                               Margin="0,6,0,0"
+                               Foreground="{DynamicResource DesignerMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Text="{Binding Synthetic.DisplayRoleHint}" />
                 </Grid>
                 <Grid x:Name="SyntheticStateRow" Grid.Row="1" Margin="0,10,0,0">
                     <WrapPanel Orientation="Horizontal">

@@ -1,10 +1,32 @@
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.Core.Models;
+using CodexQuotaHud.Skins.Templates.FreeDecorationRing;
 
 namespace CodexQuotaHud.App.Tests.Preview;
 
 public sealed class PreviewQuotaRefreshControllerTests
 {
+    [Fact]
+    public void Publish_DualKeepsFiveHourOnTheOuterPrimaryRing()
+    {
+        var controller = new PreviewQuotaRefreshController();
+
+        controller.Publish(
+            PreviewDisplayChoice.Dual,
+            fiveHourPercent: 68,
+            weeklyPercent: 34,
+            isRefreshing: false);
+
+        var display = controller.CurrentState.Display;
+        var geometry = FreeDecorationRingGeometry.CalculateGuideGeometry(
+            SyntheticPreviewCompositionTests.CreateTheme());
+        Assert.Equal(QuotaWindowKind.FiveHour, display.Primary?.Kind);
+        Assert.Equal(QuotaWindowKind.Weekly, display.Secondary?.Kind);
+        Assert.Equal(geometry.PrimaryDiameter,
+            SyntheticPreviewCompositionTests.CreateTheme().RingDiameter);
+        Assert.True(geometry.PrimaryDiameter > geometry.SecondaryDiameter);
+    }
+
     public static TheoryData<PreviewDisplayChoice, QuotaDisplayMode,
         QuotaWindowKind?, QuotaWindowKind?> DisplayShapes => new()
     {

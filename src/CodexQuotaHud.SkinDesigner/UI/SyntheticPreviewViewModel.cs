@@ -81,6 +81,16 @@ public sealed class SyntheticPreviewViewModel : INotifyPropertyChanged, IDisposa
 
     public IReadOnlyList<double> PercentPresets => Presets;
 
+    public string DisplayRoleHint => DisplayChoice switch
+    {
+        PreviewDisplayChoice.Dual => "Dual：外圈 = 5 小时，内圈 = 每周",
+        PreviewDisplayChoice.FiveHourOnly => "5h：单圈显示 5 小时额度",
+        PreviewDisplayChoice.WeeklyOnly => "Week：单圈显示每周额度",
+        PreviewDisplayChoice.NoQuota => "None：隐藏额度显示",
+        _ => throw new InvalidOperationException(
+            $"Unsupported {nameof(PreviewDisplayChoice)}: {DisplayChoice}.")
+    };
+
     public PreviewDisplayChoice DisplayChoice
     {
         get => _displayChoice;
@@ -94,6 +104,9 @@ public sealed class SyntheticPreviewViewModel : INotifyPropertyChanged, IDisposa
             if (SetField(ref _displayChoice, value))
             {
                 _session.SetDisplayChoice(value);
+                PropertyChanged?.Invoke(
+                    this,
+                    new PropertyChangedEventArgs(nameof(DisplayRoleHint)));
             }
         }
     }

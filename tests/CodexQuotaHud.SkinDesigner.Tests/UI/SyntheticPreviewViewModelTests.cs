@@ -6,6 +6,41 @@ namespace CodexQuotaHud.SkinDesigner.Tests.UI;
 
 public sealed class SyntheticPreviewViewModelTests
 {
+    [Theory]
+    [InlineData(PreviewDisplayChoice.Dual, "Dual：外圈 = 5 小时，内圈 = 每周")]
+    [InlineData(PreviewDisplayChoice.FiveHourOnly, "5h：单圈显示 5 小时额度")]
+    [InlineData(PreviewDisplayChoice.WeeklyOnly, "Week：单圈显示每周额度")]
+    [InlineData(PreviewDisplayChoice.NoQuota, "None：隐藏额度显示")]
+    public void DisplayRoleHint_ExplainsTheCurrentSyntheticDisplayChoice(
+        PreviewDisplayChoice choice,
+        string expectedHint)
+    {
+        var session = new RecordingPreviewSession();
+        using var sut = new SyntheticPreviewViewModel(
+            session,
+            animationsAllowed: () => true);
+
+        sut.DisplayChoice = choice;
+
+        Assert.Equal(expectedHint, sut.DisplayRoleHint);
+    }
+
+    [Fact]
+    public void DisplayChoice_ImmediatelyNotifiesDisplayRoleHint()
+    {
+        var session = new RecordingPreviewSession();
+        using var sut = new SyntheticPreviewViewModel(
+            session,
+            animationsAllowed: () => true);
+        var changedProperties = new List<string?>();
+        sut.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        sut.DisplayChoice = PreviewDisplayChoice.WeeklyOnly;
+
+        Assert.Contains(nameof(SyntheticPreviewViewModel.DisplayRoleHint),
+            changedProperties);
+    }
+
     [Fact]
     public async Task ExposesExactControlsAndDelegatesOnlyToPreviewSession()
     {

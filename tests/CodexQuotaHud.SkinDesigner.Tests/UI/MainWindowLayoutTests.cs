@@ -657,8 +657,20 @@ public sealed class MainWindowLayoutTests
                 window.FindName("SyntheticQuotaRow"));
             var stateRow = Assert.IsType<Grid>(
                 window.FindName("SyntheticStateRow"));
+            var roleHint = Assert.IsType<TextBlock>(
+                window.FindName("DisplayRoleHintText"));
             AssertFullyRenderedWithin(quotaRow, strip);
             AssertFullyRenderedWithin(stateRow, strip);
+            Assert.Equal(2, quotaRow.RowDefinitions.Count);
+            Assert.Equal(1, Grid.GetRow(roleHint));
+            Assert.Equal(3, Grid.GetColumnSpan(roleHint));
+            Assert.Equal(TextWrapping.Wrap, roleHint.TextWrapping);
+            Assert.Equal("Dual：外圈 = 5 小时，内圈 = 每周", roleHint.Text);
+
+            window.Synthetic.DisplayChoice =
+                CodexQuotaHud.App.Preview.PreviewDisplayChoice.WeeklyOnly;
+
+            Assert.Equal("Week：单圈显示每周额度", roleHint.Text);
 
             var stateGroup = Assert.IsType<Border>(
                 window.FindName("SyntheticStateGroup"));
