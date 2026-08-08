@@ -20,25 +20,34 @@ discoverable, and a full history panel, which is unnecessary for v1.3.0.
   keyboard-only code paths.
 - `撤销` is disabled when `CanUndo` is false. `重做` is disabled when
   `CanRedo` is false.
-- Command availability updates after every meaningful edit, undo, redo, new
-  document, open/import/edit-installed document transition, and disposal.
-- Undo/redo restores the complete draft snapshot already tracked by the
-  bounded history, including text layout, colors, ring settings, animation,
-  metadata, and asset references.
+- Command availability updates after every undoable edit, undo, redo, image
+  history boundary, new document, open/import/edit-installed document
+  transition, and disposal.
+- Undo/redo restores the parameter and metadata snapshot already tracked by
+  the bounded history, including text layout, colors, ring settings,
+  animation, and descriptive fields.
 - The existing `MeaningfulChange` path refreshes editor controls, dirty state,
   recovery scheduling, and the live synthetic preview after undo/redo.
 - A new meaningful edit after undo truncates the redo branch, preserving the
   current `DraftHistory` contract.
 - History remains capped at 100 snapshots.
 
-Undo/redo does not reverse external side effects: file-picker choices, named
-save writes, Apply-to-HUD, export, window movement, preview tools, or package
-installation. Preview-only guides and animation audition never enter history.
+Image files are deliberately not copied into the 100-entry in-memory history.
+A successful image replacement or removal becomes a new history boundary:
+the resulting draft remains dirty relative to the last named save, but undo
+cannot cross back over the image operation. This prevents a restored image
+reference from pointing at bytes that the transactional image workflow has
+already replaced or removed.
+
+Undo/redo also does not reverse external side effects: file-picker choices,
+named save writes, Apply-to-HUD, export, window movement, preview tools, or
+package installation. Preview-only guides and animation audition never enter
+history.
 
 ## UI and accessibility
 
-- Place `撤销` and `重做` in the top document toolbar, after the four existing
-  document buttons, separated by a slightly larger left margin.
+- Place `撤销` and `重做` in a compact edit-history toolbar at the top of the
+  editor column. Do not crowd the existing four document buttons.
 - Use the existing Designer dark button style and compact dimensions so the
   current minimum-width layout remains usable.
 - Give the controls stable names `UndoDraftButton` and `RedoDraftButton` and
@@ -50,11 +59,15 @@ installation. Preview-only guides and animation audition never enter history.
 
 1. Expose read-only `CanUndo` and `CanRedo` from `SkinDraftSession` by
    delegating to `DraftHistory`.
-2. Add two synchronous Designer commands owned by `DesignerViewModel`. They
-   call the session operations and publish `CanExecuteChanged` after every
-   meaningful change.
-3. Bind toolbar buttons and window input bindings to those commands.
-4. Dispose/unsubscribe the commands with `DesignerViewModel`; no global input
+2. Add a history-boundary operation that resets `DraftHistory` to the current
+   image-mutated document without changing the named-save dirty baseline.
+3. Route successful image replacement/removal commits through that boundary;
+   ordinary parameter/metadata edits continue to push undoable snapshots.
+4. Add two Designer commands owned by `DesignerViewModel`. They call the
+   session operations and publish `CanExecuteChanged` after undoable changes
+   and image boundaries.
+5. Bind toolbar buttons and window input bindings to those commands.
+6. Dispose/unsubscribe the commands with `DesignerViewModel`; no global input
    hook or process-wide state is introduced.
 
 ## Error and lifetime handling
@@ -74,7 +87,8 @@ Tests are written before production changes and must first fail because the
 UI commands/bindings do not exist.
 
 - Session tests: initial disabled state, edit enables undo, undo enables redo,
-  redo restores the edit, and a branched edit disables redo.
+  redo restores the edit, a branched edit disables redo, and an image history
+  boundary disables both directions while preserving dirty state.
 - View-model command tests: `CanExecute` transitions and the restored draft/
   preview values are exact.
 - WPF layout tests: both named buttons exist, use Designer styling, expose the
@@ -82,6 +96,8 @@ UI commands/bindings do not exist.
   expected commands.
 - Input-binding tests: `Ctrl+Z` and `Ctrl+Y` resolve to the same commands as
   the buttons.
+- Image workflow tests: a successful replacement/removal establishes the
+  history boundary; failed or cancelled mutations do not clear prior history.
 - Focused Designer tests pass, followed by the full four-assembly serial
   Release suite and a zero-warning Release build.
 - Rebuild Setup/ZIP as v1.3.0, rerun the applicable installer checks, upgrade
