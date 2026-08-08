@@ -1,4 +1,4 @@
-# Skin Designer Authoring Upgrade Acceptance — v1.3.0 Source
+# Skin Designer Authoring Upgrade Acceptance — v1.3.0 Source and Installed Candidate
 
 ## Scope and decision rule
 
@@ -18,13 +18,11 @@ evidence was recorded separately by commit
 (`test: record designer authoring upgrade acceptance`). No Setup, install,
 package, tag, push, or release action is in this task.
 
-**Current decision: PARTIAL — this is neither full manual acceptance nor a
-release-ready result.** Source and compatibility gates PASS, but all ten
-direct source-Designer GUI rows are `NOT RUN` because the Windows automation
-runtime blocked ownership validation. The source window launched, but no
-input was sent. Task 9 must execute and record each of the ten GUI rows
-individually against the installed v1.3.0 Designer before any full-manual-
-acceptance or release-ready claim.
+**Current decision: FAIL — the Task 4 candidate is not release-ready.** The
+historical Task 8/9 evidence below remains as an audit trail, but the final
+Task 4 record at the end supersedes it for the current candidate. Fresh source,
+package, matrix, and upgrade gates pass; direct installed smoke finds a stale
+Undo/Redo control defect and destructive image Discard behavior.
 
 ## Automated source gates
 
@@ -568,3 +566,95 @@ practical acceptance remain open. The real-upgrade PASS scope is limited to
 Setup exit/identity, data preservation, startup/shortcut/uninstall state, and
 binary launch; it does not include the unrun tray/import/isolation checks.
 Remote release Step 7 remains prohibited.
+
+## Task 4 final undo/redo candidate acceptance
+
+This section is the current record for source
+`fbdf23c659cc524224bcd51d2b1581efde43153f`. It supersedes the earlier Task 9
+candidate identities and aggregates above. No source/product-code change was
+made during Task 4.
+
+### Fresh serial source gates
+
+| Status | Date/time (Asia/Tokyo) | Exact command | Observed |
+|---|---|---|---|
+| PASS | 2026-08-08 19:48:53.797–19:48:58.621 +09:00 | `dotnet test .\tests\CodexQuotaHud.Core.Tests\CodexQuotaHud.Core.Tests.csproj -c Release --no-restore` | `75/75`; failed `0`; skipped `0`; exit `0` |
+| PASS | 2026-08-08 19:49:08.947–19:49:21.075 +09:00 | `dotnet test .\tests\CodexQuotaHud.Skins.Tests\CodexQuotaHud.Skins.Tests.csproj -c Release --no-restore` | `375/375`; failed `0`; skipped `0`; exit `0` |
+| PASS | 2026-08-08 19:49:31.687–19:52:10.185 +09:00 | `dotnet test .\tests\CodexQuotaHud.App.Tests\CodexQuotaHud.App.Tests.csproj -c Release --no-restore` | `625/625`; failed `0`; skipped `0`; exit `0` |
+| PASS | 2026-08-08 19:52:20.430–19:52:41.181 +09:00 | `dotnet test .\tests\CodexQuotaHud.SkinDesigner.Tests\CodexQuotaHud.SkinDesigner.Tests.csproj -c Release --no-restore` | `433/433`; failed `0`; skipped `0`; exit `0` |
+| PASS | 2026-08-08 19:48:53.797–19:52:41.181 +09:00 | Four serial commands above | `1508/1508`; failed `0`; skipped `0` |
+| PASS | 2026-08-08 19:52:51.460–19:52:54.856 +09:00 | `dotnet build .\CodexQuotaHud.sln -c Release --no-restore` | warnings `0`; errors `0`; exit `0` |
+| PASS | 2026-08-08 19:53:04.685–19:53:04.819 +09:00 | `git diff --check` | no output; exit `0` |
+
+### Current package, matrix, and real upgrade
+
+| Status | Date/time (Asia/Tokyo) | Gate | Observed |
+|---|---|---|---|
+| PASS | 2026-08-08 19:53:19.483–19:55:03.951 +09:00 | `.\scripts\package-release.ps1 -Version 1.3.0` | Setup `100,056,769` bytes / `a3352f5e74e186cb698431897d0b991fde41a2e1de86047547e6a9d5c55a8d2d`; ZIP `68,342,354` / `61d9d04b2c5495dc041fc2e2a528dfa31908b4a196449303b353cbe88f32a2ef`; checksum file `196` / `df99aad23eed4882e173076bbac2ed1f924ba94a1be9b96d9da202cccb8b1751` |
+| PASS | 2026-08-08 19:55 +09:00 | Identity/boundaries | checksum exactly two matching lowercase lines; ZIP exactly five entries (`artifacts\CodexQuotaHud-win-x64\CodexQuotaHud.App.exe`, `scripts\install.ps1`, `scripts\uninstall.ps1`, `LICENSE`, `README.md`) and no Designer; App/Designer `1.3.0.0` + full `fbdf23c`; Setup `1.3.0`; Setup/App/Designer `NotSigned`, no signer/timestamper |
+| PASS | 2026-08-08 19:59:30.635–20:16:07.569 +09:00 | `.\scripts\test-installer.ps1 -Version 1.3.0 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.3.0.exe` | `9/9`: `fresh-default`, `fresh-designer`, `add-designer`, `remove-designer`, `upgrade-selected`, `uninstall-preserve`, `uninstall-purge`, `cleanup-legacy-failure`, `cleanup-designer-failure`; current-run final smoke roots/processes `0/0` |
+| PASS | 2026-08-08 20:17:39.450 +09:00 | Preinstall snapshot | old installed App/Designer `1.3.0.0 + aecaea1`; exact startup; selected skin `custom:75c7b76e-7b3a-4e51-83db-c404555a7a7e`; `34` state files (`10` installed-skin, `22` draft-tree, `2` recovery, `0` imports); two exchange packages; exact preview shortcut |
+| PASS | 2026-08-08 20:18:11.928–20:18:32.223 +09:00 | Real Setup upgrade | `/SILENT /SUPPRESSMSGBOXES /NORESTART /TASKS="startup" /TYPE=custom /COMPONENTS=designer`; exit `0`; 6,204-byte log SHA `75ce66cf88d568f34030e496e35d81218f8025dba812e288dfff1f45789f1d89` |
+| PASS | 2026-08-08 20:19:11.979 +09:00 | Installed identity/state | App `170,548,632` bytes / `940ca077805b0eb12ec200fa8ee56aef8a265726403ce88aea9db32d1188f5bc`; Designer `171,061,112` / `27521dcca14b2e5eb55c01270093557956a2b77f79e1d1e638b332dcd03895f0`; both match publish at `1.3.0.0 + fbdf23c`; uninstall `1.3.0`; startup exact `--background`; state/exchange unchanged; normal+Designer Start links exact; zero desktop product links |
+| PASS | 2026-08-08 20:19:25.140 +09:00 | Maintainer preview restoration | exact preinstall shortcut SHA `6afe8a88685af47d67a374ca04782c6aa10da28c567a39799577f87c9d174abf`, standard App target, exact `--preview`; explicitly separate local behavior, not Setup |
+
+Two stale historical isolated-test uninstall entries were observed for already
+absent temp install roots:
+`CodexQuotaHud.InternalTest.344b...` and
+`CodexQuotaHud.InternalTest.430c...`. They were outside the current exact
+matrix roots and were not modified.
+
+### Installed undo/redo flow
+
+Before every input phase, the installed Designer was revalidated for exact PID,
+path `C:\Users\yaozi\AppData\Local\Programs\CodexQuotaHud\designer\CodexQuotaHud.SkinDesigner.exe`,
+title `Codex Quota HUD 皮肤设计器`, responding state, and current HWND.
+
+| Status | Installed action | Expected | Direct observation |
+|---|---|---|---|
+| FAIL | Change `文字整体偏移` `0 -> 12`, click Undo | Control and preview return exactly | Preview Number/Label returned from tops `254/280` to `248/274`; Undo disabled and Redo enabled, but the slider/value remained `12` instead of returning to `0` |
+| PARTIAL | Click Redo | Control and preview return to edited value | Preview returned to `254/280`; Undo enabled and Redo disabled, but the control still displayed `12` throughout, so no observable control transition occurred |
+| PASS | Undo, then make a new line-gap edit | Redo disables | New `文字行距=5` edit cleared Redo exactly |
+| PARTIAL | `Ctrl+Z` and `Ctrl+Y` | Same observable result as buttons | Exact foreground-gated shortcuts changed preview/history identically to buttons, but the visible gap control remained stale during Undo |
+| PASS | Save final offset/gap `8/5`, close, reopen | Persist exactly | Save status `Draft saved.`; disk revision `265` stored `8/5`; reopened controls showed `8/5` with Undo/Redo disabled |
+| PASS | Successful image removal; later picker cancel | Both histories clear, draft dirty, cancel preserves availability | Decoration removal cleared Undo/Redo; a later exact-owner native picker was cancelled and both remained disabled; close produced exact `Unsaved skin draft` dirty prompt |
+
+Separate release-blocking defect: choosing exact `Discard` at that dirty prompt
+closed the Designer but did not restore the removed file. The saved draft still
+referenced `assets/decoration.png`; the file was absent, and reopen showed
+`document.asset-missing: A draft-owned image is missing.` The exact preinstall
+draft backup was restored before continuing.
+
+### Remaining installed smoke
+
+| Status | Installed gate | Direct observation |
+|---|---|---|
+| PASS | Six animation auditions | Restored animation-complete `雷光伙伴` draft had nonzero rotation `0.7824`, breathing `0.8787`, glow `0.9185`, floating `0.1806`, refresh `3.5`, hold `3`. Exact installed selections `转圈`, `呼吸`, `光晕`, `浮动`, `刷新加速`, `全部` were captured; direct 132×132 frames were inspected and `全部` restored |
+| PASS | Apply-to-HUD | Exact result dialog: name `雷光伙伴`, version `1.0.0`, skin ID `75c7b76e-7b3a-4e51-83db-c404555a7a7e`, installed and applied to running HUD. Exact formal App remained responsive with selected key `custom:75c7b76e-...` and its sole 132×132 window captured |
+| NOT RUN | Untouched v1.2.3 package import | `柔光玫瑰.cqskin` remained exact SHA `cbcf4caff3238e9f4ee4ce247fb6b8b39652d6d2d7f444912853788a6684279f`, but filename input did not round-trip exactly in the native picker. Per safety rule that input path stopped and the exact picker was cancelled; effective installed `0/0` was not claimed |
+| NOT RUN | Formal HUD tray menu actions | Overflow panel exposed one product `NotifyItemIcon`, but center-point UIA hit-testing did not resolve to that exact icon. The safety gate stopped before input; no right-click/menu action was sent |
+| PASS | Close Designer, inspect formal HUD isolation | Immediately before close, guides were Off and audition `全部`; exact Designer exited, exact formal App remained responding, Designer process count became `0`, and the sole 132×132 formal window was captured without guide/audition overlays |
+
+Installed Task 4 total: `6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`.
+
+### Final state restoration and decision
+
+After closing exact product processes, the bounded backup was restored through
+validated absolute non-reparse roots. Final state is:
+
+- `34` state files; all `33` non-settings files match preinstall path, size,
+  and SHA-256 exactly;
+- settings `Left`, `Top`, `AnimationsEnabled`, and `SelectedSkinKey` match
+  exactly; only allowed `LastSuccessfulRefresh` advanced from
+  `2026-08-08T11:17:19.6198663Z` to `2026-08-08T12:00:11.8422183Z`;
+- exchange packages `2/2` match exact names, sizes, and hashes;
+- startup is exact standard App `--background`;
+- maintainer preview shortcut matches SHA/target/`--preview` exactly;
+- formal HUD was relaunched from the exact installed path and is responding;
+  Designer is closed.
+
+**Final Task 4 decision: FAIL — do not release this candidate.** Source,
+packaging, matrix, and upgrade gates are green, but the stale-control Undo/Redo
+defect and destructive image Discard defect require a new implementation and
+fresh installed acceptance. The two `NOT RUN` safety-gated rows remain open.
+No push, merge, tag, upload, GitHub Release, or public readback was performed.

@@ -1,5 +1,54 @@
 # AI Change Log
 
+## 2026-08-08 — v1.3.0 undo/redo candidate rejected after installed smoke
+
+- Reverified source `fbdf23c659cc524224bcd51d2b1581efde43153f` with fresh
+  serial Release suites: Core `75/75`, Skins `375/375`, App/UI `625/625`, and
+  Designer `433/433`; total `1508/1508`, failed `0`, skipped `0`. Release build
+  warnings/errors were `0/0`; `git diff --check` emitted no output.
+- Rebuilt the current assets: Setup `100,056,769` bytes / SHA-256
+  `a3352f5e74e186cb698431897d0b991fde41a2e1de86047547e6a9d5c55a8d2d`,
+  normal-HUD ZIP `68,342,354` bytes /
+  `61d9d04b2c5495dc041fc2e2a528dfa31908b4a196449303b353cbe88f32a2ef`,
+  and 196-byte `SHA256SUMS.txt` /
+  `df99aad23eed4882e173076bbac2ed1f924ba94a1be9b96d9da202cccb8b1751`.
+  The manifest has exactly two matching lowercase lines; ZIP has exactly five
+  normal-HUD entries and no Designer. Setup/App/Designer are `NotSigned`.
+- Passed all nine isolated installer scenarios with checked cleanup and zero
+  final current-run smoke roots/processes. Two stale historical isolated-test
+  uninstall entries whose install roots were already absent remain outside the
+  current matrix roots and were deliberately not changed.
+- Upgraded the real local install with Designer + startup selected and normal
+  desktop icon omitted. Setup exited `0`; installed App
+  `940ca077805b0eb12ec200fa8ee56aef8a265726403ce88aea9db32d1188f5bc`
+  and Designer
+  `27521dcca14b2e5eb55c01270093557956a2b77f79e1d1e638b332dcd03895f0`
+  match publish at `1.3.0.0 + fbdf23c`. Startup remained exact
+  `--background`; Setup created no desktop product link. The exact preexisting
+  maintainer standard-App `--preview` shortcut was restored separately and is
+  not installer behavior.
+- Direct installed undo/redo smoke found a release-blocking stale-control
+  defect. Undo/Redo and `Ctrl+Z`/`Ctrl+Y` changed preview geometry and history
+  availability, but did not update the edited slider/value. Branch invalidation
+  and save/reopen persistence passed, but the required observable control +
+  preview round trip did not.
+- Found a second destructive installed defect: after successful decoration
+  removal, choosing Discard at the dirty prompt closed the draft but left
+  `assets\decoration.png` physically deleted while saved `draft.json` still
+  referenced it. Reopening reported `document.asset-missing`.
+- Installed rows total `6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`. Six nonzero
+  animation auditions, Apply-to-HUD result/actual formal-HUD selection, and
+  post-Designer-close isolation passed. Old-package import stopped when the
+  filename failed exact round-trip verification; the picker was safely
+  cancelled. Tray operation stopped when exact icon hit-testing failed before
+  input; no right-click was sent.
+- Restored all bounded user state. The 33 non-settings files match preinstall
+  bytes/hashes; settings stable fields and selected skin match with only the
+  allowed refresh advance; both exchange packages and the maintainer preview
+  shortcut match exactly. Formal HUD was relaunched; Designer is closed.
+- Overall status is `FAIL — candidate not release-ready`. No product-code fix,
+  push, merge, tag, upload, GitHub Release, or public readback was performed.
+
 ## 2026-08-08 — v1.3.0 local candidate packaged and installed
 
 - Prepared candidate documentation for the Skin Designer authoring upgrade

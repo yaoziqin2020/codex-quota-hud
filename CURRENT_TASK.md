@@ -1,13 +1,12 @@
 # Current Task
 
-## v1.3.0 installed candidate — awaiting user acceptance
+## v1.3.0 undo/redo candidate — FAIL, not release-ready
 
-Task 9 is preparing a local `v1.3.0` release candidate from source commit
-`aecaea11f3ecf60738f46d8907ade63b3e081cb8`. Task 8 source verification is
-green at Core `75/75`, Skins `375/375`, App/UI `625/625`, and Designer
-`424/424`, totaling `1499/1499` with zero failed or skipped; the Release build
-reported zero warnings/errors and `git diff --check` passed. Those source
-results do not substitute for installed GUI acceptance.
+Task 4 rebuilt and installed the local `v1.3.0` candidate from source commit
+`fbdf23c659cc524224bcd51d2b1581efde43153f`. Fresh serial verification passed
+Core `75/75`, Skins `375/375`, App/UI `625/625`, and Designer `433/433`,
+totaling `1508/1508` with zero failed or skipped. The Release build reported
+zero warnings/errors and `git diff --check` emitted no output.
 
 The candidate adds persisted text vertical-offset and line-gap controls,
 Designer-only composition guides, per-channel animation audition,
@@ -16,27 +15,40 @@ start directory, and exact truthful Apply/Export result feedback. Old v1.2.x
 packages without the new fields read
 as `0/0`; new output declares minimum HUD `1.3.0` while schema remains `1`.
 
-Production packaging and identity inspection pass, including exact hashes,
-normal-only ZIP, App+Designer publish, `1.3.0` versions, and `NotSigned` status.
-All nine isolated installer scenarios pass. The real Setup upgrade's verified
-scope is limited to exit `0`, matching installed App/Designer identity,
-startup/uninstall/Start-menu state, data preservation except the expected
-refresh timestamp, and successful binary launch. Formal HUD and installed
-Designer are running. Bounded installed-GUI smoke is
-`6 PASS / 3 PARTIAL / 1 NOT RUN`; user practical acceptance remains `NOT RUN`.
-The partial rows are the unavailable installed Undo/Redo path plus unexecuted
-save/reopen subset, missing same-context v1.2.3 visual, and an unsuitable blank
-animation fixture. Apply is `NOT RUN` because its exact PID/HWND/title safety
-gate failed twice before input; no HUD or skin state changed. The latest public
-release remains `v1.2.3`. Three additional plan-required installed gates are
-also `NOT RUN`: operating the installed tray menu, importing an old package
-through the installed product, and directly confirming that the formal HUD
-shows neither composition guides nor audition-isolated animation after the
-Designer closes. Task 8 source compatibility/isolation automation does not
-substitute for these installed checks. Overall Task 9 remains `PARTIAL`; no
-push, `main` integration, tag, GitHub Release, upload, or public readback is
-authorized before explicit user acceptance. Remote release Step 7 remains
-prohibited.
+Production packaging and identity inspection passed. Current assets are Setup
+`100,056,769` bytes / `a3352f5e74e186cb698431897d0b991fde41a2e1de86047547e6a9d5c55a8d2d`,
+normal-HUD ZIP `68,342,354` bytes /
+`61d9d04b2c5495dc041fc2e2a528dfa31908b4a196449303b353cbe88f32a2ef`,
+and 196-byte `SHA256SUMS.txt` /
+`df99aad23eed4882e173076bbac2ed1f924ba94a1be9b96d9da202cccb8b1751`.
+App/Designer are `1.3.0.0` + full `fbdf23c`; Setup/App/Designer are `NotSigned`.
+All nine isolated installer scenarios passed. The real Setup upgrade exited
+`0`; installed App `940ca077…f5bc` and Designer `27521dcc…95f0` match publish,
+startup remains exact `--background`, and bounded state was preserved.
+
+The installed undo/redo flow is release-blocking. With `文字整体偏移` changed
+from `0` to `12`, Undo restored the preview and history availability but left
+the slider/value at `12`; Redo repeated the same stale-control behavior.
+`Ctrl+Z`/`Ctrl+Y` share the defect. Save/reopen did persist final `8/5`, redo
+branch invalidation passed, and image mutation history boundaries passed.
+However, after removing the decoration and choosing Discard, the physical
+`assets\decoration.png` remained deleted while saved `draft.json` still
+referenced it, producing `document.asset-missing` on reopen.
+
+Installed Task 4 rows total `6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`.
+Six nonzero animation auditions, Apply-to-HUD identity/result/actual formal-HUD
+selection, and post-Designer-close isolation passed. Old-package import is
+`NOT RUN` because the native filename input did not round-trip exactly; the
+picker was safely cancelled. Tray-menu operation is `NOT RUN` because the
+exact tray-icon center hit-test failed before input; no right-click was sent.
+All user state was restored: 33 non-settings files are byte/hash exact,
+settings stable fields and selected skin are exact with only the allowed
+refresh advance, both exchange packages and the maintainer `--preview`
+shortcut are exact, formal HUD is running, and Designer is closed.
+
+Overall status is `FAIL — candidate not release-ready`. The latest public
+release remains `v1.2.3`. No push, `main` integration, tag, GitHub Release,
+upload, public readback, or historical-asset mutation is authorized.
 
 Public Setup behavior is unchanged: startup and the normal `Codex Quota HUD`
 desktop shortcut are selected by default and may be deselected; the normal

@@ -8,10 +8,10 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
-## v1.3.0 local candidate — installed, awaiting user acceptance
+## v1.3.0 undo/redo local candidate — failed installed acceptance
 
-Task 9 is building an installed candidate from
-`aecaea11f3ecf60738f46d8907ade63b3e081cb8`. The authoring upgrade adds two
+Task 4 rebuilt and installed the candidate from
+`fbdf23c659cc524224bcd51d2b1581efde43153f`. The authoring upgrade adds two
 persisted schema-v1 theme properties, `textOffsetY` (`-32..32 DIP`) and
 `textLineGap` (`-16..32 DIP`). Both default to `0`, preserving v1.2.3 layout.
 New Designer output declares minimum HUD `1.3.0`; untouched v1.2.x packages
@@ -26,27 +26,35 @@ native Save dialog starts in
 exact skin/version/ID and activation disposition without overstating a merely
 installed skin as live-switched.
 
-Task 8 source evidence is Core `75/75`, Skins `375/375`, App/UI `625/625`, and
-Designer `424/424`, totaling `1499/1499`, with zero failed/skipped; Release
-build and diff checks passed. The v1.3.0 package identity and nine-scenario
-installer matrix pass. The verified real-upgrade scope is Setup exit `0`,
-installed App/Designer matching publish at `1.3.0.0 + aecaea1`, correct
-startup/uninstall/Start-menu state, preserved state/exchange data except a
-normal refresh timestamp advance, and successful App/Designer launch.
-Bounded installed Designer GUI smoke is `6 PASS / 3 PARTIAL / 1 NOT RUN`.
-Text offset, line gap, guides/click-through, refresh-state restoration, display
-roles, and export-picker rows passed directly. Undo/redo/save/reopen, same-
-context legacy visual equivalence, and visually distinct animation channels
-remain partial; Apply was stopped before input by the exact identity gate and
-is not run. Temporary GUI-smoke state was removed, all pre-existing state was
-reverified, and the installed Designer remains open. Three separate installed
-gates are `NOT RUN`: formal-HUD tray-menu operation, old-package import through
-the installed product, and direct confirmation that closing Designer leaves no
-composition guides or audition-isolated animation in the formal HUD. Task 8
-source automated compatibility/isolation coverage is not evidence for those
-installed-smoke gates. User practical acceptance is still `NOT RUN`; overall
-Task 9 remains `PARTIAL`, and the latest public accepted release remains
-`v1.2.3`. Remote release Step 7 remains prohibited.
+Fresh source evidence is Core `75/75`, Skins `375/375`, App/UI `625/625`, and
+Designer `433/433`, totaling `1508/1508`, with zero failed/skipped; Release
+build and diff checks passed. Current assets are Setup `100,056,769` bytes /
+`a3352f5e…a8d2`, normal-HUD ZIP `68,342,354` bytes / `61d9d04b…a2ef`, and a
+196-byte checksum file / `df99aad2…1751`; all identities, exact ZIP/publish
+boundaries, and unsigned status passed. The nine-scenario matrix passed `9/9`.
+The real upgrade exited `0`; installed App `940ca077…f5bc` and Designer
+`27521dcc…95f0` match publish at `1.3.0.0 + fbdf23c`; startup, uninstall,
+Start-menu, state, exchange packages, and shortcuts were verified.
+
+Installed undo/redo acceptance failed. Undo and Redo changed preview geometry
+and command availability, but the edited slider/value remained stale; keyboard
+shortcuts share this defect. A separate destructive defect was observed after
+image removal: choosing Discard closed the dirty draft but did not restore the
+deleted decoration file, so the saved JSON referenced a missing asset on
+reopen. The Task 4 installed aggregate is
+`6 PASS / 1 FAIL / 2 PARTIAL / 2 NOT RUN`. Nonzero animation auditions,
+Apply-to-HUD, and post-Designer-close formal-HUD isolation passed. Old-package
+import and tray-menu operation are `NOT RUN` because their exact input gates
+failed before a safe action; no guess was made.
+
+State restoration passed after the smoke: all 34 state paths are present, 33
+non-settings files match preinstall bytes/hashes, settings stable fields and
+selected skin match with only the allowed refresh timestamp advance, both
+exchange packages are exact, startup is exact `--background`, and the exact
+maintainer standard-App `--preview` shortcut is restored separately from
+Setup. Formal HUD is running and Designer is closed. Overall candidate status
+is `FAIL`, the latest public accepted release remains `v1.2.3`, and remote
+release actions remain prohibited.
 
 Distribution boundaries remain fixed: ordinary Setup defaults startup plus
 the normal desktop shortcut, both deselectable and without `--preview`;
