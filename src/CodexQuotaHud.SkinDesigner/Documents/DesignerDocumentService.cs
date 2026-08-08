@@ -443,10 +443,7 @@ public sealed class DesignerDocumentService
                     ref project,
                     ownedOperations))
             {
-                return Invalid(
-                    "document.cleanup-failed",
-                    "$document.assets",
-                    "The failed copy could not remove only its claimed partial files.");
+                return CopyFailureWithCleanupFailure(exception);
             }
 
             return DecodeOrCopyInvalid(exception);
@@ -659,6 +656,22 @@ public sealed class DesignerDocumentService
             code,
             "$document.assets",
             "The draft-owned asset conversion failed and was not opened.");
+    }
+
+    private static DesignerDocumentResult CopyFailureWithCleanupFailure(
+        Exception exception)
+    {
+        var primary = DecodeOrCopyInvalid(exception);
+        return new DesignerDocumentResult(
+            null,
+            EmptyAssets,
+            [
+                .. primary.Errors,
+                new SkinValidationError(
+                    "document.cleanup-failed",
+                    "$document.assets",
+                    "The failed copy could not remove only its claimed partial files.")
+            ]);
     }
 
     private static SkinValidationError ToValidationError(DraftLoadFailure failure) =>

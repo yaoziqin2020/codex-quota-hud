@@ -418,9 +418,16 @@ public sealed class DesignerDocumentServiceTests
         {
             Assert.Equal(1, racingStorage.ReleaseCalls);
             Assert.Null(result.Draft);
-            Assert.Contains(result.Errors,
-                error => error.Code == "document.cleanup-failed");
+            Assert.Collection(
+                result.Errors,
+                error => Assert.Equal(
+                    "document.asset-copy-failed",
+                    error.Code),
+                error => Assert.Equal(
+                    "document.cleanup-failed",
+                    error.Code));
             Assert.Equal(OpaquePng, await File.ReadAllBytesAsync(blobPath));
+            Assert.True(Directory.Exists(Path.GetDirectoryName(blobPath)));
         }
 
         Assert.DoesNotContain(
