@@ -33,6 +33,18 @@ retry. Policy prohibited a UIA fallback, so the required fixed-path UI rows
 still need a healthy Computer Use session or user manual smoke. Overall
 candidate status is `FAIL`; no push, merge, tag, upload, or GitHub Release is
 authorized.
+
+Task 8 provenance supplements preserve two important qualifications. The
+historical `12-post-install.json` captured uninstall DisplayVersion as `null`;
+this is a capture defect, so the `1.3.0` uninstall claim relies on a later
+timestamped read-only query of the canonical HKCU key in
+`19-uninstall-registry-supplement.json`, correlated with the Setup log that
+recreated that key. Computer Use actor/window/call/
+recovery facts are recorded in `20-computer-use-attempts-supplement.json`;
+replayable commands, raw-log hashes, and the zero aggregate smoke-root readback
+are in `21-command-state-provenance-supplement.json`. The literal backup/restore
+shell transcript was not retained; only the bounded method and before/after
+evidence are claimed.
 Until explicit acceptance and publication, the
 [latest public release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
 remains `v1.2.3`.

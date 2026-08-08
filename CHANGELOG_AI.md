@@ -18,6 +18,21 @@
   `NotSigned`.
 - Passed the exact isolated installer matrix `9/9`: all seven normal scenarios
   and both committed-cleanup failure scenarios completed with checked cleanup.
+- Added an evidence-review provenance supplement without replacing historical
+  artifacts. `12-post-install.json` has a capture defect: its uninstall
+  DisplayVersion is null and does not support that field; a literal read-only
+  query in `19-uninstall-registry-supplement.json` returns `1.3.0` from the
+  exact canonical HKCU key, while Setup-log lines show that key being recreated.
+- Recorded both Computer Use attempts by actor/session, unique exact window,
+  retained failed call names, allowed recovery, exact runtime error, zero
+  inputs, and stop decision in `20-computer-use-attempts-supplement.json`.
+  Per-call timestamps/full serialized tool objects were not retained; the
+  attempts are bounded by exact launch/close evidence.
+- Recorded exact source/build/diff/package/matrix commands, raw-log hashes,
+  product-source parent identity, and a fresh aggregate smoke-root count of
+  `0` in `21-command-state-provenance-supplement.json`. The literal backup/
+  restore shell transcript was not retained, so the supplement explicitly
+  limits provenance to the bounded method and named before/after evidence.
 - Took a bounded stable backup after gracefully stopping the exact formal HUD.
   Real Setup selected startup plus Designer, omitted the ordinary desktop
   shortcut, and exited `0`. Installed App

@@ -29,6 +29,17 @@ exactly matching publish. Uninstall reports `1.3.0`; startup remains exact
 were preserved. Setup removed the preview shortcut; the exact maintainer
 standard-App `--preview` shortcut was restored separately.
 
+Evidence review preserves `12-post-install.json` unchanged and flags its
+`UninstallDisplayVersion: null` as a capture defect. Uninstall `1.3.0` is
+supported instead by the timestamped literal read-only canonical-HKCU query in
+`19-uninstall-registry-supplement.json` and the Setup-log key recreation.
+`20-computer-use-attempts-supplement.json` separates the subagent and root
+attempts, exact window/calls/recovery/error, and zero inputs.
+`21-command-state-provenance-supplement.json` records replayable commands,
+source/log hashes, the `b9fecdb` review-baseline parent readback, and aggregate
+smoke-root count `0`; it explicitly records that the literal backup/restore
+shell command transcript was not retained.
+
 Installed UI acceptance is `NOT RUN`. Both the Task 8 agent and root independently
 read the Computer Use guidance/confirmation policy, selected the one exact
 installed Designer window, and stopped before input when `@oai/sky`

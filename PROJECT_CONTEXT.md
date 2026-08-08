@@ -40,6 +40,18 @@ startup, Start-menu targets, state, exchange packages, and shortcut behavior
 were verified. Setup removed the maintainer preview link; its exact backup was
 restored separately with `--preview`, explicitly outside Setup behavior.
 
+The uninstall-version provenance is supplemental: historical
+`12-post-install.json` contains `UninstallDisplayVersion: null` and is retained
+as a capture defect. `19-uninstall-registry-supplement.json` records a later
+literal read-only query of the canonical HKCU uninstall key returning `1.3.0`,
+plus the Setup-log lines that recreated that key.
+`20-computer-use-attempts-supplement.json` and
+`21-command-state-provenance-supplement.json` record the two Computer Use
+actors/window/call failures and the replayable command/log/source/matrix
+provenance respectively. The exact backup/restore shell transcript was not
+retained, so restoration claims are limited to the recorded bounded method and
+before/after comparisons.
+
 Installed UI acceptance did not run. The Task 8 agent and root independently
 selected the unique exact installed Designer through Computer Use, but
 `get_window`/`get_window_state` failed with

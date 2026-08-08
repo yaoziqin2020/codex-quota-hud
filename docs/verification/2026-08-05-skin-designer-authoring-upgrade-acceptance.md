@@ -584,6 +584,12 @@ remote action.
 | PASS | 2026-08-08 22:57:05.125–22:57:09.280 +09:00 | `dotnet build .\CodexQuotaHud.sln -c Release --no-restore` | warnings `0`; errors `0`; exit `0` |
 | PASS | 2026-08-08 22:57 +09:00 | `git diff --check` | no output; exit `0` |
 
+`21-command-state-provenance-supplement.json` records these exact replayable
+commands, the review-baseline `b9fecdb` parent readback to product source
+`cd5634c`, and the byte length/SHA-256 of raw logs `01`–`06`. It also records
+the exact matrix command/log hash and a fresh read-only aggregate temp-root
+query with count `0`.
+
 ### Package, matrix, and real upgrade
 
 | Status | Date/time (Asia/Tokyo) | Gate | Observed |
@@ -593,8 +599,15 @@ remote action.
 | PASS | 2026-08-08 23:00:23.881–23:19:29.293 +09:00 | `.\scripts\test-installer.ps1 -Version 1.3.0 -InstallerPath .\artifacts\release\CodexQuotaHud-Setup-v1.3.0.exe` | `9/9`: `fresh-default`, `fresh-designer`, `add-designer`, `remove-designer`, `upgrade-selected`, `uninstall-preserve`, `uninstall-purge`, `cleanup-legacy-failure`, `cleanup-designer-failure`; every isolated root completed checked cleanup |
 | PASS | 2026-08-08 23:22:33.754 +09:00 | Stable preinstall backup | Exact formal HUD stopped through its product shutdown event; non-reparse state/exchange roots copied and rehashed; `34` state files and two exchange packages matched the backup exactly; startup and preview shortcut captured |
 | PASS | 2026-08-08 23:22:51.557–23:23:14.971 +09:00 | Real Setup upgrade | `/SILENT /SUPPRESSMSGBOXES /NORESTART /TASKS="startup" /TYPE=custom /COMPONENTS=designer`; exact Setup rehashed immediately before launch; exit `0`; 6,210-byte log SHA `9d0c5e017e8ea31730058daf3d11dde218e42a3dc5260642fe4d598e41f480ea` |
-| PASS | 2026-08-08 23:23:52.909 +09:00 | Installed identity/state | installed App/Designer hashes exactly match publish; both `1.3.0.0 + cd5634c`; uninstall `1.3.0`; startup exact `--background`; `34` state files with zero non-settings and stable-settings differences; exchange `2/2` exact; normal and Designer Start links exact; zero product desktop links |
+| PASS | 2026-08-08 23:23:52.909 +09:00 plus 23:52:49.915 readback | Installed identity/state | installed App/Designer hashes exactly match publish; both `1.3.0.0 + cd5634c`; startup exact `--background`; `34` state files with zero non-settings and stable-settings differences; exchange `2/2` exact; normal and Designer Start links exact; zero product desktop links. Uninstall `1.3.0` comes from supplemental read-only canonical-HKCU evidence, not the null historical capture |
 | PASS | 2026-08-08 23:24:55.108 +09:00 | Maintainer preview restoration | exact backup/destination SHA `6afe8a88685af47d67a374ca04782c6aa10da28c567a39799577f87c9d174abf`; standard installed App target and exact `--preview`; separate maintainer behavior, not Setup |
+
+Historical `12-post-install.json` has
+`Installed.UninstallDisplayVersion: null`; that field is a capture defect and
+does not support an uninstall-version claim. It remains unchanged.
+`19-uninstall-registry-supplement.json` records the literal read-only command,
+exit `0`, exact canonical HKCU key, `DisplayVersion REG_SZ 1.3.0`, and Setup-log
+lines 72–74 recreating and writing that key.
 
 ### Installed UI runtime blocker
 
@@ -614,6 +627,15 @@ selected the same unique exact window, and reproduced the same pre-input
 failure and permitted retry failure. Zero UI input was sent. The policy
 explicitly prohibited mixing the earlier PowerShell/UIA fallback, so source
 automation is not substituted for installed observation.
+
+Raw transcript supplement `20-computer-use-attempts-supplement.json`
+distinguishes the Task 8 subagent and independent root/controller sessions. It
+records the returned exact app/HWND/title/PID, retained failed call names,
+allowed refresh/reset/reinitialize/retry sequences as applicable, the exact
+error, zero inputs, and stop decisions. Exact per-call timestamps and full
+serialized tool objects were not retained; both attempts are honestly bounded
+between `15-process-launch.json` at 23:27:47.1376154 and
+`16-product-processes-closed.json` at 23:31:49.9866926 +09:00.
 
 | Status | Required installed row | Direct result |
 |---|---|---|
@@ -641,6 +663,11 @@ root, removing the controlled fixture from live data. At
 - maintainer preview shortcut exact SHA/target/`--preview`;
 - installed App/Designer still exact fixed-candidate hashes;
 - formal HUD PID `10492` running and responding; Designer process count `0`.
+
+The literal backup/restore shell command transcript was not retained.
+Supplement `21` therefore does not fabricate it: it records the bounded method
+and names the shutdown, preinstall snapshot, process-close, pre-relaunch
+comparison, and final comparison artifacts supporting the restoration claim.
 
 **Final Task 8 decision: FAIL — candidate not release-ready.** Source,
 packaging, matrix, real upgrade, identity, and restoration gates are green, but
