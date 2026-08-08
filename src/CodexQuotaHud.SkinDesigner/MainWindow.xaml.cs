@@ -665,16 +665,53 @@ public partial class MainWindow : Window, IDesignerWindow
 
     private void OnMeaningfulChange(object? sender, SkinDraftDocument draft)
     {
-        _recovery.NotifyMeaningfulChange(draft);
-        if (Dispatcher.CheckAccess())
+        if (Volatile.Read(ref _disposed) != 0 || _previewDisposed)
         {
-            SyncManualEditorControls();
             return;
         }
 
-        _ = Dispatcher.BeginInvoke(
-            DispatcherPriority.DataBind,
-            new Action(SyncManualEditorControls));
+        _recovery.NotifyMeaningfulChange(draft);
+        if (Dispatcher.CheckAccess())
+        {
+            if (!Dispatcher.HasShutdownStarted &&
+                !Dispatcher.HasShutdownFinished)
+            {
+                SyncManualEditorControls();
+            }
+
+            return;
+        }
+
+        if (Volatile.Read(ref _disposed) != 0 ||
+            _previewDisposed ||
+            Dispatcher.HasShutdownStarted ||
+            Dispatcher.HasShutdownFinished)
+        {
+            return;
+        }
+
+        try
+        {
+            _ = Dispatcher.BeginInvoke(
+                DispatcherPriority.DataBind,
+                new Action(() =>
+                {
+                    if (Volatile.Read(ref _disposed) == 0 &&
+                        !_previewDisposed &&
+                        !Dispatcher.HasShutdownStarted &&
+                        !Dispatcher.HasShutdownFinished)
+                    {
+                        SyncManualEditorControls();
+                    }
+                }));
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException or
+            TaskCanceledException or
+            ObjectDisposedException)
+        {
+            // Background image work may race Designer dispatcher shutdown.
+        }
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)

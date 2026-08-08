@@ -977,6 +977,31 @@ public sealed class MainWindowLayoutTests
     }
 
     [Fact]
+    public void BackgroundImageChangeDuringDisposal_DoesNotUpdateManualControlsAfterWindowLifetimeEnds()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var window = CreateWindow(temporary, out _);
+            window.AttachPreviewOwnerForTesting();
+            var imageOffset = Assert.IsType<Slider>(window.FindName("ImageOffsetXSlider"));
+            Assert.Equal(0, imageOffset.Value);
+
+            var mutation = Task.Run(() =>
+                window.Editor.Images.Background.SetOffsetX(23))
+                .GetAwaiter().GetResult();
+            Assert.True(mutation.Succeeded);
+            Assert.Equal(23, window.Editor.Current.Theme.Background.OffsetX);
+
+            window.DisposeWithoutShowingForTesting();
+            Assert.True(window.PreviewDisposedForTesting);
+            DrainDispatcher();
+
+            Assert.Equal(0, imageOffset.Value);
+        });
+    }
+
+    [Fact]
     public void RealWindow_ProvidesVisibleFocusRingAndWcagContrastPairs()
     {
         RunSta(() =>
