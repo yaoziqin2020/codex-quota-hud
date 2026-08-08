@@ -151,6 +151,30 @@ public sealed class WindowsSkinOutputDialogsTests
     }
 
     [Fact]
+    public void Create_CancelledWithCleanupErrorWarnsWithoutClaimingCommittedOutput()
+    {
+        var result = new DesignerOutputResult(
+            DesignerOutputDisposition.Cancelled,
+            null,
+            null,
+            [new SkinValidationError(
+                "apply.cleanup-failed",
+                "$operation",
+                "Cleanup failed; recovery operation: cancel123.")],
+            "Apply cancelled. Temporary files could not be cleaned up; " +
+                "recovery operation: cancel123.");
+
+        var presentation = DesignerOutputPresentation.Create(result);
+
+        Assert.Equal("操作已取消", presentation.Title);
+        Assert.Equal(DesignerDialogIcon.Warning, presentation.Icon);
+        Assert.Contains("未创建或更改任何输出", presentation.Message);
+        Assert.Contains("临时文件清理未完全成功", presentation.Message);
+        Assert.Contains("cancel123", presentation.Message);
+        Assert.DoesNotContain("输出已完成", presentation.Message);
+    }
+
+    [Fact]
     public void Create_FailedUsesErrorPresentationWithoutSuccessIcon()
     {
         var result = new DesignerOutputResult(

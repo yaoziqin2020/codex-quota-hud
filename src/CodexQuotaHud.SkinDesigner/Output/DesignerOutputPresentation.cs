@@ -47,9 +47,13 @@ internal sealed record DesignerOutputPresentation(
         {
             return presentation with
             {
-                Message = AppendCommittedWarnings(
-                    presentation.Message,
-                    result.Errors.Select(error => error.Message)),
+                Message = result.Disposition == DesignerOutputDisposition.Cancelled
+                    ? AppendCancelledWarnings(
+                        presentation.Message,
+                        result.Errors.Select(error => error.Message))
+                    : AppendCommittedWarnings(
+                        presentation.Message,
+                        result.Errors.Select(error => error.Message)),
                 Icon = DesignerDialogIcon.Warning
             };
         }
@@ -113,6 +117,21 @@ internal sealed record DesignerOutputPresentation(
             .ToArray();
         var warning = message +
             "\n\n注意：输出已完成，但后续清理或收尾未完全成功。";
+        return details.Length == 0
+            ? warning
+            : warning + "\n详细信息：\n" + string.Join("\n", details);
+    }
+
+    private static string AppendCancelledWarnings(
+        string message,
+        IEnumerable<string> warnings)
+    {
+        var details = warnings
+            .Where(warning => !string.IsNullOrWhiteSpace(warning))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var warning = message +
+            "\n\n注意：操作已取消，但临时文件清理未完全成功。";
         return details.Length == 0
             ? warning
             : warning + "\n详细信息：\n" + string.Join("\n", details);
