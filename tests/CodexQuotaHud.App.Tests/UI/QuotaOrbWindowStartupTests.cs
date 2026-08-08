@@ -953,6 +953,46 @@ public sealed class QuotaOrbWindowStartupTests
     }
 
     [Fact]
+    public void OrdinaryWindow_KeepsDesignerGuideOverlayCollapsedBelowDragSurface()
+    {
+        RunSta(() =>
+        {
+            using var viewModel = new QuotaOrbViewModel(
+                new InertRefreshController(),
+                new InMemorySettingsStore(),
+                new AppSettings(),
+                new InlineDispatcher(),
+                () => { });
+            var window = new QuotaOrbWindow(viewModel);
+
+            try
+            {
+                var root = Assert.IsType<Grid>(window.FindName("OrbRoot"));
+                var skinHost = Assert.IsType<ContentControl>(
+                    window.FindName("SkinHost"));
+                var overlay = Assert.IsType<Grid>(
+                    window.FindName("DesignerGuideOverlay"));
+                var dragSurface = Assert.IsType<Border>(
+                    window.FindName("DragSurface"));
+
+                Assert.Equal(Visibility.Collapsed, overlay.Visibility);
+                Assert.False(overlay.IsHitTestVisible);
+                Assert.Equal(900, Panel.GetZIndex(overlay));
+                Assert.True(Panel.GetZIndex(dragSurface) >
+                    Panel.GetZIndex(overlay));
+                Assert.True(root.Children.IndexOf(skinHost) <
+                    root.Children.IndexOf(overlay));
+                Assert.True(root.Children.IndexOf(overlay) <
+                    root.Children.IndexOf(dragSurface));
+            }
+            finally
+            {
+                window.CloseForExit();
+            }
+        });
+    }
+
+    [Fact]
     public void ProductionWindow_ShowsWhenFirstQuotaArrives()
     {
         RunSta(() =>

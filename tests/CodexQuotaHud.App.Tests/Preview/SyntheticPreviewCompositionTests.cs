@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -10,12 +11,86 @@ using CodexQuotaHud.Core.Models;
 using CodexQuotaHud.Core.Settings;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Templates.FreeDecorationRing;
+using ShapeEllipse = System.Windows.Shapes.Ellipse;
+using ShapeLine = System.Windows.Shapes.Line;
+using ShapeRectangle = System.Windows.Shapes.Rectangle;
 
 namespace CodexQuotaHud.App.Tests.Preview;
 
 [Collection(PreviewWpfCollection.Name)]
 public sealed class SyntheticPreviewCompositionTests
 {
+    [Fact]
+    public void DesignerGuides_DefaultCollapsedAndMapSharedGeometry()
+    {
+        RunSta(() =>
+        {
+            using var composition = new SyntheticPreviewComposition(
+                Dispatcher.CurrentDispatcher,
+                () => { });
+            var overlay = Assert.IsType<Grid>(
+                composition.HudWindow.FindName("DesignerGuideOverlay"));
+
+            Assert.Equal(Visibility.Collapsed, overlay.Visibility);
+            Assert.False(overlay.IsHitTestVisible);
+
+            var theme = CreateTheme() with
+            {
+                Center = IdentityTransform() with
+                {
+                    OffsetX = 7,
+                    OffsetY = -5,
+                    Scale = 1.2
+                },
+                TextOffsetY = 3,
+                TextLineGap = 8,
+                Animation = new SkinAnimationSettings(0, 0.75, 0, 0)
+            };
+            var expected = FreeDecorationRingGeometry.CalculateGuideGeometry(
+                theme);
+
+            composition.SetDesignerGuides(theme, visible: true);
+
+            Assert.Equal(Visibility.Visible, overlay.Visibility);
+            Assert.False(overlay.IsHitTestVisible);
+            var primary = Assert.IsType<ShapeEllipse>(
+                composition.HudWindow.FindName("DesignerGuidePrimaryRing"));
+            var secondary = Assert.IsType<ShapeEllipse>(
+                composition.HudWindow.FindName("DesignerGuideSecondaryRing"));
+            Assert.Equal(expected.PrimaryDiameter, primary.Width);
+            Assert.Equal(expected.PrimaryDiameter, primary.Height);
+            Assert.Equal(expected.SecondaryDiameter, secondary.Width);
+            Assert.Equal(expected.SecondaryDiameter, secondary.Height);
+
+            var center = Assert.IsType<ShapeRectangle>(
+                composition.HudWindow.FindName("DesignerGuideCenterPeak"));
+            Assert.Equal(expected.CenterPeakSize, center.Width);
+            Assert.Equal(expected.CenterPeakSize, center.Height);
+            var centerOffset = Assert.IsType<TranslateTransform>(
+                center.RenderTransform);
+            Assert.Equal(expected.CenterPeakOffsetX, centerOffset.X);
+            Assert.Equal(expected.CenterPeakOffsetY, centerOffset.Y);
+
+            var numberLine = Assert.IsType<ShapeLine>(
+                composition.HudWindow.FindName("DesignerGuideNumberLine"));
+            var labelLine = Assert.IsType<ShapeLine>(
+                composition.HudWindow.FindName("DesignerGuideLabelLine"));
+            Assert.Equal(
+                expected.Text.NumberY,
+                Assert.IsType<TranslateTransform>(numberLine.RenderTransform).Y);
+            Assert.Equal(
+                expected.Text.LabelY,
+                Assert.IsType<TranslateTransform>(labelLine.RenderTransform).Y);
+
+            composition.SetDesignerGuides(theme, visible: false);
+
+            Assert.Equal(Visibility.Collapsed, overlay.Visibility);
+            Assert.Equal(0, primary.Width);
+            Assert.Equal(0, secondary.Width);
+            Assert.Equal(0, center.Width);
+        });
+    }
+
     [Fact]
     public void PublicComposition_DoesNotCreateAMonitorBackedWindowHandle()
     {

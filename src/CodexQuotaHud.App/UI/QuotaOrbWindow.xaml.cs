@@ -12,6 +12,7 @@ using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.App.Preview;
 using CodexQuotaHud.Core.Models;
 using CodexQuotaHud.Core.Settings;
+using CodexQuotaHud.Skins.Templates.FreeDecorationRing;
 using MenuItem = System.Windows.Controls.MenuItem;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
@@ -374,6 +375,43 @@ public partial class QuotaOrbWindow : Window, IPreviewHud
     {
         ArgumentNullException.ThrowIfNull(view);
         SkinHost.Content = view;
+    }
+
+    public void SetDesignerGuides(
+        FreeDecorationRingGuideGeometry? geometry)
+    {
+        if (geometry is null)
+        {
+            DesignerGuidePrimaryRing.Width = 0;
+            DesignerGuidePrimaryRing.Height = 0;
+            DesignerGuideSecondaryRing.Width = 0;
+            DesignerGuideSecondaryRing.Height = 0;
+            DesignerGuideCenterPeak.Width = 0;
+            DesignerGuideCenterPeak.Height = 0;
+            DesignerGuideCenterPeak.RenderTransform = new TranslateTransform();
+            DesignerGuideNumberLine.RenderTransform = new TranslateTransform();
+            DesignerGuideLabelLine.RenderTransform = new TranslateTransform();
+            DesignerGuideOverlay.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var value = geometry.Value;
+        DesignerGuidePrimaryRing.Width = value.PrimaryDiameter;
+        DesignerGuidePrimaryRing.Height = value.PrimaryDiameter;
+        DesignerGuideSecondaryRing.Width = value.SecondaryDiameter;
+        DesignerGuideSecondaryRing.Height = value.SecondaryDiameter;
+        DesignerGuideCenterPeak.Width = value.CenterPeakSize;
+        DesignerGuideCenterPeak.Height = value.CenterPeakSize;
+        DesignerGuideCenterPeak.RenderTransform = new TranslateTransform(
+            value.CenterPeakOffsetX,
+            value.CenterPeakOffsetY);
+        DesignerGuideNumberLine.RenderTransform = new TranslateTransform(
+            0,
+            value.Text.NumberY);
+        DesignerGuideLabelLine.RenderTransform = new TranslateTransform(
+            0,
+            value.Text.LabelY);
+        DesignerGuideOverlay.Visibility = Visibility.Visible;
     }
 
     internal void ActivateSyntheticSkin(SyntheticSkinCandidate candidate)

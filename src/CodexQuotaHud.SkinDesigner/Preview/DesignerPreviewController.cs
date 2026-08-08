@@ -7,6 +7,8 @@ namespace CodexQuotaHud.SkinDesigner.Preview;
 public sealed class DesignerPreviewController
 {
     private readonly SyntheticPreviewComposition _composition;
+    private SkinPackageDocument? _lastValidPackage;
+    private bool _guidesVisible;
 
     public DesignerPreviewController(SyntheticPreviewComposition composition)
     {
@@ -19,8 +21,28 @@ public sealed class DesignerPreviewController
         IReadOnlyDictionary<SkinAssetSlot, SkinAsset> assets)
     {
         var built = DraftPreviewDocumentBuilder.Build(draft, assets);
-        return built.IsValid
-            ? _composition.SetCustomPackage(built.Value!)
-            : built;
+        if (!built.IsValid)
+        {
+            return built;
+        }
+
+        var rendered = _composition.SetCustomPackage(built.Value!);
+        if (rendered.IsValid)
+        {
+            _lastValidPackage = built.Value;
+            _composition.SetDesignerGuides(
+                _lastValidPackage!.Theme,
+                _guidesVisible);
+        }
+
+        return rendered;
+    }
+
+    public void SetGuidesVisible(bool value)
+    {
+        _guidesVisible = value;
+        _composition.SetDesignerGuides(
+            _lastValidPackage?.Theme,
+            value);
     }
 }

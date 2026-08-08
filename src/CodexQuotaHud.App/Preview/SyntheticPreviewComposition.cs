@@ -7,6 +7,7 @@ using CodexQuotaHud.App.UI.Skins;
 using CodexQuotaHud.Core.Settings;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Templates;
+using CodexQuotaHud.Skins.Templates.FreeDecorationRing;
 
 namespace CodexQuotaHud.App.Preview;
 
@@ -106,6 +107,17 @@ public sealed class SyntheticPreviewComposition : IDisposable
 
         HudWindow.ActivateSyntheticSkin(candidate.Value!);
         return new SkinValidationResult<SkinPackageDocument>(package, []);
+    }
+
+    public void SetDesignerGuides(SkinTheme? theme, bool visible)
+    {
+        ObjectDisposedException.ThrowIf(
+            Volatile.Read(ref _disposed) != 0,
+            this);
+        HudWindow.SetDesignerGuides(
+            visible && theme is not null
+                ? FreeDecorationRingGeometry.CalculateGuideGeometry(theme)
+                : null);
     }
 
     public void SetPreviewWorkArea(Rect workArea)

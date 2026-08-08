@@ -661,13 +661,29 @@ public sealed class MainWindowLayoutTests
 
             var stateGroup = Assert.IsType<Border>(
                 window.FindName("SyntheticStateGroup"));
+            var toolsGroup = Assert.IsType<Border>(
+                window.FindName("PreviewToolsGroup"));
             var dockGroup = Assert.IsType<Border>(
                 window.FindName("SyntheticDockGroup"));
             AssertFullyRenderedWithin(stateGroup, stateRow);
+            AssertFullyRenderedWithin(toolsGroup, stateRow);
             AssertFullyRenderedWithin(dockGroup, stateRow);
             Assert.True(
                 dockGroup.TranslatePoint(new Point(), stateRow).X <=
                 stateGroup.ActualWidth + 16);
+
+            var guides = Assert.IsType<CheckBox>(
+                window.FindName("CompositionGuidesCheckBox"));
+            Assert.Equal("构图参考线", guides.Content);
+            Assert.Equal("显示构图参考线",
+                AutomationProperties.GetName(guides));
+            Assert.False(guides.IsChecked);
+            guides.IsChecked = true;
+            Assert.True(window.PreviewTools.CompositionGuidesVisible);
+            Assert.Equal(
+                Visibility.Visible,
+                Assert.IsType<Grid>(window.PreviewWindowForTesting.FindName(
+                    "DesignerGuideOverlay")).Visibility);
 
             var presets = Assert.IsType<ComboBox>(
                 window.FindName("FiveHourPresetBox"));
@@ -735,7 +751,7 @@ public sealed class MainWindowLayoutTests
                 Assert.False(string.IsNullOrWhiteSpace(
                     AutomationProperties.GetName(control))));
             var tabIndexes = controls.Select(KeyboardNavigation.GetTabIndex).ToArray();
-            Assert.Equal(Enumerable.Range(1, 64), tabIndexes);
+            Assert.Equal(Enumerable.Range(1, 65), tabIndexes);
             Assert.Equal(
                 "图片变换目标",
                 AutomationProperties.GetName(controls[15]));
@@ -747,7 +763,7 @@ public sealed class MainWindowLayoutTests
                 AutomationProperties.GetName(controls[48]));
             Assert.Equal(
                 "保存草稿",
-                AutomationProperties.GetName(controls[61]));
+                AutomationProperties.GetName(controls[62]));
             var projectName = Assert.IsType<TextBox>(
                 window.FindName("ProjectNameTextBox"));
             var displayName = Assert.IsType<TextBox>(

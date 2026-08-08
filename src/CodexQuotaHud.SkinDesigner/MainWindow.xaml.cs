@@ -129,6 +129,7 @@ public partial class MainWindow : Window, IDesignerWindow
             Dispatcher,
             () => Dispatcher.BeginInvoke(Close));
         _previewController = new DesignerPreviewController(_previewComposition);
+        PreviewTools = new DesignerPreviewToolsViewModel(_previewController);
         Editor = new DesignerViewModel(
             _session,
             assets,
@@ -347,6 +348,8 @@ public partial class MainWindow : Window, IDesignerWindow
     public DesignerViewModel Editor { get; }
 
     public SyntheticPreviewViewModel Synthetic { get; }
+
+    public DesignerPreviewToolsViewModel PreviewTools { get; }
 
     internal QuotaOrbWindow PreviewWindowForTesting =>
         _previewComposition.HudWindow;

@@ -39,10 +39,58 @@
 
         <ContentControl x:Name="SkinHost" IsHitTestVisible="False" />
 
-        <Border Background="Transparent" Cursor="SizeAll"
+        <Grid x:Name="DesignerGuideOverlay"
+              Panel.ZIndex="900"
+              Visibility="Collapsed"
+              IsHitTestVisible="False"
+              Opacity="0.78">
+            <Ellipse x:Name="DesignerGuidePrimaryRing"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     Fill="Transparent"
+                     Stroke="#FFFFD166"
+                     StrokeThickness="1.5"
+                     StrokeDashArray="5 3" />
+            <Ellipse x:Name="DesignerGuideSecondaryRing"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     Fill="Transparent"
+                     Stroke="#FF53DCF8"
+                     StrokeThickness="1.25"
+                     StrokeDashArray="3 3" />
+            <Rectangle x:Name="DesignerGuideCenterPeak"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Fill="Transparent"
+                       Stroke="#FFFF5A67"
+                       StrokeThickness="1.25"
+                       StrokeDashArray="4 3"
+                       RenderTransformOrigin=".5,.5" />
+            <Line x:Name="DesignerGuideNumberLine"
+                  Width="72" Height="1"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  X1="0" Y1="0.5" X2="72" Y2="0.5"
+                  Stroke="#FFFFFFFF"
+                  StrokeThickness="1.25"
+                  StrokeDashArray="4 3" />
+            <Line x:Name="DesignerGuideLabelLine"
+                  Width="72" Height="1"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  X1="0" Y1="0.5" X2="72" Y2="0.5"
+                  Stroke="#FFFFB547"
+                  StrokeThickness="1.25"
+                  StrokeDashArray="2 3" />
+        </Grid>
+
+        <Border x:Name="DragSurface"
+                Panel.ZIndex="1000"
+                Background="Transparent" Cursor="SizeAll"
                 MouseLeftButtonDown="OnDragSurfaceMouseLeftButtonDown" />
 
         <Border x:Name="EdgeHandle"
+                Panel.ZIndex="1100"
                 Width="12" Height="72"
                 CornerRadius="3"
                 Opacity="0"

@@ -669,6 +669,25 @@
                                           KeyboardNavigation.TabIndex="56" />
                             </StackPanel>
                         </Border>
+                        <Border x:Name="PreviewToolsGroup"
+                                Margin="8,0,0,0"
+                                Padding="10,6"
+                                Background="{DynamicResource DesignerRaisedBrush}"
+                                BorderBrush="{DynamicResource DesignerBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Margin="0,0,12,0"
+                                           VerticalAlignment="Center"
+                                           FontWeight="SemiBold"
+                                           Text="预览工具" />
+                                <CheckBox x:Name="CompositionGuidesCheckBox"
+                                          Content="构图参考线"
+                                          IsChecked="{Binding PreviewTools.CompositionGuidesVisible, Mode=TwoWay}"
+                                          AutomationProperties.Name="显示构图参考线"
+                                          KeyboardNavigation.TabIndex="57" />
+                            </StackPanel>
+                        </Border>
                         <Border x:Name="SyntheticDockGroup"
                                 Margin="8,0,0,0"
                                 Padding="10,6"
@@ -685,31 +704,31 @@
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Command="{Binding Synthetic.PreviewLeftEdgeCommand}"
                                         AutomationProperties.Name="预览左边缘停靠"
-                                        KeyboardNavigation.TabIndex="57" />
+                                        KeyboardNavigation.TabIndex="58" />
                                 <Button x:Name="PreviewRightButton" Content="右"
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.PreviewRightEdgeCommand}"
                                         AutomationProperties.Name="预览右边缘停靠"
-                                        KeyboardNavigation.TabIndex="58" />
+                                        KeyboardNavigation.TabIndex="59" />
                                 <Button x:Name="PreviewTopButton" Content="上"
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.PreviewTopEdgeCommand}"
                                         AutomationProperties.Name="预览上边缘停靠"
-                                        KeyboardNavigation.TabIndex="59" />
+                                        KeyboardNavigation.TabIndex="60" />
                                 <Button x:Name="PreviewBottomButton" Content="下"
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.PreviewBottomEdgeCommand}"
                                         AutomationProperties.Name="预览下边缘停靠"
-                                        KeyboardNavigation.TabIndex="60" />
+                                        KeyboardNavigation.TabIndex="61" />
                                 <Button x:Name="ExpandPreviewButton" Content="展开"
                                         MinHeight="30" Padding="10,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.ExpandCommand}"
                                         AutomationProperties.Name="展开预览 HUD"
-                                        KeyboardNavigation.TabIndex="61" />
+                                        KeyboardNavigation.TabIndex="62" />
                             </StackPanel>
                         </Border>
                     </WrapPanel>
@@ -731,17 +750,17 @@
                     <Button x:Name="SaveDraftButton" Content="保存草稿"
                             Click="SaveDraftButton_OnClick"
                             AutomationProperties.Name="保存草稿"
-                            KeyboardNavigation.TabIndex="62" />
+                            KeyboardNavigation.TabIndex="63" />
                     <Button x:Name="ApplyToHudButton" Margin="8,0,0,0" Content="应用到 HUD"
                             Command="{Binding Editor.Output.ApplyCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="应用到 HUD"
-                            KeyboardNavigation.TabIndex="63" />
+                            KeyboardNavigation.TabIndex="64" />
                     <Button x:Name="ExportPackageButton" Margin="8,0,0,0" Content="导出皮肤包"
                             Command="{Binding Editor.Output.ExportCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="导出皮肤包"
-                            KeyboardNavigation.TabIndex="64" />
+                            KeyboardNavigation.TabIndex="65" />
                 </StackPanel>
             </Grid>
         </Border>
