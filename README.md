@@ -153,16 +153,20 @@ dialogs while retaining native Windows open/save pickers.
 line-gap increment (`-16..32 DIP`) controls. Old v1.2.x packages without these
 schema-v1 properties default to `0/0`; new Designer output declares minimum
 HUD `1.3.0`. Designer preview also gains default-off click-through composition
-guides, non-persistent per-channel animation audition, and explicit Dual outer
-= 5h / inner = Week guidance. The native export picker now starts in
+guides, non-persistent per-channel animation audition, and explicit
+`free-decoration-ring` preview guidance for Dual outer = 5h / inner = Week.
+The five built-in skins retain their established center/inner 5h and outer
+Week geometry. The native export picker now starts in
 `Documents\Codex Quota HUD Skins`, while Apply/Export dialogs report exact
 skin identity and truthful activation disposition.
 
 `v1.3.0` 新增持久化“文字整体上下偏移”（`-32..32 DIP`）和“数字/时间间距”
 （`-16..32 DIP`）。旧 v1.2.x 包缺少这两个 schema-v1 字段时按 `0/0` 读取，
 新输出最低 HUD 自动声明为 `1.3.0`。设计器预览还新增默认关闭且不拦截点击的构图
-参考线、不写入草稿的单项动画预演，以及 Dual 外圈为 5 小时、内圈为每周的明确
-说明。原生导出选择器从 `Documents\Codex Quota HUD Skins` 开始；应用/导出结果会
+参考线、不写入草稿的单项动画预演，以及 `free-decoration-ring` 模板预览中 Dual
+外圈为 5 小时、内圈为每周的明确说明。五款内置皮肤继续保留原有“中央/内圈 5 小时、
+外层每周”的几何。原生导出选择器从 `Documents\Codex Quota HUD Skins`
+开始；应用/导出结果会
 显示准确皮肤身份和真实激活状态。
 
 The Setup shows an optional component named **Install
@@ -396,7 +400,8 @@ GitHub Actions 会在每次推送和拉取请求中执行恢复、测试、构�
 
 当前 v1.3.0 候选源码的 fresh serial Release 测试为 `1499/1499`、失败 `0`、
 跳过 `0`，Release build 为 `0` warnings / `0` errors。旧包 `0/0` 默认值、
-规范写出、共享文字/参考线几何、预览工具不持久化、Dual 语义、原生选择器目录和
+规范写出、共享文字/参考线几何、预览工具不持久化、`free-decoration-ring`
+预览的 Dual 圈层说明、原生选择器目录和
 结果反馈均有自动化覆盖。生产封包、九场景安装器矩阵、本机升级、已安装身份/数据
 保留、十行已安装 Designer GUI 冒烟和用户实操验收在 Task 9 按实际执行结果记录；
 在未执行时一律为 `NOT RUN`。尤其是 installed 托盘菜单、旧包导入和 Designer 关闭后

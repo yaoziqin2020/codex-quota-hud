@@ -10,9 +10,10 @@ reported zero warnings/errors and `git diff --check` passed. Those source
 results do not substitute for installed GUI acceptance.
 
 The candidate adds persisted text vertical-offset and line-gap controls,
-Designer-only composition guides, per-channel animation audition, Dual ring
-role guidance, a corrected native export start directory, and exact truthful
-Apply/Export result feedback. Old v1.2.x packages without the new fields read
+Designer-only composition guides, per-channel animation audition,
+`free-decoration-ring` preview Dual-role guidance, a corrected native export
+start directory, and exact truthful Apply/Export result feedback. Old v1.2.x
+packages without the new fields read
 as `0/0`; new output declares minimum HUD `1.3.0` while schema remains `1`.
 
 Production packaging and identity inspection pass, including exact hashes,

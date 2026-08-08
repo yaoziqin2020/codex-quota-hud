@@ -9,7 +9,9 @@
   number/time line-gap increment (`-16..32 DIP`). Missing v1.2.x properties
   default to `0/0`; new output declares minimum HUD `1.3.0` under schema `1`.
 - Added Designer-only click-through composition guides, non-persistent
-  animation-channel audition, and exact Dual/5h/Week/None role guidance.
+  animation-channel audition, and exact `free-decoration-ring` preview
+  Dual/5h/Week/None role guidance. The five built-in skins retain their
+  established center/inner 5h and outer Week geometry.
 - Corrected the native export picker to start in the shared skin exchange
   directory and expanded Apply/Export feedback to include exact identity and
   truthful activation disposition.
@@ -35,7 +37,8 @@
   backup with `--preview`; this is explicitly not Setup behavior.
 - Formal HUD and installed Designer are running. Direct installed GUI checks
   passed text offset, line gap, guides/click-through, refresh-state restore,
-  display semantics, and the export picker. Undo/redo/save/reopen, legacy
+  `free-decoration-ring` display semantics, and the export picker.
+  Undo/redo/save/reopen, legacy
   same-context visual equivalence, and distinct animation-channel visuals are
   partial. Apply was stopped before input when the exact identity gate failed
   twice and remains `NOT RUN`; user practical acceptance is also `NOT RUN`.

@@ -18,7 +18,7 @@
 - 新字段默认值必须完全复现当前视觉：`TextOffsetY = 0`、`TextLineGap = 0`。
 - 文字范围固定：整体上下偏移 `-32..32 DIP`；行距增量 `-16..32 DIP`；非有限值和越界值必须被验证器拒绝。
 - 预览工具不得写入 `SkinDraftDocument`、不得产生撤销历史、不得让草稿变脏，也不得进入 `.cqskin`。
-- Dual 的真实语义固定：主/外圈 = 5 小时，副/内圈 = 每周；单圈 5h/Week 只显示所选额度。不得为某一皮肤倒置生产数据含义。
+- Dual 的数据角色固定：`Primary = 5 小时`、`Secondary = 每周`，不得为某一皮肤交换生产数据含义。Designer 当前唯一的 `free-decoration-ring` 模板把 Primary 画在外圈、Secondary 画在内圈，因此其合成预览提示为“外圈 = 5 小时、内圈 = 每周”；五款内置皮肤继续保留既有几何（中央/内圈显示 Primary 5 小时，外层显示 Secondary 每周），本任务不改动它们的视觉层级。
 - 参考线只是几何辅助，不声称能够识别 PNG 内实际角色轮廓或自动保证无碰撞。
 - “应用到 HUD”结果必须根据 `DesignerOutputDisposition` 如实显示；`InstalledNotActivated` 不能写成“已切换成功”。
 - Setup 仍是普通用户安装包，Designer 仍为默认不勾选的可选组件；ZIP 仍是普通 HUD 后备包，不借本次升级改变产品边界。
@@ -578,7 +578,7 @@ git commit -m "feat: audition skin animation channels in preview"
 
 ---
 
-### Task 6: Explain Dual ring roles in the synthetic preview
+### Task 6: Explain free-decoration Dual ring roles in the synthetic preview
 
 **Files:**
 - Modify: `src/CodexQuotaHud.SkinDesigner/UI/SyntheticPreviewViewModel.cs`
@@ -590,6 +590,11 @@ git commit -m "feat: audition skin animation channels in preview"
 **Interfaces:**
 - Add read-only `SyntheticPreviewViewModel.DisplayRoleHint`.
 - Raise `PropertyChanged(nameof(DisplayRoleHint))` whenever `DisplayChoice` changes.
+
+The Designer and its synthetic preview currently author only the registered
+`free-decoration-ring` template. The hint below describes that template's
+actual geometry; it is not a claim that the five built-in HUD skins use the
+same inner/outer arrangement.
 
 - [ ] **Step 1: Write failing semantic tests**
 
@@ -832,7 +837,7 @@ If CI or public readback fails, do not call the release complete and do not move
 - [ ] Preview guides are default-off, click-through, Designer-only, and never persisted.
 - [ ] Animation audition does not mutate draft, history, Apply, or Export data.
 - [ ] Refresh audition restores the prior refresh state.
-- [ ] Dual outer = 5h and inner = Week is tested and explained in UI.
+- [ ] The Designer's `free-decoration-ring` preview explains and tests outer = 5h and inner = Week without redefining the five built-in skins' established geometry.
 - [ ] Export starts in `Documents\Codex Quota HUD Skins` with a leaf filename.
 - [ ] Apply feedback includes exact skin/version/ID and truthful activation disposition.
 - [ ] All four Release test assemblies pass serially with zero skipped.

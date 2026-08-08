@@ -19,7 +19,9 @@ remain readable and normalize to `0/0` in the v1.3.0 Designer.
 
 Designer preview tools now include default-off click-through composition
 guides, non-persistent per-channel animation audition, and explicit
-Dual/5h/Week/None role hints. The native Save dialog starts in
+`free-decoration-ring` preview Dual/5h/Week/None role hints. The five built-in
+skins retain their established center/inner 5h and outer Week geometry. The
+native Save dialog starts in
 `Documents\Codex Quota HUD Skins`, and Apply/Export result dialogs report the
 exact skin/version/ID and activation disposition without overstating a merely
 installed skin as live-switched.
@@ -371,15 +373,15 @@ It does not call a private web endpoint directly.
 - Public source: GitHub `main`
 - Installed executable:
   `%LOCALAPPDATA%\Programs\CodexQuotaHud\CodexQuotaHud.App.exe`
-- Installed release: `v1.2.3`
+- Installed candidate on the maintainer machine: `v1.3.0` from `aecaea1`
 - Latest public release: `v1.2.3`
 - Preferred new Codex project directory:
   `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud`
 
-The real machine currently has the verified `v1.2.2` package code from
-`2d53407`. It includes the optional Designer, because that component was
-selected for maintainer acceptance. The maintainer-only desktop Developer
-Preview shortcut is local customization and is not public Setup behavior.
+The real machine currently has the verified local `v1.3.0` candidate with the
+optional Designer selected for maintainer acceptance. The maintainer-only
+desktop Developer Preview shortcut is local customization and is not public
+Setup behavior.
 
 Do not treat the old conversation worktree under
 `Documents\Codex\2026-07-27\new-chat` as the long-term project root.
