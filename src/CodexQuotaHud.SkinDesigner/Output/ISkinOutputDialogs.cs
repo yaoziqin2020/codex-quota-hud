@@ -17,6 +17,10 @@ public interface ISkinOutputDialogs
     void ShowResult(DesignerOutputResult result);
 }
 
+internal sealed record SkinExportDialogOptions(
+    string InitialDirectory,
+    string FileName);
+
 internal sealed class WindowsSkinOutputDialogs : ISkinOutputDialogs
 {
     private readonly Func<Window?> _owner;
@@ -48,6 +52,12 @@ internal sealed class WindowsSkinOutputDialogs : ISkinOutputDialogs
                 ownerWindow,
                 SkinPackageExchangeDirectory.SuggestedExportPath(
                     suggestedFileName)));
+
+    internal static SkinExportDialogOptions BuildExportDialogOptions(
+        string suggestedPath) =>
+        new(
+            System.IO.Path.GetDirectoryName(suggestedPath) ?? string.Empty,
+            System.IO.Path.GetFileName(suggestedPath));
 
     public bool ConfirmExportReplace(string destinationPath) =>
         _dialogs.Show(
@@ -136,15 +146,17 @@ internal sealed class WindowsSkinOutputDialogs : ISkinOutputDialogs
 
     private static string? ChooseExportPath(
         Window? owner,
-        string suggestedFileName)
+        string suggestedPath)
     {
+        var options = BuildExportDialogOptions(suggestedPath);
         var dialog = new SaveFileDialog
         {
             Title = "Export skin package",
             Filter = "Codex Quota skin package (*.cqskin)|*.cqskin",
             AddExtension = true,
             DefaultExt = ".cqskin",
-            FileName = suggestedFileName,
+            InitialDirectory = options.InitialDirectory,
+            FileName = options.FileName,
             OverwritePrompt = false
         };
         return dialog.ShowDialog(owner) == true ? dialog.FileName : null;

@@ -12,6 +12,22 @@ namespace CodexQuotaHud.SkinDesigner.Tests.Output;
 public sealed class WindowsSkinOutputDialogsTests
 {
     [Fact]
+    public void BuildExportDialogOptions_SplitsExchangeDirectoryFromLeafFileName()
+    {
+        var expectedDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "Codex Quota HUD Skins");
+        var suggestedPath = Path.Combine(expectedDirectory, "Ocean Ring.cqskin");
+
+        var options = WindowsSkinOutputDialogs.BuildExportDialogOptions(suggestedPath);
+
+        Assert.Equal(expectedDirectory, options.InitialDirectory);
+        Assert.Equal("Ocean Ring.cqskin", options.FileName);
+        Assert.NotEqual(suggestedPath, options.FileName);
+        Assert.False(Path.IsPathRooted(options.FileName));
+    }
+
+    [Fact]
     public void ChooseExportPath_KeepsNativePickerOnTheDesignerDispatcher()
     {
         const string suggested = "Ocean Ring.cqskin";
