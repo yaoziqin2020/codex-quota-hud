@@ -781,7 +781,10 @@ Record sizes and SHA-256 hashes; verify manifest lines; inspect ZIP entries; ins
 - Setup selects creation of the normal desktop shortcut by default, allows the
   user to deselect it, and the shortcut launches without `--preview`;
 - startup remains `--background` when selected;
-- historical installed skins, drafts, recovery, exchange packages, settings, and desktop Developer Preview shortcut are not part of installer cleanup.
+- historical installed skins, drafts, recovery, exchange packages, and settings
+  are not part of installer cleanup; Setup deliberately removes Developer
+  Preview desktop entries, so the maintainer-only `--preview` shortcut is
+  snapshotted and restored separately after product installation.
 
 - [ ] **Step 4: Perform the real local upgrade to v1.3.0**
 
