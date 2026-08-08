@@ -48,6 +48,7 @@ public partial class MainWindow : Window, IDesignerWindow
     private bool _suppressPreviewShowForTesting;
     private int _closeCoordinatorRequestCount;
     private bool _updatingImageTransformControls;
+    private bool _updatingTextControls;
     private bool _restoringEditorControl;
     private bool _editorControlsReady;
     private bool _applyingLayout;
@@ -165,7 +166,7 @@ public partial class MainWindow : Window, IDesignerWindow
             ApplyToHudButton.IsEnabled = true;
             ExportPackageButton.IsEnabled = true;
         }
-        SyncImageTransformControls();
+        SyncManualEditorControls();
         _editorControlsReady = true;
         _session.MeaningfulChange += OnMeaningfulChange;
         _ = _previewController.Update(Editor.Current, Editor.Assets);
@@ -662,8 +663,19 @@ public partial class MainWindow : Window, IDesignerWindow
         }
     }
 
-    private void OnMeaningfulChange(object? sender, SkinDraftDocument draft) =>
+    private void OnMeaningfulChange(object? sender, SkinDraftDocument draft)
+    {
         _recovery.NotifyMeaningfulChange(draft);
+        if (Dispatcher.CheckAccess())
+        {
+            SyncManualEditorControls();
+            return;
+        }
+
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.DataBind,
+            new Action(SyncManualEditorControls));
+    }
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -905,7 +917,7 @@ public partial class MainWindow : Window, IDesignerWindow
         object sender,
         SelectionChangedEventArgs e)
     {
-        if (!_editorControlsReady ||
+        if (!_editorControlsReady || _updatingTextControls ||
             TextWeightBox is null || TextWeightBox.SelectedIndex < 0)
         {
             return;
@@ -926,7 +938,7 @@ public partial class MainWindow : Window, IDesignerWindow
         object sender,
         SelectionChangedEventArgs e)
     {
-        if (!_editorControlsReady ||
+        if (!_editorControlsReady || _updatingTextControls ||
             TextPlacementBox is null || TextPlacementBox.SelectedIndex < 0)
         {
             return;
@@ -982,6 +994,43 @@ public partial class MainWindow : Window, IDesignerWindow
         finally
         {
             _updatingImageTransformControls = false;
+        }
+    }
+
+    private void SyncManualEditorControls()
+    {
+        SyncImageTransformControls();
+        SyncTextControls();
+    }
+
+    private void SyncTextControls()
+    {
+        if (TextWeightBox is null || TextPlacementBox is null)
+        {
+            return;
+        }
+
+        _updatingTextControls = true;
+        try
+        {
+            TextWeightBox.SelectedIndex = Editor.Current.Theme.TextWeight switch
+            {
+                SkinTextWeight.Regular => 0,
+                SkinTextWeight.SemiBold => 1,
+                SkinTextWeight.Bold => 2,
+                _ => -1
+            };
+            TextPlacementBox.SelectedIndex = Editor.Current.Theme.TextPlacement switch
+            {
+                SkinTextPlacement.Centered => 0,
+                SkinTextPlacement.NumberAboveLabel => 1,
+                SkinTextPlacement.LabelAboveNumber => 2,
+                _ => -1
+            };
+        }
+        finally
+        {
+            _updatingTextControls = false;
         }
     }
 

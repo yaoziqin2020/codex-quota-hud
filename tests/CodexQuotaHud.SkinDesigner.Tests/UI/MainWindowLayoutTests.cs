@@ -905,6 +905,78 @@ public sealed class MainWindowLayoutTests
     }
 
     [Fact]
+    public void RealWindow_HistoryNavigationRefreshesBoundAndManualEditorControls()
+    {
+        RunSta(() =>
+        {
+            using var temporary = new TemporaryDirectory();
+            var window = CreateWindow(temporary, out _);
+            window.AttachPreviewOwnerForTesting();
+            window.ApplyTemplate();
+            window.UpdateLayout();
+
+            var offset = Assert.IsType<Slider>(window.FindName("TextOffsetYSlider"));
+            var offsetText = Assert.IsType<TextBlock>(window.FindName("TextOffsetYValueText"));
+            offset.SetCurrentValue(Slider.ValueProperty, 12d);
+            Assert.Equal(12, window.Editor.Current.Theme.TextOffsetY);
+            Assert.Equal("+12 DIP", offsetText.Text);
+            var editedRevision = window.Editor.Current.Revision;
+
+            window.Editor.UndoCommand.ExecuteAsync().GetAwaiter().GetResult();
+            DrainDispatcher();
+            window.UpdateLayout();
+            Assert.Equal(0, window.Editor.Current.Theme.TextOffsetY);
+            Assert.Equal(0, offset.Value);
+            Assert.Equal("0 DIP", offsetText.Text);
+
+            window.Editor.RedoCommand.ExecuteAsync().GetAwaiter().GetResult();
+            DrainDispatcher();
+            window.UpdateLayout();
+            Assert.Equal(12, offset.Value);
+            Assert.Equal("+12 DIP", offsetText.Text);
+            Assert.Equal(editedRevision + 2, window.Editor.Current.Revision);
+
+            var imageOffset = Assert.IsType<Slider>(window.FindName("ImageOffsetXSlider"));
+            var weight = Assert.IsType<ComboBox>(window.FindName("TextWeightBox"));
+            var placement = Assert.IsType<ComboBox>(window.FindName("TextPlacementBox"));
+            imageOffset.SetCurrentValue(Slider.ValueProperty, 23d);
+            weight.SelectedIndex = 2;
+            placement.SelectedIndex = 2;
+            Assert.Equal(23, window.Editor.Current.Theme.Background.OffsetX);
+            Assert.Equal(SkinTextWeight.Bold, window.Editor.Current.Theme.TextWeight);
+            Assert.Equal(
+                SkinTextPlacement.LabelAboveNumber,
+                window.Editor.Current.Theme.TextPlacement);
+
+            var revisionBeforeManualControlSynchronization = window.Editor.Current.Revision;
+            window.Editor.UndoCommand.ExecuteAsync().GetAwaiter().GetResult();
+            window.Editor.UndoCommand.ExecuteAsync().GetAwaiter().GetResult();
+            window.Editor.UndoCommand.ExecuteAsync().GetAwaiter().GetResult();
+            DrainDispatcher();
+            window.UpdateLayout();
+            Assert.Equal(
+                revisionBeforeManualControlSynchronization + 3,
+                window.Editor.Current.Revision);
+            Assert.Equal(0, imageOffset.Value);
+            Assert.Equal(1, weight.SelectedIndex);
+            Assert.Equal(1, placement.SelectedIndex);
+
+            window.Editor.RedoCommand.ExecuteAsync().GetAwaiter().GetResult();
+            window.Editor.RedoCommand.ExecuteAsync().GetAwaiter().GetResult();
+            window.Editor.RedoCommand.ExecuteAsync().GetAwaiter().GetResult();
+            DrainDispatcher();
+            window.UpdateLayout();
+            Assert.Equal(
+                revisionBeforeManualControlSynchronization + 6,
+                window.Editor.Current.Revision);
+            Assert.Equal(23, imageOffset.Value);
+            Assert.Equal(2, weight.SelectedIndex);
+            Assert.Equal(2, placement.SelectedIndex);
+            window.DisposeWithoutShowingForTesting();
+        });
+    }
+
+    [Fact]
     public void RealWindow_ProvidesVisibleFocusRingAndWcagContrastPairs()
     {
         RunSta(() =>

@@ -35,6 +35,19 @@ public sealed class DesignerViewModelTests
     }
 
     [Fact]
+    public void MeaningfulChange_PublishesCurrentOnceAndNoOpPublishesNothing()
+    {
+        using var sut = CreateViewModel(out _, out _);
+        var changedProperties = new List<string?>();
+        sut.PropertyChanged += (_, e) => changedProperties.Add(e.PropertyName);
+
+        Assert.True(sut.Text.SetTextOffsetY(12).Succeeded);
+        Assert.True(sut.Text.SetTextOffsetY(12).Succeeded);
+
+        Assert.Equal([nameof(DesignerViewModel.Current)], changedProperties);
+    }
+
+    [Fact]
     public void Dispose_DisablesHistoryCommandsAndIgnoresLaterSessionEvents()
     {
         var sut = CreateViewModel(out var session, out _);

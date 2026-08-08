@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Images;
 using CodexQuotaHud.SkinDesigner.Output;
@@ -11,7 +12,7 @@ public sealed record EditorMutationResult(
     bool Succeeded,
     IReadOnlyList<SkinValidationError> Errors);
 
-public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommitter
+public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommitter, INotifyPropertyChanged
 {
     private readonly SkinDraftSession _session;
     private readonly Dictionary<SkinAssetSlot, SkinAsset> _assets;
@@ -108,6 +109,8 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
     public AsyncRelayCommand UndoCommand { get; }
 
     public AsyncRelayCommand RedoCommand { get; }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public SkinDraftDocument Current => _session.Current;
 
@@ -319,6 +322,9 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
         object? sender,
         SkinDraftDocument draft)
     {
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(Current)));
         Images.NotifyStateChanged();
         Animation.NotifyStateChanged();
         _previewUpdate(
