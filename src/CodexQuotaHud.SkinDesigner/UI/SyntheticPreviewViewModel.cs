@@ -40,6 +40,8 @@ public sealed class SyntheticPreviewViewModel : INotifyPropertyChanged, IDisposa
     private bool _detailsOpen;
     private bool _animationsEnabled;
     private bool _isRefreshing;
+    private bool _refreshAuditionActive;
+    private bool _refreshBeforeAudition;
 
     public SyntheticPreviewViewModel(
         PreviewSession session,
@@ -156,9 +158,10 @@ public sealed class SyntheticPreviewViewModel : INotifyPropertyChanged, IDisposa
         get => _isRefreshing;
         set
         {
-            if (SetField(ref _isRefreshing, value))
+            var effective = _refreshAuditionActive || value;
+            if (SetField(ref _isRefreshing, effective))
             {
-                _session.SetRefreshing(value);
+                _session.SetRefreshing(effective);
             }
         }
     }
@@ -173,8 +176,28 @@ public sealed class SyntheticPreviewViewModel : INotifyPropertyChanged, IDisposa
 
     public AsyncRelayCommand ExpandCommand { get; }
 
+    internal void SetRefreshAudition(bool active)
+    {
+        if (_refreshAuditionActive == active)
+        {
+            return;
+        }
+
+        if (active)
+        {
+            _refreshBeforeAudition = _isRefreshing;
+            _refreshAuditionActive = true;
+            IsRefreshing = true;
+            return;
+        }
+
+        _refreshAuditionActive = false;
+        IsRefreshing = _refreshBeforeAudition;
+    }
+
     public void Dispose()
     {
+        SetRefreshAudition(false);
         PreviewLeftEdgeCommand.Dispose();
         PreviewRightEdgeCommand.Dispose();
         PreviewTopEdgeCommand.Dispose();

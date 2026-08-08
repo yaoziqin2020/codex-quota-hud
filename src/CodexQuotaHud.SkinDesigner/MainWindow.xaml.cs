@@ -129,7 +129,6 @@ public partial class MainWindow : Window, IDesignerWindow
             Dispatcher,
             () => Dispatcher.BeginInvoke(Close));
         _previewController = new DesignerPreviewController(_previewComposition);
-        PreviewTools = new DesignerPreviewToolsViewModel(_previewController);
         Editor = new DesignerViewModel(
             _session,
             assets,
@@ -148,6 +147,9 @@ public partial class MainWindow : Window, IDesignerWindow
         Synthetic = new SyntheticPreviewViewModel(
             _previewComposition.Session,
             RecenterPreviewAfterExpand);
+        PreviewTools = new DesignerPreviewToolsViewModel(
+            _previewController,
+            Synthetic);
         _closeCoordinator = new DraftCloseCoordinator(
             _session,
             _store,
@@ -745,6 +747,7 @@ public partial class MainWindow : Window, IDesignerWindow
         Closed -= OnClosed;
         _session.MeaningfulChange -= OnMeaningfulChange;
         DetachSystemEvents();
+        PreviewTools.Dispose();
         Synthetic.Dispose();
         Editor.Dispose();
         _previewComposition.Dispose();

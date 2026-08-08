@@ -3,6 +3,7 @@ using System.Windows.Threading;
 using System.Windows.Controls;
 using System.Windows.Media;
 using CodexQuotaHud.App.Preview;
+using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Preview;
 using CodexQuotaHud.Skins.Contracts;
 using CodexQuotaHud.Skins.Templates.FreeDecorationRing;
@@ -15,6 +16,129 @@ namespace CodexQuotaHud.SkinDesigner.Tests.Preview;
 [Collection(DesignerPreviewWpfCollection.Name)]
 public sealed class DesignerPreviewControllerTests
 {
+    [Fact]
+    public void AnimationAudition_IsolatesOnlyRenderedPackageAndPreservesDraftHistory()
+    {
+        var initial = DraftPreviewDocumentBuilderTests.CreateDraft();
+        var session = new SkinDraftSession(
+            initial,
+            () => DateTimeOffset.Parse("2026-08-08T00:00:00Z"));
+        var saved = new SkinAnimationSettings(
+            RotationIntensity: 0.4,
+            BreathingIntensity: 0.5,
+            GlowIntensity: 0.6,
+            FloatingIntensity: 0.7,
+            RefreshSpeedMultiplier: 2.3,
+            RefreshHoldSeconds: 1.8);
+        Assert.True(session.Apply(draft => draft with
+        {
+            Theme = draft.Theme with { Animation = saved }
+        }));
+        var current = session.Current;
+        var rendered = new List<SkinPackageDocument>();
+        var controller = new DesignerPreviewController(package =>
+        {
+            rendered.Add(package);
+            return new SkinValidationResult<SkinPackageDocument>(package, []);
+        });
+
+        var updated = controller.Update(
+            current,
+            new Dictionary<SkinAssetSlot, SkinAsset>());
+
+        Assert.True(updated.IsValid,
+            DraftPreviewDocumentBuilderTests.Format(updated.Errors));
+        var original = Assert.Single(rendered);
+        Assert.Same(original, updated.Value);
+
+        var cases = new[]
+        {
+            (DesignerAnimationAudition.Rotation, 0.4, 0d, 0d, 0d, 1),
+            (DesignerAnimationAudition.All, 0.4, 0.5, 0.6, 0.7, 4),
+            (DesignerAnimationAudition.Breathing, 0d, 0.5, 0d, 0d, 1),
+            (DesignerAnimationAudition.Refresh, 0.4, 0.5, 0.6, 0.7, 4),
+            (DesignerAnimationAudition.Glow, 0d, 0d, 0.6, 0d, 1),
+            (DesignerAnimationAudition.Floating, 0d, 0d, 0d, 0.7, 1)
+        };
+        foreach (var (mode, rotation, breathing, glow, floating, nonZero) in cases)
+        {
+            controller.SetAnimationAudition(mode);
+
+            var auditioned = rendered[^1];
+            var animation = auditioned.Theme.Animation;
+            Assert.Equal(rotation, animation.RotationIntensity);
+            Assert.Equal(breathing, animation.BreathingIntensity);
+            Assert.Equal(glow, animation.GlowIntensity);
+            Assert.Equal(floating, animation.FloatingIntensity);
+            Assert.Equal(nonZero, new[]
+            {
+                animation.RotationIntensity,
+                animation.BreathingIntensity,
+                animation.GlowIntensity,
+                animation.FloatingIntensity
+            }.Count(value => value != 0));
+            Assert.Equal(2.3, animation.RefreshSpeedMultiplier);
+            Assert.Equal(1.8, animation.RefreshHoldSeconds);
+            if (mode is DesignerAnimationAudition.All or
+                DesignerAnimationAudition.Refresh)
+            {
+                Assert.Same(original, auditioned);
+            }
+            else
+            {
+                Assert.NotSame(original, auditioned);
+            }
+
+            Assert.Same(current, session.Current);
+            Assert.Equal(saved, original.Theme.Animation);
+            Assert.Equal(saved, session.Current.Theme.Animation);
+            Assert.True(session.HasUnsavedChanges);
+        }
+
+        Assert.True(session.TryUndo());
+        Assert.False(session.TryUndo());
+        Assert.True(session.TryRedo());
+        Assert.Equal(saved, session.Current.Theme.Animation);
+    }
+
+    [Fact]
+    public void UpdateDuringIsolation_ReturnsOriginalPackageAndOnlyRendersDerivedCopy()
+    {
+        var saved = new SkinAnimationSettings(0.4, 0.5, 0.6, 0.7, 2.3, 1.8);
+        var initial = DraftPreviewDocumentBuilderTests.CreateDraft();
+        var draft = initial with
+        {
+            Theme = initial.Theme with
+            {
+                Animation = saved
+            }
+        };
+        var rendered = new List<SkinPackageDocument>();
+        var controller = new DesignerPreviewController(package =>
+        {
+            rendered.Add(package);
+            return new SkinValidationResult<SkinPackageDocument>(package, []);
+        });
+        controller.SetAnimationAudition(DesignerAnimationAudition.Rotation);
+
+        var result = controller.Update(
+            draft,
+            new Dictionary<SkinAssetSlot, SkinAsset>());
+
+        var original = Assert.IsType<SkinPackageDocument>(result.Value);
+        var isolated = Assert.Single(rendered);
+        Assert.Equal(saved, original.Theme.Animation);
+        Assert.NotSame(original, isolated);
+        Assert.Equal(
+            new SkinAnimationSettings(0.4, 0, 0, 0, 2.3, 1.8),
+            isolated.Theme.Animation);
+
+        controller.SetAnimationAudition(DesignerAnimationAudition.All);
+
+        Assert.Same(original, rendered[^1]);
+        Assert.Equal(saved, original.Theme.Animation);
+    }
+
     [Fact]
     public void Update_RendersCanonicalBackgroundJpegAndCenterPng()
     {

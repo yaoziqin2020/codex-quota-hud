@@ -81,6 +81,32 @@ public sealed class SyntheticPreviewViewModelTests
         Assert.True(sut.IsRefreshing);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RefreshAudition_RestoresExactPreviousValueOnLeaveAndDispose(
+        bool previousValue)
+    {
+        var session = new RecordingPreviewSession();
+        var sut = new SyntheticPreviewViewModel(
+            session,
+            animationsAllowed: () => true);
+        sut.IsRefreshing = previousValue;
+
+        sut.SetRefreshAudition(true);
+
+        Assert.True(sut.IsRefreshing);
+
+        sut.SetRefreshAudition(false);
+
+        Assert.Equal(previousValue, sut.IsRefreshing);
+
+        sut.SetRefreshAudition(true);
+        sut.Dispose();
+
+        Assert.Equal(previousValue, sut.IsRefreshing);
+    }
+
     private sealed class RecordingPreviewSession : ISyntheticPreviewSession
     {
         public PreviewDisplayChoice DisplayChoice { get; private set; } =

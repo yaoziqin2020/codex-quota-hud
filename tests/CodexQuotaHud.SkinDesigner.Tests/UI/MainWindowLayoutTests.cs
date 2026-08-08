@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using CodexQuotaHud.SkinDesigner.Documents;
 using CodexQuotaHud.SkinDesigner.Drafts;
 using CodexQuotaHud.SkinDesigner.Output;
+using CodexQuotaHud.SkinDesigner.Preview;
 using CodexQuotaHud.SkinDesigner.Tests.Preview;
 using CodexQuotaHud.SkinDesigner.UI;
 using CodexQuotaHud.Skins.Contracts;
@@ -685,6 +686,36 @@ public sealed class MainWindowLayoutTests
                 Assert.IsType<Grid>(window.PreviewWindowForTesting.FindName(
                     "DesignerGuideOverlay")).Visibility);
 
+            var animations = Assert.IsType<CheckBox>(
+                window.FindName("AnimationsEnabledCheckBox"));
+            var refresh = Assert.IsType<CheckBox>(
+                window.FindName("RefreshStateCheckBox"));
+            var audition = Assert.IsType<ComboBox>(
+                window.FindName("AnimationAuditionBox"));
+            Assert.Equal("单项动画预演", AutomationProperties.GetName(audition));
+            Assert.Equal(
+                ["全部", "转圈", "呼吸", "光晕", "浮动", "刷新加速"],
+                audition.Items.Cast<ComboBoxItem>()
+                    .Select(item => Assert.IsType<string>(item.Content)));
+            Assert.True(animations.IsEnabled);
+            Assert.True(refresh.IsEnabled);
+            Assert.Equal(DesignerAnimationAudition.All,
+                window.PreviewTools.AnimationAudition);
+
+            audition.SelectedIndex = 5;
+
+            Assert.Equal(DesignerAnimationAudition.Refresh,
+                window.PreviewTools.AnimationAudition);
+            Assert.True(window.Synthetic.IsRefreshing);
+            Assert.True(refresh.IsChecked);
+            Assert.False(refresh.IsEnabled);
+
+            audition.SelectedIndex = 0;
+
+            Assert.False(window.Synthetic.IsRefreshing);
+            Assert.False(refresh.IsChecked);
+            Assert.True(refresh.IsEnabled);
+
             var presets = Assert.IsType<ComboBox>(
                 window.FindName("FiveHourPresetBox"));
             Assert.Equal(84, presets.Width);
@@ -751,7 +782,7 @@ public sealed class MainWindowLayoutTests
                 Assert.False(string.IsNullOrWhiteSpace(
                     AutomationProperties.GetName(control))));
             var tabIndexes = controls.Select(KeyboardNavigation.GetTabIndex).ToArray();
-            Assert.Equal(Enumerable.Range(1, 65), tabIndexes);
+            Assert.Equal(Enumerable.Range(1, 66), tabIndexes);
             Assert.Equal(
                 "图片变换目标",
                 AutomationProperties.GetName(controls[15]));
@@ -763,7 +794,7 @@ public sealed class MainWindowLayoutTests
                 AutomationProperties.GetName(controls[48]));
             Assert.Equal(
                 "保存草稿",
-                AutomationProperties.GetName(controls[62]));
+                AutomationProperties.GetName(controls[63]));
             var projectName = Assert.IsType<TextBox>(
                 window.FindName("ProjectNameTextBox"));
             var displayName = Assert.IsType<TextBox>(

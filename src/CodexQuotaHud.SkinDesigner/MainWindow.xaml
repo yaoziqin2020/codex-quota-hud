@@ -1,6 +1,7 @@
 <Window x:Class="CodexQuotaHud.SkinDesigner.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:preview="clr-namespace:CodexQuotaHud.SkinDesigner.Preview"
         x:Name="DesignerWindow"
         Title="Codex Quota HUD 皮肤设计器"
         Width="1280"
@@ -659,12 +660,15 @@
                                           IsChecked="{Binding Synthetic.DetailsOpen, Mode=TwoWay}"
                                           AutomationProperties.Name="显示详情"
                                           KeyboardNavigation.TabIndex="54" />
-                                <CheckBox Margin="12,0,0,0" Content="动画"
+                                <CheckBox x:Name="AnimationsEnabledCheckBox"
+                                          Margin="12,0,0,0" Content="动画"
                                           IsChecked="{Binding Synthetic.AnimationsEnabled, Mode=TwoWay}"
                                           AutomationProperties.Name="启用预览动画"
                                           KeyboardNavigation.TabIndex="55" />
-                                <CheckBox Margin="12,0,0,0" Content="刷新中"
+                                <CheckBox x:Name="RefreshStateCheckBox"
+                                          Margin="12,0,0,0" Content="刷新中"
                                           IsChecked="{Binding Synthetic.IsRefreshing, Mode=TwoWay}"
+                                          IsEnabled="{Binding PreviewTools.CanEditRefreshCheckbox}"
                                           AutomationProperties.Name="模拟刷新状态"
                                           KeyboardNavigation.TabIndex="56" />
                             </StackPanel>
@@ -686,6 +690,28 @@
                                           IsChecked="{Binding PreviewTools.CompositionGuidesVisible, Mode=TwoWay}"
                                           AutomationProperties.Name="显示构图参考线"
                                           KeyboardNavigation.TabIndex="57" />
+                                <TextBlock Margin="12,0,6,0"
+                                           VerticalAlignment="Center"
+                                           Text="单项动画预演" />
+                                <ComboBox x:Name="AnimationAuditionBox"
+                                          Width="92"
+                                          SelectedValuePath="Tag"
+                                          SelectedValue="{Binding PreviewTools.AnimationAudition, Mode=TwoWay}"
+                                          AutomationProperties.Name="单项动画预演"
+                                          KeyboardNavigation.TabIndex="58">
+                                    <ComboBoxItem Content="全部"
+                                                  Tag="{x:Static preview:DesignerAnimationAudition.All}" />
+                                    <ComboBoxItem Content="转圈"
+                                                  Tag="{x:Static preview:DesignerAnimationAudition.Rotation}" />
+                                    <ComboBoxItem Content="呼吸"
+                                                  Tag="{x:Static preview:DesignerAnimationAudition.Breathing}" />
+                                    <ComboBoxItem Content="光晕"
+                                                  Tag="{x:Static preview:DesignerAnimationAudition.Glow}" />
+                                    <ComboBoxItem Content="浮动"
+                                                  Tag="{x:Static preview:DesignerAnimationAudition.Floating}" />
+                                    <ComboBoxItem Content="刷新加速"
+                                                  Tag="{x:Static preview:DesignerAnimationAudition.Refresh}" />
+                                </ComboBox>
                             </StackPanel>
                         </Border>
                         <Border x:Name="SyntheticDockGroup"
@@ -704,31 +730,31 @@
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Command="{Binding Synthetic.PreviewLeftEdgeCommand}"
                                         AutomationProperties.Name="预览左边缘停靠"
-                                        KeyboardNavigation.TabIndex="58" />
+                                        KeyboardNavigation.TabIndex="59" />
                                 <Button x:Name="PreviewRightButton" Content="右"
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.PreviewRightEdgeCommand}"
                                         AutomationProperties.Name="预览右边缘停靠"
-                                        KeyboardNavigation.TabIndex="59" />
+                                        KeyboardNavigation.TabIndex="60" />
                                 <Button x:Name="PreviewTopButton" Content="上"
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.PreviewTopEdgeCommand}"
                                         AutomationProperties.Name="预览上边缘停靠"
-                                        KeyboardNavigation.TabIndex="60" />
+                                        KeyboardNavigation.TabIndex="61" />
                                 <Button x:Name="PreviewBottomButton" Content="下"
                                         MinWidth="38" MinHeight="30" Padding="8,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.PreviewBottomEdgeCommand}"
                                         AutomationProperties.Name="预览下边缘停靠"
-                                        KeyboardNavigation.TabIndex="61" />
+                                        KeyboardNavigation.TabIndex="62" />
                                 <Button x:Name="ExpandPreviewButton" Content="展开"
                                         MinHeight="30" Padding="10,4"
                                         Margin="4,0,0,0"
                                         Command="{Binding Synthetic.ExpandCommand}"
                                         AutomationProperties.Name="展开预览 HUD"
-                                        KeyboardNavigation.TabIndex="62" />
+                                        KeyboardNavigation.TabIndex="63" />
                             </StackPanel>
                         </Border>
                     </WrapPanel>
@@ -750,17 +776,17 @@
                     <Button x:Name="SaveDraftButton" Content="保存草稿"
                             Click="SaveDraftButton_OnClick"
                             AutomationProperties.Name="保存草稿"
-                            KeyboardNavigation.TabIndex="63" />
+                            KeyboardNavigation.TabIndex="64" />
                     <Button x:Name="ApplyToHudButton" Margin="8,0,0,0" Content="应用到 HUD"
                             Command="{Binding Editor.Output.ApplyCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="应用到 HUD"
-                            KeyboardNavigation.TabIndex="64" />
+                            KeyboardNavigation.TabIndex="65" />
                     <Button x:Name="ExportPackageButton" Margin="8,0,0,0" Content="导出皮肤包"
                             Command="{Binding Editor.Output.ExportCommand}"
                             IsEnabled="False"
                             AutomationProperties.Name="导出皮肤包"
-                            KeyboardNavigation.TabIndex="65" />
+                            KeyboardNavigation.TabIndex="66" />
                 </StackPanel>
             </Grid>
         </Border>
