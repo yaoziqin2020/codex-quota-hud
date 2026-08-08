@@ -44,6 +44,33 @@ named save writes, Apply-to-HUD, export, window movement, preview tools, or
 package installation. Preview-only guides and animation audition never enter
 history.
 
+The editor publishes a real `Current` property-change notification after every
+accepted meaningful change. Controls that are not bound to `Current`
+(image-transform sliders and the two text enum selectors) are synchronized by
+one guarded window method. Undo/redo therefore restores the visible editor,
+the session document, and the live preview as one observable state without
+creating a second revision while controls are being synchronized.
+
+Installed acceptance exposed a pre-existing destructive image-storage defect:
+the Designer changed or deleted mutable slot files before named Save, so
+Discard could leave saved JSON pointing at missing or silently replaced bytes.
+Draft assets therefore use an optional Designer-only immutable storage
+locator. New image bytes are written as content-addressed leaves named
+`assets/sha256-<64 lowercase hex>.<png|jpg>`; `RelativePath` remains the
+canonical package path used by `.cqskin`, Apply, export, and runtime preview.
+Legacy drafts without the locator continue to resolve their existing canonical
+slot files. Replacement/removal never deletes a named or recovery-referenced
+blob, and v1.3.0 performs no eager blob garbage collection. Named Save commits
+the new locator through the existing atomic JSON swap; Discard deletes only the
+working recovery JSON, so the last named JSON still resolves its exact old
+bytes.
+
+This is an internal Designer draft extension only: draft schema remains `1`,
+legacy three-property references stay readable, and `.cqskin` schema and HUD
+minimum-version rules do not change. Once a draft is saved with the optional
+locator it requires Designer v1.3.0 or newer to reopen; older Designers already
+reject unknown draft properties and must not silently reinterpret it.
+
 ## UI and accessibility
 
 - Place `撤销` and `重做` in a compact edit-history toolbar at the top of the
@@ -63,11 +90,15 @@ history.
    image-mutated document without changing the named-save dirty baseline.
 3. Route successful image replacement/removal commits through that boundary;
    ordinary parameter/metadata edits continue to push undoable snapshots.
-4. Add two Designer commands owned by `DesignerViewModel`. They call the
+4. Store newly imported draft images as immutable content-addressed blobs and
+   keep package paths separate from Designer storage locators.
+5. Add two Designer commands owned by `DesignerViewModel`. They call the
    session operations and publish `CanExecuteChanged` after undoable changes
    and image boundaries.
-5. Bind toolbar buttons and window input bindings to those commands.
-6. Dispose/unsubscribe the commands with `DesignerViewModel`; no global input
+6. Publish `PropertyChanged(nameof(Current))` and synchronize unbound editor
+   controls after meaningful changes.
+7. Bind toolbar buttons and window input bindings to those commands.
+8. Dispose/unsubscribe the commands with `DesignerViewModel`; no global input
    hook or process-wide state is introduced.
 
 ## Error and lifetime handling
@@ -98,6 +129,11 @@ UI commands/bindings do not exist.
   the buttons.
 - Image workflow tests: a successful replacement/removal establishes the
   history boundary; failed or cancelled mutations do not clear prior history.
+- Persistence tests: replace/remove then Discard reopens the exact named JSON
+  and bytes; Save reopens replacement bytes; recovery reopens its own immutable
+  bytes; legacy drafts without a storage locator still open.
+- Real-window tests: Undo/Redo refresh bound fields, image transforms, text
+  selectors, and value labels without producing an extra revision.
 - Focused Designer tests pass, followed by the full four-assembly serial
   Release suite and a zero-warning Release build.
 - Rebuild Setup/ZIP as v1.3.0, rerun the applicable installer checks, upgrade

@@ -13,6 +13,7 @@
 - Work only in `C:\Users\yaozi\Documents\Codex\Projects\CodexQuotaHud\.worktrees\inno-setup-installer-20260731`; never use an old conversation worktree.
 - Preserve the user-owned untracked `tmp/` directory: do not read, modify, delete, stage, or commit it.
 - Version stays `1.3.0`; this is a candidate rebuild, not a new version number.
+- Draft schema stays `1`; `storageRelativePath` is optional, legacy three-property drafts remain readable, and `.cqskin` schema/minimum HUD version do not change. A draft saved with the new optional property requires Designer v1.3.0 or newer to reopen.
 - Undo/redo covers parameter and metadata snapshots only: text layout, colors, quota-ring settings, animation settings, and descriptive fields.
 - A successful image replacement or removal starts a new history segment; undo/redo cannot cross that image operation.
 - A cancelled, failed, rejected, or no-op image operation must not clear existing undo/redo history.
@@ -497,9 +498,317 @@ Confirm `git status --short` contains no tracked change and only the pre-existin
 
 ---
 
+### Task 5: Refresh every visible editor control after history navigation
+
+**Files:**
+- Modify: `src/CodexQuotaHud.SkinDesigner/UI/DesignerViewModel.cs`
+- Modify: `src/CodexQuotaHud.SkinDesigner/MainWindow.xaml.cs`
+- Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/UI/DesignerViewModelTests.cs`
+- Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/UI/MainWindowLayoutTests.cs`
+
+**Interfaces:**
+- Consumes: existing `SkinDraftSession.MeaningfulChange`, `DesignerViewModel.Current`, `SyncImageTransformControls`, and text selection handlers.
+- Produces: `DesignerViewModel : INotifyPropertyChanged`, event `PropertyChanged`, and one `PropertyChanged(nameof(Current))` publication per accepted meaningful change.
+- Produces: `MainWindow.SyncManualEditorControls()` which refreshes image-transform sliders plus text-weight/text-placement selectors without adding a revision.
+
+- [ ] **Step 1: Add failing view-model and real-window regressions**
+
+In `DesignerViewModelTests.cs`, subscribe to `PropertyChanged`, perform one accepted text-offset edit and one rejected/no-op edit, and assert only the accepted edit publishes `nameof(DesignerViewModel.Current)` exactly once.
+
+In `MainWindowLayoutTests.cs`, add one STA real-window test with literal expectations:
+
+```csharp
+var offset = Assert.IsType<Slider>(window.FindName("TextOffsetYSlider"));
+var offsetText = Assert.IsType<TextBlock>(window.FindName("TextOffsetYValueText"));
+offset.Value = 12;
+Assert.Equal(12, window.Editor.Current.Theme.TextOffsetY);
+Assert.Equal("+12 DIP", offsetText.Text);
+var editedRevision = window.Editor.Current.Revision;
+
+await window.Editor.UndoCommand.ExecuteAsync();
+window.UpdateLayout();
+Assert.Equal(0, window.Editor.Current.Theme.TextOffsetY);
+Assert.Equal(0, offset.Value);
+Assert.Equal("0 DIP", offsetText.Text);
+
+await window.Editor.RedoCommand.ExecuteAsync();
+window.UpdateLayout();
+Assert.Equal(12, offset.Value);
+Assert.Equal("+12 DIP", offsetText.Text);
+Assert.Equal(editedRevision + 2, window.Editor.Current.Revision);
+```
+
+The same test must set a non-default image transform, `SkinTextWeight.Bold`, and `SkinTextPlacement.LabelAboveNumber`, navigate Undo/Redo, and assert the corresponding sliders/combobox indexes exactly match the restored model. Record the revision immediately before manual-control synchronization and prove synchronization itself does not increment it.
+
+- [ ] **Step 2: Run focused tests and verify RED**
+
+```powershell
+dotnet test .\tests\CodexQuotaHud.SkinDesigner.Tests\CodexQuotaHud.SkinDesigner.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~DesignerViewModelTests|FullyQualifiedName~MainWindowLayoutTests"
+```
+
+Expected: `PropertyChanged` API is missing at compile time and the real-window control assertions fail under the current stale binding/manual-control behavior.
+
+- [ ] **Step 3: Publish `Current` changes from the view model**
+
+Implement `INotifyPropertyChanged` on `DesignerViewModel`:
+
+```csharp
+public event PropertyChangedEventHandler? PropertyChanged;
+```
+
+At the beginning of `OnMeaningfulChange`, raise exactly:
+
+```csharp
+PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Current)));
+```
+
+Retain the existing image/animation/preview/command notifications. Rejected/no-op edits emit no `MeaningfulChange`, so no property event is manufactured.
+
+- [ ] **Step 4: Synchronize the unbound window controls safely**
+
+Add `_updatingTextControls` and:
+
+```csharp
+private void SyncManualEditorControls()
+{
+    SyncImageTransformControls();
+    SyncTextControls();
+}
+
+private void SyncTextControls()
+{
+    _updatingTextControls = true;
+    try
+    {
+        TextWeightBox.SelectedIndex = Editor.Current.Theme.TextWeight switch
+        {
+            SkinTextWeight.Regular => 0,
+            SkinTextWeight.SemiBold => 1,
+            SkinTextWeight.Bold => 2,
+            _ => -1
+        };
+        TextPlacementBox.SelectedIndex = Editor.Current.Theme.TextPlacement switch
+        {
+            SkinTextPlacement.Centered => 0,
+            SkinTextPlacement.NumberAboveLabel => 1,
+            SkinTextPlacement.LabelAboveNumber => 2,
+            _ => -1
+        };
+    }
+    finally
+    {
+        _updatingTextControls = false;
+    }
+}
+```
+
+Use `SyncManualEditorControls()` after `InitializeComponent()` and before `_editorControlsReady = true`. In `MainWindow.OnMeaningfulChange`, notify recovery and dispatch the same sync method onto the window Dispatcher when required. Both text selection handlers must return while `_updatingTextControls` is true.
+
+- [ ] **Step 5: Run focused GREEN and full Designer GREEN**
+
+Run the Step 2 command, then the full Designer project. Required: zero failed/skipped; visible model, bound controls, manual controls, preview, and history remain synchronized.
+
+- [ ] **Step 6: Commit Task 5**
+
+```powershell
+git add -- src/CodexQuotaHud.SkinDesigner/UI/DesignerViewModel.cs src/CodexQuotaHud.SkinDesigner/MainWindow.xaml.cs tests/CodexQuotaHud.SkinDesigner.Tests/UI/DesignerViewModelTests.cs tests/CodexQuotaHud.SkinDesigner.Tests/UI/MainWindowLayoutTests.cs
+git commit -m "fix: refresh designer controls after history changes"
+```
+
+---
+
+### Task 6: Backward-compatible immutable draft-asset contract and storage lease
+
+**Files:**
+- Modify: `src/CodexQuotaHud.SkinDesigner/Drafts/SkinDraftDocument.cs`
+- Modify: `src/CodexQuotaHud.SkinDesigner/Drafts/DraftJsonCodec.cs`
+- Modify: `src/CodexQuotaHud.SkinDesigner/Drafts/SkinDraftValidator.cs`
+- Create: `src/CodexQuotaHud.SkinDesigner/Drafts/DraftAssetStorage.cs`
+- Modify: `src/CodexQuotaHud.SkinDesigner/Drafts/IDraftFileOperations.cs`
+- Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/Drafts/DraftJsonCodecTests.cs`
+- Create: `tests/CodexQuotaHud.SkinDesigner.Tests/Drafts/DraftAssetFileOperationsTests.cs`
+
+**Interfaces:**
+- Produces: optional fourth constructor parameter `string? StorageRelativePath = null` on `DraftAssetReference`; all three-argument callers remain source compatible.
+- Produces: immutable locators `assets/sha256-<64 lowercase hex>.png|jpg`; `RelativePath` retains the canonical package path.
+- Produces: `DraftAssetStorage.CreateContentRelativePath`, `ResolveOwnedLeaf`, `IsValidContentRelativePath`, and `MatchesContent`.
+- Produces: `IDesignerDraftAssetsLease.MoveOperationToImmutable(string operationLeafName, string contentAddressedLeafName)` using no-replace rename semantics.
+
+- [ ] **Step 1: Add failing JSON/validation tests**
+
+Add literal legacy and addressed fixtures. Required canonical addressed order is:
+
+```json
+{"slot":"center","relativePath":"assets/center.png","storageRelativePath":"assets/sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png","originalFileName":"center.png"}
+```
+
+Prove legacy three-property schema-1 JSON round-trips byte-canonically with `StorageRelativePath == null`; addressed JSON write/parse/write is canonical; unknown/duplicate properties still fail; and invalid values fail with code `draft.asset.storage-path.invalid` at `$.assets[n].storageRelativePath`. Invalid matrix: uppercase hash, 63/65 hex chars, wrong prefix, slash traversal, backslash, absolute path, `.jpeg`, unsupported extension, and extension different from `RelativePath`.
+
+- [ ] **Step 2: Add failing storage-lease tests**
+
+Test that an operation leaf can promote once to `sha256-<hash>.png`; a second no-replace promotion to the same leaf fails without changing existing bytes; fixed canonical leaves still work; traversal/reparse/invalid content leaves fail before mutation.
+
+- [ ] **Step 3: Run focused RED**
+
+```powershell
+dotnet test .\tests\CodexQuotaHud.SkinDesigner.Tests\CodexQuotaHud.SkinDesigner.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~DraftJsonCodecTests|FullyQualifiedName~DraftAssetFileOperationsTests"
+```
+
+Expected: missing fourth property/helper/lease API and addressed-path validation failures.
+
+- [ ] **Step 4: Implement the optional contract and strict codec**
+
+Change the record to:
+
+```csharp
+public sealed record DraftAssetReference(
+    SkinAssetSlot Slot,
+    string RelativePath,
+    string OriginalFileName,
+    string? StorageRelativePath = null);
+```
+
+Keep draft schema version `1`. Writer omits the property when null; otherwise writes it between `relativePath` and `originalFileName`. Replace the asset strict-object check with one that requires the three legacy properties and permits the optional property exactly once. Reader treats absence as null and present non-string/null as invalid.
+
+- [ ] **Step 5: Implement content-address helpers and validation**
+
+`CreateContentRelativePath` hashes exact encoded bytes with SHA-256 and returns lowercase hex under `assets/`; it derives `.png` or `.jpg` from the already validated canonical package path. `ResolveOwnedLeaf` returns `Path.GetFileName(StorageRelativePath ?? RelativePath)`. Validation must enforce the exact locator grammar and extension match. `MatchesContent` recomputes exact SHA-256 and compares ordinal lowercase hex.
+
+- [ ] **Step 6: Add no-replace immutable promotion**
+
+Extend the lease and native rename plumbing with `replaceIfExists`. Existing canonical/JSON promotions keep their current replacement semantics. `MoveOperationToImmutable` validates both leaves and calls rename with replacement disabled; it never deletes an existing blob.
+
+- [ ] **Step 7: Run focused GREEN and commit**
+
+Run the Step 3 command, then full Designer tests. Commit only Task 6 files:
+
+```powershell
+git commit -m "feat: add immutable draft asset references"
+```
+
+---
+
+### Task 7: Append-only image mutations and exact document resolution
+
+**Files:**
+- Modify: `src/CodexQuotaHud.SkinDesigner/Images/DesignerImageService.cs`
+- Modify: `src/CodexQuotaHud.SkinDesigner/Documents/DesignerDocumentService.cs`
+- Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/Images/DesignerImageServiceTests.cs`
+- Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/Images/DesignerImageCommitterIntegrationTests.cs`
+- Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/Documents/DesignerDocumentServiceTests.cs`
+- Create: `tests/CodexQuotaHud.SkinDesigner.Tests/Documents/DraftAssetPersistenceIntegrationTests.cs`
+- Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/Output/DraftPackageBuilderTests.cs`
+- Modify: `tests/CodexQuotaHud.SkinDesigner.Tests/Preview/DraftPreviewDocumentBuilderTests.cs`
+
+**Interfaces:**
+- Consumes: Task 6 optional storage locator, content helper, and no-replace promotion.
+- Guarantees: import writes/reuses immutable bytes then commits the reference; remove changes only session reference/assets; neither deletes a named/recovery-referenced file.
+- Guarantees: addressed document load verifies locator hash; legacy null locator resolves the canonical fixed leaf.
+
+- [ ] **Step 1: Replace unsafe mutable-slot expectations with failing append-only tests**
+
+Required behaviors:
+
+- replacing a slot retains exact old bytes and creates/reuses the exact addressed blob;
+- an existing addressed blob is reused only when its bytes match its hash;
+- mismatched existing blob fails closed without session mutation;
+- rejected/cancelled import preserves prior reference/history and never deletes prior blobs;
+- remove commits reference removal, starts the existing history boundary, and retains physical bytes;
+- direct removal-after-undo asserts both history directions clear, addressing the Task 2 deferred minor.
+
+- [ ] **Step 2: Add failing document conversion/resolution tests**
+
+Test legacy null locators, different named/recovery addressed locators, package/edit-installed conversion to addressed leaves, missing blob, and hash mismatch code `document.asset-hash-mismatch` at the asset location. Assert returned `SkinAsset.RelativePath` is still canonical, never the storage locator.
+
+- [ ] **Step 3: Add failing cross-component persistence and package-path tests**
+
+Using real unique storage roots, test exact byte hashes for named replacement +
+Discard, named removal + Discard, replacement + Save, replacement recovery
+reopen, named-save failure, and a crash before recovery flush. Each case must
+reopen through the real `DesignerDocumentService`, not just inspect file
+existence. Add builder/preview cases whose canonical `RelativePath` differs
+from `StorageRelativePath`; assert `.cqskin` declarations/archive entries and
+runtime preview use only the canonical package path and never expose the
+Designer-only locator.
+
+- [ ] **Step 4: Run focused RED**
+
+```powershell
+dotnet test .\tests\CodexQuotaHud.SkinDesigner.Tests\CodexQuotaHud.SkinDesigner.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~DesignerImageServiceTests|FullyQualifiedName~DesignerImageCommitterIntegrationTests|FullyQualifiedName~DesignerDocumentServiceTests|FullyQualifiedName~DraftAssetPersistenceIntegrationTests|FullyQualifiedName~DraftPackageBuilderTests|FullyQualifiedName~DraftPreviewDocumentBuilderTests"
+```
+
+Expected: current import deletes/replaces canonical files, remove deletes bytes, and document loading ignores addressed locators.
+
+- [ ] **Step 5: Rewrite import as append-only promotion**
+
+After existing decode/pixel validation, compute the package path and `StorageRelativePath`. If the blob exists, read and require exact hash/content match. Otherwise write/flush/read/decode an operation leaf and promote with `MoveOperationToImmutable`; on a same-content race, re-read the winner and require exact match. Commit a four-property reference. If session rejects or cancellation arrives after promotion, delete only remaining operation-temporary files; retain the unreferenced immutable blob.
+
+- [ ] **Step 6: Rewrite removal as reference-only mutation**
+
+`RemoveAsync` retains draft-id/slot/cancellation validation and calls `CommitRemove(slot)` without quarantining/deleting any canonical or addressed asset. Delete old mutable-slot tomb/rollback helpers only after all callers/tests move to append-only behavior.
+
+- [ ] **Step 7: Convert/import and load exact storage bytes**
+
+Package/edit-installed project creation writes each decoded package asset as an immutable blob and stores its locator. Loading uses `DraftAssetStorage.ResolveOwnedLeaf(reference)`; null locators use the legacy leaf. For addressed blobs, verify exact hash before decoding. Keep package `RelativePath` on returned `SkinAsset` and all validation limits.
+
+- [ ] **Step 8: Run focused/full GREEN and commit**
+
+Run Step 4, then full Designer suite. Commit all Task 7 files:
+
+```powershell
+git commit -m "fix: preserve named draft image bytes"
+```
+
+---
+
+### Task 8: Fixed-candidate verification, package replacement, installed acceptance, and handoff
+
+**Files:**
+- Modify only the same six Task 4 handoff documents.
+- Generate but do not commit the same three v1.3.0 release assets.
+
+**Interfaces:**
+- Consumes: Tasks 5–7 and the exact Task 4 evidence method.
+- Produces: a new source-identified v1.3.0 local candidate; Task 4 hashes/source identity become historical failed-candidate evidence.
+
+- [ ] **Step 1: Run fresh serial source gates**
+
+Run Core, Skins, App, Designer separately in Release, zero skipped; build solution with zero warnings/errors; `git diff --check` clean.
+
+- [ ] **Step 2: Rebuild v1.3.0 assets and rerun installer matrix 9/9**
+
+Use the exact Task 4 packaging/matrix commands. Record new full hashes/sizes/versions; never retain Task 4 failed-candidate hashes as current.
+
+- [ ] **Step 3: Upgrade real installation with bounded backup/restore**
+
+Preserve exact user settings, all drafts/assets/recovery, installed skins, exchange packages, startup, and maintainer preview shortcut. Verify installed App/Designer match new publish payload and source commit.
+
+- [ ] **Step 4: Re-run every installed row, including both prior blockers**
+
+Required direct outcomes:
+
+- Undo/Redo buttons and `Ctrl+Z`/`Ctrl+Y` restore model, preview, all visible bound/manual controls, and correct history availability;
+- new edit clears redo; Save/reopen persists;
+- replace/remove then Discard reopens exact old JSON and image bytes with no `document.asset-missing`;
+- replace then Save reopens exact new bytes;
+- picker cancellation preserves history;
+- six auditions remain distinct;
+- Apply dialog identity and actual HUD switch pass;
+- untouched v1.2.3 import completes and displays effective offset/gap `0/0`;
+- tray menu actions run on the exact installed formal HUD;
+- close Designer while guides are On and one non-All audition is active, then prove the formal HUD remains free of both states.
+
+Any failed/partial/not-run required row keeps the candidate not release-ready. Restore user state exactly after testing.
+
+- [ ] **Step 5: Update six handoff docs and commit evidence only**
+
+Record fresh source/tests/hashes/matrix/install/UI/restoration evidence. Keep unsigned status explicit. No push/main/tag/release until user accepts the installed fixed candidate.
+
+---
+
 ## Plan self-review record
 
-- Spec coverage: Tasks 1–3 cover availability, parameter/metadata undo, redo branching, image history boundaries, dirty baseline, shared commands, disposal, compact toolbar, accessibility, shortcuts, and minimum-width layout. Task 4 covers serial verification, candidate replacement, isolated installer matrix, real upgrade, direct installed checks, state restoration, and honest handoff.
+- Spec coverage: Tasks 1–3 cover history and UI discovery. Task 4 records the failed installed candidate. Tasks 5–7 cover visible-control synchronization and immutable named/recovery image ownership. Task 8 repeats all release/install/UI gates on the fixed source.
 - Completeness scan: every production edit has a named file, exact interface, RED command, GREEN command, and observable acceptance result.
-- Type consistency: Task 1 produces `CanUndo`, `CanRedo`, and `ApplyAsHistoryBoundary`; Task 2 consumes those exact members and produces `UndoCommand`/`RedoCommand`; Task 3 binds those exact command properties; Task 4 tests the same user-visible operations.
-- Safety check: no step reads or mutates `tmp/`; no remote action is authorized; image bytes are not placed in history; successful image mutations cannot be undone into a missing file reference.
+- Type consistency: Task 1 produces history APIs; Task 2 produces commands; Task 3 binds them; Task 5 refreshes consumers; Task 6 produces `StorageRelativePath` and immutable lease APIs; Task 7 consumes those exact names; Task 8 tests the installed result.
+- Safety check: no step reads or mutates `tmp/`; no remote action is authorized; image bytes are not placed in history; immutable named/recovery references prevent Discard from deleting or silently replacing saved bytes; no eager garbage collector is introduced.
