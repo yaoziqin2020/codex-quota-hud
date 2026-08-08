@@ -778,7 +778,8 @@ Record sizes and SHA-256 hashes; verify manifest lines; inspect ZIP entries; ins
 
 - ZIP contains normal HUD and PowerShell fallback only, no Designer;
 - Setup defaults Designer unchecked and includes it only when selected;
-- Setup does not create a normal desktop shortcut by default;
+- Setup selects creation of the normal desktop shortcut by default, allows the
+  user to deselect it, and the shortcut launches without `--preview`;
 - startup remains `--background` when selected;
 - historical installed skins, drafts, recovery, exchange packages, settings, and desktop Developer Preview shortcut are not part of installer cleanup.
 
