@@ -21,7 +21,7 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
         IReadOnlyDictionary<SkinAssetSlot, SkinAsset>> _previewUpdate;
     private readonly Func<
         Func<SkinDraftDocument, SkinDraftDocument>,
-        bool> _meaningfulCommit;
+        bool> _imageMutationCommit;
     private IImagePicker? _imagePicker;
     private DesignerImageService? _imageService;
     private int _disposed;
@@ -45,7 +45,7 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
             SkinDraftDocument,
             IReadOnlyDictionary<SkinAssetSlot, SkinAsset>>? previewUpdate,
         Func<Func<SkinDraftDocument, SkinDraftDocument>, bool>?
-            meaningfulCommit = null)
+            imageMutationCommit = null)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         ArgumentNullException.ThrowIfNull(assets);
@@ -54,7 +54,8 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
             pair => CloneAsset(pair.Value));
         _assetsView = new ReadOnlyDictionary<SkinAssetSlot, SkinAsset>(_assets);
         _previewUpdate = previewUpdate ?? ((_, _) => { });
-        _meaningfulCommit = meaningfulCommit ?? _session.ApplyMeaningful;
+        _imageMutationCommit = imageMutationCommit ??
+            _session.ApplyAsHistoryBoundary;
 
         BasicInformation = new BasicInformationEditorViewModel(this);
         Images = new ImageEditorViewModel(this);
@@ -72,6 +73,21 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
             Animation
         ];
 
+        UndoCommand = new AsyncRelayCommand(
+            _ =>
+            {
+                _session.TryUndo();
+                return Task.CompletedTask;
+            },
+            () => _session.CanUndo);
+        RedoCommand = new AsyncRelayCommand(
+            _ =>
+            {
+                _session.TryRedo();
+                return Task.CompletedTask;
+            },
+            () => _session.CanRedo);
+
         _session.MeaningfulChange += OnMeaningfulChange;
     }
 
@@ -88,6 +104,10 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
     public AnimationEditorViewModel Animation { get; }
 
     public IReadOnlyList<EditorSectionViewModel> Sections { get; }
+
+    public AsyncRelayCommand UndoCommand { get; }
+
+    public AsyncRelayCommand RedoCommand { get; }
 
     public SkinDraftDocument Current => _session.Current;
 
@@ -203,6 +223,8 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
         }
 
         _session.MeaningfulChange -= OnMeaningfulChange;
+        UndoCommand.Dispose();
+        RedoCommand.Dispose();
         Output?.Dispose();
         Images.Dispose();
     }
@@ -231,7 +253,7 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
         var accepted = false;
         try
         {
-            accepted = _meaningfulCommit(draft => draft with
+            accepted = _imageMutationCommit(draft => draft with
             {
                 Assets = ReplaceReference(draft.Assets, slot, reference)
             });
@@ -275,7 +297,7 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
         var accepted = false;
         try
         {
-            accepted = _meaningfulCommit(draft => draft with
+            accepted = _imageMutationCommit(draft => draft with
             {
                 Assets = RemoveReference(draft.Assets, slot)
             });
@@ -305,6 +327,8 @@ public sealed class DesignerViewModel : IDisposable, IDesignerImageMutationCommi
                 _assets.ToDictionary(
                     pair => pair.Key,
                     pair => CloneAsset(pair.Value))));
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
     }
 
     private async Task<ImageMutationResult?> RemoveConfiguredImageAsync(

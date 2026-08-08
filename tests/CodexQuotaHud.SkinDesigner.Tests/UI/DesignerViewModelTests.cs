@@ -11,6 +11,48 @@ public sealed class DesignerViewModelTests
         DateTimeOffset.Parse("2026-08-02T00:00:00Z");
 
     [Fact]
+    public async Task HistoryCommands_RestoreExactDraftAndPreviewAndBranchRedo()
+    {
+        using var sut = CreateViewModel(out var session, out var previewed);
+        Assert.False(sut.UndoCommand.CanExecute(null));
+        Assert.False(sut.RedoCommand.CanExecute(null));
+
+        Assert.True(sut.Text.SetTextOffsetY(12).Succeeded);
+        Assert.True(sut.UndoCommand.CanExecute(null));
+        await sut.UndoCommand.ExecuteAsync();
+        Assert.Equal(0, session.Current.Theme.TextOffsetY);
+        Assert.Equal(0, previewed[^1].Theme.TextOffsetY);
+        Assert.False(sut.UndoCommand.CanExecute(null));
+        Assert.True(sut.RedoCommand.CanExecute(null));
+
+        await sut.RedoCommand.ExecuteAsync();
+        Assert.Equal(12, session.Current.Theme.TextOffsetY);
+        Assert.Equal(12, previewed[^1].Theme.TextOffsetY);
+
+        await sut.UndoCommand.ExecuteAsync();
+        Assert.True(sut.Text.SetTextLineGap(6).Succeeded);
+        Assert.False(sut.RedoCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Dispose_DisablesHistoryCommandsAndIgnoresLaterSessionEvents()
+    {
+        var sut = CreateViewModel(out var session, out _);
+        var undo = sut.UndoCommand;
+        var redo = sut.RedoCommand;
+
+        sut.Dispose();
+
+        Assert.False(undo.CanExecute(null));
+        Assert.False(redo.CanExecute(null));
+        var exception = Record.Exception(() => session.Apply(draft => draft with
+        {
+            Theme = draft.Theme with { TextOffsetY = 12 }
+        }));
+        Assert.Null(exception);
+    }
+
+    [Fact]
     public void Constructor_ExposesExactlySixOrderedEditorSections()
     {
         var sut = CreateViewModel(out _, out _);
@@ -203,7 +245,16 @@ public sealed class DesignerViewModelTests
                 Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
                 Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
                 CreatedAt,
-                SemanticVersion.Parse("1.1.1")),
+                SemanticVersion.Parse("1.1.1")) with
+            {
+                Assets = new Dictionary<SkinAssetSlot, DraftAssetReference>
+                {
+                    [SkinAssetSlot.Decoration] = new(
+                        SkinAssetSlot.Decoration,
+                        asset.RelativePath,
+                        "decoration.png")
+                }
+            },
             () => next = next.AddSeconds(1));
         using var sut = new DesignerViewModel(
             session,

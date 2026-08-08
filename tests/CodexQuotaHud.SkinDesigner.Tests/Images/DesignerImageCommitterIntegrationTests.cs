@@ -9,6 +9,113 @@ namespace CodexQuotaHud.SkinDesigner.Tests.Images;
 public sealed class DesignerImageCommitterIntegrationTests
 {
     [Fact]
+    public async Task Import_AfterUndoStartsNewHistoryBoundaryAndRetainsCurrentAsset()
+    {
+        using var temporary = new TemporaryDirectory();
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var session = CreateSession(draftId);
+        using var designer = new DesignerViewModel(
+            session,
+            new Dictionary<SkinAssetSlot, SkinAsset>(),
+            (_, _) => { });
+        var service = new DesignerImageService(
+            new SkinStoragePaths(temporary.Path),
+            designer);
+        var source = Path.Combine(temporary.SourceRoot, "background.png");
+        await File.WriteAllBytesAsync(source, AlphaPng);
+
+        Assert.True(designer.Text.SetTextOffsetY(12).Succeeded);
+        Assert.True(session.TryUndo());
+        Assert.False(session.CanUndo);
+        Assert.True(session.CanRedo);
+
+        var imported = await service.ImportAsync(
+            draftId,
+            SkinAssetSlot.Background,
+            source);
+
+        Assert.True(imported.Succeeded, Format(imported.Errors));
+        Assert.False(session.CanUndo);
+        Assert.False(session.CanRedo);
+        Assert.True(session.HasUnsavedChanges);
+        Assert.Equal("assets/background.png",
+            session.Current.Assets[SkinAssetSlot.Background].RelativePath);
+        Assert.Equal(AlphaPng, designer.Assets[SkinAssetSlot.Background].Content);
+    }
+
+    [Fact]
+    public async Task Import_WhenCommitDelegateThrowsRollsBackBytesAssetsAndHistory()
+    {
+        using var temporary = new TemporaryDirectory();
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var session = CreateSession(draftId);
+        using var designer = new DesignerViewModel(
+            session,
+            new Dictionary<SkinAssetSlot, SkinAsset>(),
+            (_, _) => { },
+            _ => throw new InvalidOperationException("Rejected by test seam."));
+        var paths = new SkinStoragePaths(temporary.Path);
+        var service = new DesignerImageService(paths, designer);
+        var source = Path.Combine(temporary.SourceRoot, "background.png");
+        await File.WriteAllBytesAsync(source, AlphaPng);
+
+        Assert.True(designer.Text.SetTextOffsetY(12).Succeeded);
+        Assert.True(session.TryUndo());
+        var canUndoBefore = session.CanUndo;
+        var canRedoBefore = session.CanRedo;
+
+        var rejected = await service.ImportAsync(
+            draftId,
+            SkinAssetSlot.Background,
+            source);
+
+        Assert.False(rejected.Succeeded);
+        Assert.Contains(rejected.Errors,
+            error => error.Code == "image.session-rejected");
+        Assert.Equal(canUndoBefore, session.CanUndo);
+        Assert.Equal(canRedoBefore, session.CanRedo);
+        Assert.Empty(session.Current.Assets);
+        Assert.Empty(designer.Assets);
+        Assert.False(File.Exists(Path.Combine(
+            new DraftProjectPaths(paths.DraftsRoot, draftId).AssetsRoot,
+            "background.png")));
+    }
+
+    [Fact]
+    public async Task Import_WhenCancelledBeforeCommitRetainsHistory()
+    {
+        using var temporary = new TemporaryDirectory();
+        var draftId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var session = CreateSession(draftId);
+        using var designer = new DesignerViewModel(
+            session,
+            new Dictionary<SkinAssetSlot, SkinAsset>(),
+            (_, _) => { });
+        var service = new DesignerImageService(
+            new SkinStoragePaths(temporary.Path),
+            designer);
+        var source = Path.Combine(temporary.SourceRoot, "background.png");
+        await File.WriteAllBytesAsync(source, AlphaPng);
+
+        Assert.True(designer.Text.SetTextOffsetY(12).Succeeded);
+        Assert.True(session.TryUndo());
+        var canUndoBefore = session.CanUndo;
+        var canRedoBefore = session.CanRedo;
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.ImportAsync(
+                draftId,
+                SkinAssetSlot.Background,
+                source,
+                new CancellationToken(canceled: true)));
+
+        Assert.Equal(canUndoBefore, session.CanUndo);
+        Assert.Equal(canRedoBefore, session.CanRedo);
+        Assert.Empty(session.Current.Assets);
+        Assert.Empty(designer.Assets);
+    }
+
+    [Fact]
     public async Task Import_ThroughDesignerCommitterUpdatesReferenceAssetAndPreviewOnce()
     {
         using var temporary = new TemporaryDirectory();
