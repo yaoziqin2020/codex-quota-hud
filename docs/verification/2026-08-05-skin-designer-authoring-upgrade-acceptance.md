@@ -693,6 +693,18 @@ the fixed installed candidate. Push, merge, tag, upload, GitHub Release, and
 public readback are authorized; none had been performed at this acceptance
 checkpoint.
 
+### Public release closeout
+
+The accepted checkpoint commit
+`c0f6ae5a51112dfde8098f97e26022dfbc4ef309` was fast-forwarded to `main`.
+GitHub CI run `31266376831` passed all steps in `22m24s`, including tests,
+Release build, ephemeral candidate packaging, and isolated installer smoke.
+Annotated tag `v1.3.0` points to that accepted commit. The latest non-draft,
+non-prerelease GitHub Release is
+`https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0`.
+Setup, normal-HUD ZIP, and `SHA256SUMS.txt` were downloaded from the public
+release and matched their recorded sizes and SHA-256 values exactly.
+
 ## Historical Task 4 undo/redo candidate acceptance
 
 This section is the historical record for source

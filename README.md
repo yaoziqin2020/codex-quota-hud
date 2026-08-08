@@ -19,7 +19,7 @@ and a numeric tray icon without scraping web pages or storing credentials.
 > This is an independent open-source project and is not an official OpenAI
 > product.
 
-## v1.3.0 accepted candidate / 已验收候选版
+## v1.3.0 release / 正式版
 
 The fixed local candidate from source
 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` is **accepted for publication**.
@@ -33,8 +33,10 @@ retry. Policy prohibited a UIA fallback, so the required fixed-path UI rows
 still need a healthy Computer Use session or user manual smoke. Overall
 automated evidence remains `NOT RUN`. On 2026-08-09, the user completed the
 installed hands-on checks, reported no issues, and accepted this exact
-candidate. User-manual acceptance is `PASS`; push, merge, tag, upload, and
-GitHub Release are authorized.
+candidate. User-manual acceptance is `PASS`. The accepted commit is on
+`main`, CI passed, and [v1.3.0](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0)
+is now the latest public release. All three public assets were downloaded and
+their sizes and SHA-256 values matched the release record exactly.
 
 Task 8 provenance supplements preserve two important qualifications. The
 historical `12-post-install.json` captured uninstall DisplayVersion as `null`;
@@ -47,9 +49,8 @@ replayable commands, raw-log hashes, and the zero aggregate smoke-root readback
 are in `21-command-state-provenance-supplement.json`. The literal backup/restore
 shell transcript was not retained; only the bounded method and before/after
 evidence are claimed.
-Until publication completes, the
-[latest public release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
-remains `v1.2.3`.
+The [latest public release](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0)
+is `v1.3.0`.
 
 从源码 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc` 重建的 fixed 本地候选版
 **已通过用户实装验收并获准发布**。fresh serial Release 测试 `1561/1561`、Release build、
@@ -58,9 +59,9 @@ remains `v1.2.3`.
 `node_repl exec context not found`；按工具安全规则不得改用 UIA 后备路径。因此撤销/重做、
 图像 Discard/Save、旧包导入、托盘和关闭隔离等直接 installed 行仍需健康的 Computer Use
 会话。2026-08-09，用户完成实装手测并反馈无问题；自动行仍诚实保留为 `NOT RUN`，
-独立的用户手测验收为 `PASS`。现已允许 push、merge、tag、上传和创建 GitHub Release。
-在 v1.3.0 正式发布完成前，[最新公开版本](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.2.3)
-仍为 `v1.2.3`。
+独立的用户手测验收为 `PASS`。验收提交已进入 `main`，CI 已通过，
+[v1.3.0](https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0)
+已成为最新公开正式版；三份公开下载资产均已重新下载并通过大小与 SHA-256 复核。
 
 Setup automatically offers Simplified Chinese or English, installs only for
 the current Windows user, and needs no administrator permission. It installs

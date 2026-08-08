@@ -1,6 +1,6 @@
 # Current Task
 
-## v1.3.0 fixed candidate — user accepted, publication authorized
+## v1.3.0 released — user accepted and public assets verified
 
 Task 8 rebuilt and installed the fixed local candidate from source commit
 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`. Fresh serial Release verification
@@ -60,9 +60,13 @@ Task 4's failed `fbdf23c` candidate remains historical evidence. On
 including the previously open rows, with no issues and accepted this exact
 candidate for publication. Automated rows remain `NOT RUN` as historical tool
 evidence; the user-manual acceptance gate is `PASS`. Overall status is
-`PASS — user accepted`; push, `main` integration, tag, GitHub Release, upload,
-and public readback are now authorized. The latest public release remains
-`v1.2.3` only until the v1.3.0 publication workflow completes.
+`PASS — user accepted`. Commit `c0f6ae5a51112dfde8098f97e26022dfbc4ef309`
+was fast-forwarded to `main`; CI run `31266376831` passed its complete test,
+build, ephemeral-package, and isolated-installer-smoke workflow in `22m24s`.
+Annotated tag `v1.3.0` points to that accepted commit. GitHub Release
+`https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0` is the
+latest non-draft, non-prerelease release. All three public downloads were
+downloaded again and matched the exact sizes and SHA-256 values above.
 
 Public Setup behavior is unchanged: startup and the normal `Codex Quota HUD`
 desktop shortcut are selected by default and may be deselected; the normal

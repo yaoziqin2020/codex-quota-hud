@@ -1,5 +1,19 @@
 # AI Change Log
 
+## 2026-08-09 — v1.3.0 published and public assets verified
+
+- Fast-forwarded the accepted release commit
+  `c0f6ae5a51112dfde8098f97e26022dfbc4ef309` to `main` and pushed the retained
+  feature branch without creating a PR.
+- GitHub CI run `31266376831` passed the full test, build, ephemeral-package,
+  and isolated-installer-smoke workflow in `22m24s`.
+- Created annotated tag `v1.3.0` on the accepted commit and published
+  `https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0` as the
+  latest non-draft, non-prerelease release.
+- Uploaded Setup, normal-HUD ZIP, and `SHA256SUMS.txt`; downloaded all three
+  public assets again and verified exact size and SHA-256 equality. Signing
+  status remains `NotSigned` as already disclosed.
+
 ## 2026-08-09 — v1.3.0 installed candidate accepted for publication
 
 - The user completed the installed hands-on checks for the exact fixed

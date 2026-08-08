@@ -8,7 +8,7 @@ remaining Codex five-hour and weekly quota reported by the local
 
 Repository: https://github.com/yaoziqin2020/codex-quota-hud
 
-## v1.3.0 fixed local candidate — user accepted for publication
+## v1.3.0 released — user accepted and public assets verified
 
 Task 8 rebuilt and installed the fixed candidate from
 `cd5634cfd7fd50b7ceb2875aa6661113cc5953cc`. The authoring upgrade adds two
@@ -72,9 +72,13 @@ is running and Designer is closed. Task 4's `fbdf23c` failures remain
 historical. On 2026-08-09, the user reported completing all installed
 hands-on checks with no issues and accepted this exact candidate for
 publication. Automated rows remain `NOT RUN` as historical tool evidence;
-user-manual acceptance is `PASS`. Overall status is release-ready and remote
-publication is authorized. Public `v1.2.3` remains latest only until the
-v1.3.0 release workflow completes.
+user-manual acceptance is `PASS`. Commit
+`c0f6ae5a51112dfde8098f97e26022dfbc4ef309` is on `main`; CI run
+`31266376831` passed in `22m24s`. Annotated tag `v1.3.0` targets that accepted
+commit, and the latest non-draft/non-prerelease GitHub Release is
+`https://github.com/yaoziqin2020/codex-quota-hud/releases/tag/v1.3.0`.
+Setup, ZIP, and checksum assets were downloaded from the public release and
+matched their recorded sizes and SHA-256 values exactly.
 
 Distribution boundaries remain fixed: ordinary Setup defaults startup plus
 the normal desktop shortcut, both deselectable and without `--preview`;
